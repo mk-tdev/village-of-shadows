@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Village of Shadows — Werewolf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#ece4d3;
+    --ink-dim:#a89cae;
+    --ink-faint:#7d7288;
+    --amber:#e8a33d;
+    --amber-dim:#8a6a35;
+    --blood:#c0495a;
+    --sage:#7fa87f;
+    --night1:#100e1a;
+    --night2:#1c1830;
+    --day1:#2e2313;
+    --day2:#3d2c17;
+    --card:rgba(255,255,255,0.045);
+    --card-border:rgba(232,163,61,0.22);
+    --card-border-strong:rgba(232,163,61,0.5);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    background:radial-gradient(ellipse at top, var(--night2), var(--night1) 70%);
+    background-attachment:fixed;
+    min-height:100vh;
+    transition:background 1.2s ease;
+    -webkit-font-smoothing:antialiased;
+  }
+  body.phase-day{
+    background:radial-gradient(ellipse at top, var(--day2), var(--day1) 70%);
+  }
+  .app{max-width:1080px;margin:0 auto;padding:28px 20px 60px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
+  h1{font-family:'Spectral',serif;font-weight:600;font-size:28px;margin:0;letter-spacing:0.3px;}
+  .subtitle{font-size:13px;color:var(--ink-faint);margin-top:4px;}
+  .status-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .badge{
+    display:flex;align-items:center;gap:7px;
+    background:var(--card);border:1px solid var(--card-border);
+    padding:7px 14px;border-radius:20px;font-size:13px;color:var(--ink-dim);
+  }
+  .badge svg{width:15px;height:15px;flex-shrink:0;}
+  .toggle-wrap{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;user-select:none;}
+  .toggle{
+    position:relative;width:38px;height:21px;background:rgba(255,255,255,0.1);
+    border-radius:11px;transition:background 0.2s;flex-shrink:0;
+  }
+  .toggle.on{background:var(--amber-dim);}
+  .toggle::after{
+    content:'';position:absolute;top:2px;left:2px;width:17px;height:17px;
+    background:var(--ink);border-radius:50%;transition:transform 0.2s;
+  }
+  .toggle.on::after{transform:translateX(17px);background:var(--amber);}
+
+  .board{display:grid;grid-template-columns:270px 1fr;gap:22px;}
+  @media (max-width:760px){.board{grid-template-columns:1fr;}}
+
+  .players{display:flex;flex-direction:column;gap:9px;}
+  .player-card{
+    background:var(--card);border:1px solid var(--card-border);border-radius:12px;
+    padding:11px 13px;display:flex;align-items:center;gap:11px;
+    transition:border-color 0.3s, box-shadow 0.3s;
+  }
+  .player-card.active{border-color:var(--card-border-strong);box-shadow:0 0 0 1px var(--card-border-strong), 0 0 16px rgba(232,163,61,0.15);}
+  .player-card.dead{opacity:0.45;}
+  .avatar{
+    width:36px;height:36px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Spectral',serif;font-weight:600;font-size:15px;
+    background:linear-gradient(160deg, rgba(232,163,61,0.25), rgba(232,163,61,0.05));
+    border:1px solid var(--card-border-strong);color:var(--amber);
+    position:relative;
+  }
+  .pulse-ring{position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--amber);animation:pulse 1.4s ease-out infinite;}
+  @keyframes pulse{0%{opacity:0.9;transform:scale(0.9);}100%{opacity:0;transform:scale(1.35);}}
+  .p-info{min-width:0;flex:1;}
+  .p-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  .p-name .you-tag{font-size:10px;font-weight:500;color:var(--amber);background:rgba(232,163,61,0.15);padding:1px 6px;border-radius:8px;}
+  .p-meta{font-size:11.5px;color:var(--ink-faint);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;}
+  .role-chip{
+    font-size:10.5px;padding:1px 7px;border-radius:8px;font-weight:500;
+  }
+  .role-werewolf{background:rgba(192,73,90,0.2);color:#e59aa4;}
+  .role-seer{background:rgba(126,168,216,0.18);color:#a8c6e8;}
+  .role-doctor{background:rgba(127,168,127,0.2);color:#a8d0a8;}
+  .role-villager{background:rgba(255,255,255,0.08);color:var(--ink-dim);}
+  .skull{width:13px;height:13px;color:var(--ink-faint);}
+
+  .feed-wrap{display:flex;flex-direction:column;gap:12px;}
+  .feed{
+    background:rgba(0,0,0,0.22);border:1px solid var(--card-border);border-radius:14px;
+    padding:16px 16px 8px;height:500px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;
+  }
+  .feed::-webkit-scrollbar{width:8px;}
+  .feed::-webkit-scrollbar-thumb{background:rgba(232,163,61,0.25);border-radius:8px;}
+
+  .entry{font-size:13.5px;line-height:1.55;animation:fadein 0.35s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+  .entry-system{
+    text-align:center;color:var(--amber);font-family:'Spectral',serif;font-size:13.5px;
+    font-style:italic;padding:6px 0;border-top:1px solid rgba(232,163,61,0.15);border-bottom:1px solid rgba(232,163,61,0.15);
+  }
+  .entry-death{text-align:center;color:var(--blood);font-weight:600;padding:6px 0;}
+  .entry-winner{text-align:center;color:var(--amber);font-family:'Spectral',serif;font-size:17px;font-weight:600;padding:10px 0;}
+  .entry-statement{display:flex;gap:9px;align-items:flex-start;}
+  .entry-thinking{display:flex;gap:9px;align-items:center;color:var(--ink-faint);font-style:italic;}
+  .dot-flicker{display:inline-flex;gap:3px;}
+  .dot-flicker span{width:4px;height:4px;border-radius:50%;background:var(--ink-faint);animation:blink 1s infinite;}
+  .dot-flicker span:nth-child(2){animation-delay:0.2s;}
+  .dot-flicker span:nth-child(3){animation-delay:0.4s;}
+  @keyframes blink{0%,100%{opacity:0.2;}50%{opacity:1;}}
+  .entry-avatar{
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;font-size:11px;
+    display:flex;align-items:center;justify-content:center;font-weight:600;
+    background:rgba(232,163,61,0.12);color:var(--amber);border:1px solid var(--card-border);
+    font-family:'Spectral',serif;
+  }
+  .entry-body{flex:1;min-width:0;}
+  .entry-name{font-weight:600;font-size:12.5px;}
+  .entry-thought{color:var(--ink-faint);font-size:12px;font-style:italic;margin-top:2px;}
+  .entry-said{margin-top:2px;}
+  .entry-vote{color:var(--ink-dim);}
+  .entry-vote b{color:var(--amber);font-weight:600;}
+  .private-tag{font-size:9.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-faint);border:1px solid var(--card-border);padding:0px 5px;border-radius:5px;margin-left:6px;}
+  .entry.private .entry-name, .entry.private .entry-said{color:#c99a9a;}
+
+  .controls{
+    background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:16px;
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .controls-hint{font-size:12px;color:var(--ink-faint);}
+  .btn{
+    background:linear-gradient(160deg, var(--amber), #c8842a);color:#1c1408;border:none;
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;padding:11px 18px;border-radius:9px;
+    cursor:pointer;transition:transform 0.15s, box-shadow 0.15s;align-self:flex-start;
+  }
+  .btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(232,163,61,0.25);}
+  .btn:active{transform:translateY(0);}
+  .btn-secondary{background:rgba(255,255,255,0.08);color:var(--ink);}
+  textarea{
+    width:100%;background:rgba(0,0,0,0.25);border:1px solid var(--card-border);border-radius:9px;
+    color:var(--ink);font-family:'Inter',sans-serif;font-size:13.5px;padding:10px 12px;resize:vertical;min-height:64px;
+  }
+  textarea:focus{outline:none;border-color:var(--card-border-strong);}
+  .vote-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .vote-btn{
+    background:rgba(255,255,255,0.06);border:1px solid var(--card-border);color:var(--ink);
+    padding:9px 15px;border-radius:9px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;
+    transition:border-color 0.15s, background 0.15s;
+  }
+  .vote-btn:hover{border-color:var(--card-border-strong);background:rgba(232,163,61,0.1);}
+
+  .overlay{
+    position:fixed;inset:0;background:rgba(10,8,16,0.82);display:flex;align-items:center;justify-content:center;
+    padding:20px;z-index:10;
+  }
+  .overlay-card{
+    background:var(--night2);border:1px solid var(--card-border-strong);border-radius:16px;
+    padding:34px 30px;text-align:center;max-width:400px;
+  }
+  .overlay-card h2{font-family:'Spectral',serif;font-size:24px;margin:0 0 10px;color:var(--amber);}
+  .overlay-card p{color:var(--ink-dim);font-size:14px;margin:0 0 20px;}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>Village of Shadows</h1>
+      <div class="subtitle">A multi-agent game of Werewolf, played out in real time</div>
+    </div>
+    <div class="status-row">
+      <div class="badge" id="phase-badge"></div>
+      <div class="badge" id="round-badge"></div>
+      <div class="toggle-wrap" onclick="toggleGodView()">
+        <span>God view</span>
+        <div class="toggle on" id="god-toggle"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="board">
+    <div class="players" id="players"></div>
+    <div class="feed-wrap">
+      <div class="feed" id="feed"></div>
+      <div class="controls" id="controls"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay">
+  <div class="overlay-card">
+    <h2 id="overlay-title"></h2>
+    <p id="overlay-text"></p>
+    <button class="btn" onclick="startGame()">Play again</button>
+  </div>
+</div>
+
+<script>
+const ICONS = {
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+  skull: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C7 2 4 5.5 4 10c0 2.5 1.2 4.3 2.5 5.5V19a1 1 0 001 1h1.2v-2h1v2h4.6v-2h1v2H16a1 1 0 001-1v-3.5C18.8 14.3 20 12.5 20 10c0-4.5-3-8-8-8z"/><circle cx="9.2" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.8" cy="10.5" r="1.1" fill="currentColor" stroke="none"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+};
+
+const NAMES = ['Mara','Tomas','Elin','Bram','Sable','Corvin'];
+const PERSONALITIES = ['sharp-eyed','hot-headed','anxious','easygoing','sly','stoic'];
+
+let state = null;
+let resumeContinue = null, resumeStatement = null, resumeVote = null;
+let gameToken = 0;
+
+function shuffle(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function initState(){
+  const roles = shuffle(['werewolf','werewolf','seer','doctor','villager','villager']);
+  const personalities = shuffle(PERSONALITIES);
+  const players = NAMES.map((name,i)=>({
+    id:'p'+i, name, personality:personalities[i], role:roles[i], alive:true, isHuman:false
+  }));
+  players.unshift({id:'you', name:'You', personality:'—', role:'villager', alive:true, isHuman:true});
+  return {
+    players,
+    phase:'lobby',
+    round:1,
+    log:[],
+    godView:true,
+    seerKnowledge:{},
+    activePlayerId:null,
+    awaiting:null,
+    voteOptions:[],
+    winner:null
+  };
+}
+
+function pushLog(entry){
+  entry.seq = state.log.length;
+  state.log.push(entry);
+  render();
+  const feed = document.getElementById('feed');
+  feed.scrollTop = feed.scrollHeight;
+}
+function popThinking(){
+  const idx = state.log.findIndex(e=>e.type==='thinking');
+  if(idx>-1) state.log.splice(idx,1);
+}
+
+async function askAgent(system, user){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:1000,
+      system,
+      messages:[{role:'user', content:user}]
+    })
+  });
+  const data = await res.json();
+  const text = (data.content||[]).map(b=>b.text||'').join('\n');
+  const clean = text.replace(/```json|```/g,'').trim();
+  try{ return JSON.parse(clean); }
+  catch(e){ return null; }
+}
+
+function personaContext(p){
+  let ctx = `You are ${p.name}, a ${p.personality} villager playing a social deduction party game called Werewolf. Your secret role is: ${p.role}. Stay fully in character. Keep everything you say short — one or two sentences, natural spoken dialogue, no stage directions.`;
+  if(p.role==='werewolf'){
+    const teammate = state.players.find(q=>q.role==='werewolf' && q.id!==p.id);
+    ctx += ` Your fellow werewolf is ${teammate.name}. You must never reveal that you or ${teammate.name} are werewolves — deflect suspicion and blend in.`;
+  }
+  if(p.role==='seer') ctx += ` Each night you secretly learn one player's true role.`;
+  if(p.role==='doctor') ctx += ` Each night you may secretly protect one player (including yourself) from being killed.`;
+  return ctx;
+}
+
+function alivePlayers(){ return state.players.filter(p=>p.alive); }
+function aliveNamesExcept(id){ return alivePlayers().filter(p=>p.id!==id).map(p=>p.name); }
+
+function waitForContinue(label){
+  state.awaiting = {kind:'continue', label};
+  render();
+  return new Promise(res=>{ resumeContinue = res; });
+}
+function waitForHumanStatement(){
+  state.awaiting = {kind:'statement'};
+  render();
+  return new Promise(res=>{ resumeStatement = res; });
+}
+function waitForHumanVote(options){
+  state.awaiting = {kind:'vote'};
+  state.voteOptions = options;
+  render();
+  return new Promise(res=>{ resumeVote = res; });
+}
+function onContinueClick(){
+  state.awaiting = null;
+  if(resumeContinue){ const r = resumeContinue; resumeContinue = null; r(); }
+}
+function onSubmitStatement(){
+  const ta = document.getElementById('human-input');
+  const val = (ta && ta.value.trim()) || '(says nothing)';
+  state.awaiting = null;
+  if(resumeStatement){ const r = resumeStatement; resumeStatement = null; r(val); }
+}
+function onVoteClick(targetId){
+  state.awaiting = null;
+  if(resumeVote){ const r = resumeVote; resumeVote = null; r(targetId); }
+}
+function toggleGodView(){
+  state.godView = !state.godView;
+  render();
+}
+
+function roundTranscriptText(){
+  return state.log
+    .filter(e=>e.round===state.round && e.type==='statement')
+    .map(e=>`${e.name}: ${e.said}`)
+    .join('\n') || '(no one has spoken yet)';
+}
+
+async function nightAction(player, targetPool, question){
+  const myToken = gameToken;
+  pushLog({type:'thinking', name:player.name, round:state.round});
+  state.activePlayerId = player.id; render();
+  const res = await askAgent(
+    personaContext(player),
+    `It is night ${state.round}. ${question}\nOptions: ${targetPool.join(', ')}\nRespond with ONLY JSON: {"thought": "one brief sentence of private reasoning", "target": "exact name from the options"}`
+  );
+  if(myToken !== gameToken) return null;
+  popThinking();
+  state.activePlayerId = null;
+  let target = res && targetPool.includes(res.target) ? res.target : targetPool[Math.floor(Math.random()*targetPool.length)];
+  let thought = (res && res.thought) || 'considers the options in silence.';
+  return {target, thought};
+}
+
+async function runNightPhase(){
+  document.body.classList.remove('phase-day');
+  state.phase = 'night';
+  pushLog({type:'system', text:`Night ${state.round} falls over the village.`});
+
+  const werewolves = alivePlayers().filter(p=>p.role==='werewolf');
+  const seer = alivePlayers().find(p=>p.role==='seer');
+  const doctor = alivePlayers().find(p=>p.role==='doctor');
+
+  const proposals = [];
+  for(const wolf of werewolves){
+    const pool = alivePlayers().filter(p=>p.role!=='werewolf').map(p=>p.name);
+    if(pool.length===0) break;
+    const r = await nightAction(wolf, pool, `Choose which villager the werewolves should attack tonight.`);
+    if(!r) return;
+    pushLog({type:'werewolf', private:true, name:wolf.name, thought:r.thought, said:`proposes attacking ${r.target}.`, round:state.round});
+    proposals.push(r.target);
+  }
+  let victimName = null;
+  if(proposals.length){
+    const tally = {};
+    proposals.forEach(n=>tally[n]=(tally[n]||0)+1);
+    victimName = Object.keys(tally).sort((a,b)=>tally[b]-tally[a])[0];
+  }
+
+  let savedName = null;
+  if(doctor){
+    const pool = alivePlayers().map(p=>p.name);
+    const r = await nightAction(doctor, pool, `Choose who to secretly protect tonight.`);
+    if(!r) return;
+    pushLog({type:'doctor', private:true, name:doctor.name, thought:r.thought, said:`decides to protect ${r.target}.`, round:state.round});
+    savedName = r.target;
+  }
+
+  if(seer){
+    const pool = aliveNamesExcept(seer.id);
+    if(pool.length){
+      const r = await nightAction(seer, pool, `Choose one player to secretly investigate. You will learn their true role.`);
+      if(!r) return;
+      const target = state.players.find(p=>p.name===r.target);
+      state.seerKnowledge[seer.id] = state.seerKnowledge[seer.id] || {};
+      state.seerKnowledge[seer.id][target.name] = target.role;
+      pushLog({type:'seer', private:true, name:seer.name, thought:r.thought, said:`investigates ${target.name} — discovers they are a ${target.role}.`, round:state.round});
+    }
+  }
+
+  if(victimName && victimName === savedName){
+    pushLog({type:'system', text:`Someone crept toward ${victimName} in the dark — but they were protected. No one died last night.`});
+  } else if(victimName){
+    const victim = state.players.find(p=>p.name===victimName);
+    victim.alive = false;
+    pushLog({type:'death', text:`Dawn breaks. The village finds ${victim.name} dead. They were a ${victim.role}.`});
+  } else {
+    pushLog({type:'system', text:`A quiet night. No one was harmed.`});
+  }
+
+  document.body.classList.add('phase-day');
+  await waitForContinue('Begin day discussion');
+}
+
+async function runDayDiscussion(){
+  state.phase = 'day-discuss';
+  pushLog({type:'system', text:`Day ${state.round} discussion begins.`});
+  const order = alivePlayers();
+  for(const p of order){
+    if(gameToken !== gameToken) return;
+    if(p.isHuman){
+      state.activePlayerId = p.id; render();
+      state.phase = 'day-discuss-human';
+      const said = await waitForHumanStatement();
+      state.phase = 'day-discuss';
+      state.activePlayerId = null;
+      pushLog({type:'statement', name:'You', said, round:state.round, human:true});
+      continue;
+    }
+    const myToken = gameToken;
+    pushLog({type:'thinking', name:p.name, round:state.round});
+    state.activePlayerId = p.id; render();
+    let knowledge = '';
+    if(p.role==='seer' && state.seerKnowledge[p.id]){
+      const facts = Object.entries(state.seerKnowledge[p.id]).map(([n,r])=>`${n} is a ${r}`).join('; ');
+      knowledge = `Privately, you know: ${facts}.`;
+    }
+    if(p.role==='werewolf'){
+      const teammate = state.players.find(q=>q.role==='werewolf' && q.id!==p.id);
+      knowledge = teammate.alive ? `Privately, your fellow werewolf ${teammate.name} is still alive and you must protect that secret.` : '';
+    }
+    const res = await askAgent(
+      personaContext(p),
+      `It is day ${state.round}. Here is the discussion so far this round:\n${roundTranscriptText()}\n${knowledge}\nAlive players: ${alivePlayers().map(x=>x.name).join(', ')}.\nGive a short in-character spoken statement — accuse someone, defend yourself, or share a suspicion. Respond with ONLY JSON: {"thought": "private reasoning, not spoken aloud", "statement": "what you say aloud"}`
+    );
+    if(myToken !== gameToken) return;
+    popThinking();
+    state.activePlayerId = null;
+    const said = (res && res.statement) || 'stays quiet, watching the others.';
+    const thought = (res && res.thought) || '';
+    pushLog({type:'statement', name:p.name, said, thought, round:state.round});
+  }
+  await waitForContinue('Open the vote');
+}
+
+async function runVoting(){
+  state.phase = 'day-vote';
+  pushLog({type:'system', text:`The village must vote. Who will be cast out?`});
+  const alive = alivePlayers();
+  const tally = {};
+  for(const p of alive){
+    const options = alive.filter(q=>q.id!==p.id);
+    if(p.isHuman){
+      state.activePlayerId = p.id; render();
+      state.phase = 'day-vote-human';
+      const targetId = await waitForHumanVote(options);
+      state.phase = 'day-vote';
+      state.activePlayerId = null;
+      const target = state.players.find(q=>q.id===targetId);
+      tally[target.name] = (tally[target.name]||0)+1;
+      pushLog({type:'vote', name:'You', target:target.name, round:state.round, human:true});
+      continue;
+    }
+    const myToken = gameToken;
+    pushLog({type:'thinking', name:p.name, round:state.round});
+    state.activePlayerId = p.id; render();
+    const pool = options.map(o=>o.name);
+    const res = await askAgent(
+      personaContext(p),
+      `It is time to vote in round ${state.round}. Full discussion this round:\n${roundTranscriptText()}\nAlive players you can vote for: ${pool.join(', ')}.\nChoose who to vote to eliminate. Respond with ONLY JSON: {"thought": "private reasoning", "target": "exact name from the list"}`
+    );
+    if(myToken !== gameToken) return;
+    popThinking();
+    state.activePlayerId = null;
+    const target = (res && pool.includes(res.target)) ? res.target : pool[Math.floor(Math.random()*pool.length)];
+    const thought = (res && res.thought) || '';
+    tally[target] = (tally[target]||0)+1;
+    pushLog({type:'vote', name:p.name, target, thought, round:state.round});
+  }
+
+  const maxVotes = Math.max(...Object.values(tally));
+  const topNames = Object.keys(tally).filter(n=>tally[n]===maxVotes);
+  const eliminatedName = topNames[Math.floor(Math.random()*topNames.length)];
+  const eliminated = state.players.find(p=>p.name===eliminatedName);
+  eliminated.alive = false;
+  pushLog({type:'death', text:`The village has spoken. ${eliminated.name} is cast out — they were a ${eliminated.role}.`});
+  await waitForContinue('Continue');
+}
+
+function checkWin(){
+  const wolves = alivePlayers().filter(p=>p.role==='werewolf').length;
+  const others = alivePlayers().filter(p=>p.role!=='werewolf').length;
+  if(wolves===0) return 'villagers';
+  if(wolves>=others) return 'werewolves';
+  return null;
+}
+
+async function runGame(){
+  gameToken++;
+  state = initState();
+  render();
+  pushLog({type:'system', text:'Seven villagers gather as the sun sets. Among them, two are not what they seem.'});
+  await waitForContinue('Begin the first night');
+
+  while(true){
+    await runNightPhase();
+    let w = checkWin();
+    if(w){ endGame(w); return; }
+    await runDayDiscussion();
+    await runVoting();
+    w = checkWin();
+    if(w){ endGame(w); return; }
+    state.round++;
+    await waitForContinue('Continue to the next night');
+  }
+}
+
+function endGame(winner){
+  state.phase = 'gameover';
+  state.winner = winner;
+  pushLog({type:'winner', text: winner==='villagers' ? 'The village has rooted out every werewolf. Villagers win!' : 'The werewolves have taken the village. Werewolves win!'});
+  render();
+  document.getElementById('overlay-title').textContent = winner==='villagers' ? 'Villagers win' : 'Werewolves win';
+  document.getElementById('overlay-text').textContent = winner==='villagers'
+    ? 'Every werewolf has been rooted out. The village is safe — for now.'
+    : 'The werewolves now equal or outnumber the villagers. The night has claimed the village.';
+  document.getElementById('overlay').classList.remove('hidden');
+}
+
+function startGame(){
+  document.getElementById('overlay').classList.add('hidden');
+  runGame();
+}
+
+function roleChipHtml(p){
+  if(!p.role) return '';
+  const known = p.isHuman || !p.alive || state.godView;
+  if(!known) return '';
+  return `<span class="role-chip role-${p.role}">${p.role}</span>`;
+}
+
+function renderPlayers(){
+  const el = document.getElementById('players');
+  el.innerHTML = state.players.map(p=>{
+    const initial = p.name[0];
+    const active = state.activePlayerId===p.id;
+    return `<div class="player-card ${active?'active':''} ${!p.alive?'dead':''}">
+      <div class="avatar">${initial}${active?'<div class="pulse-ring"></div>':''}</div>
+      <div class="p-info">
+        <div class="p-name">${p.name}${p.isHuman?'<span class="you-tag">YOU</span>':''}</div>
+        <div class="p-meta">
+          ${!p.alive ? ICONS.skull.replace('<svg ', '<svg class="skull" ') : `<span>${p.isHuman ? 'you' : p.personality}</span>`}
+          ${roleChipHtml(p)}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFeed(){
+  const el = document.getElementById('feed');
+  el.innerHTML = state.log.filter(e=>{
+    if(e.private && !state.godView) return false;
+    return true;
+  }).map(e=>{
+    if(e.type==='thinking'){
+      return `<div class="entry entry-thinking"><span>${e.name} is thinking</span><span class="dot-flicker"><span></span><span></span><span></span></span></div>`;
+    }
+    if(e.type==='system'){
+      return `<div class="entry entry-system">${e.text}</div>`;
+    }
+    if(e.type==='death'){
+      return `<div class="entry entry-death">${e.text}</div>`;
+    }
+    if(e.type==='winner'){
+      return `<div class="entry entry-winner">${e.text}</div>`;
+    }
+    if(e.type==='statement'){
+      return `<div class="entry entry-statement">
+        <div class="entry-avatar">${e.name[0]}</div>
+        <div class="entry-body">
+          <div class="entry-name">${e.name}</div>
+          ${e.thought && state.godView ? `<div class="entry-thought">${e.thought}</div>` : ''}
+          <div class="entry-said">${e.said}</div>
+        </div>
+      </div>`;
+    }
+    if(e.type==='vote'){
+      return `<div class="entry entry-statement">
+        <div class="entry-avatar">${e.name[0]}</div>
+        <div class="entry-body">
+          <div class="entry-name">Vote</div>
+          ${e.thought && state.godView ? `<div class="entry-thought">${e.thought}</div>` : ''}
+          <div class="entry-vote">${e.name} votes to eliminate <b>${e.target}</b></div>
+        </div>
+      </div>`;
+    }
+    if(e.type==='werewolf' || e.type==='seer' || e.type==='doctor'){
+      return `<div class="entry entry-statement private">
+        <div class="entry-avatar">${e.name[0]}</div>
+        <div class="entry-body">
+          <div class="entry-name">${e.name} <span class="private-tag">${e.type}</span></div>
+          ${e.thought ? `<div class="entry-thought">${e.thought}</div>` : ''}
+          <div class="entry-said">${e.said}</div>
+        </div>
+      </div>`;
+    }
+    return '';
+  }).join('');
+}
+
+function renderControls(){
+  const el = document.getElementById('controls');
+  const a = state.awaiting;
+  if(!a){ el.innerHTML = `<div class="controls-hint">The village is deciding what happens next...</div>`; return; }
+  if(a.kind==='continue'){
+    el.innerHTML = `<div class="controls-hint">Take a moment to read, then continue.</div>
+      <button class="btn" onclick="onContinueClick()">${a.label}</button>`;
+  } else if(a.kind==='statement'){
+    el.innerHTML = `<div class="controls-hint">It's your turn to speak.</div>
+      <textarea id="human-input" placeholder="What do you want to say to the village?"></textarea>
+      <button class="btn" onclick="onSubmitStatement()">Speak</button>`;
+  } else if(a.kind==='vote'){
+    el.innerHTML = `<div class="controls-hint">Cast your vote.</div>
+      <div class="vote-grid">${state.voteOptions.map(o=>`<button class="vote-btn" onclick="onVoteClick('${o.id}')">${o.name}</button>`).join('')}</div>`;
+  }
+}
+
+function renderHeader(){
+  const phaseBadge = document.getElementById('phase-badge');
+  const roundBadge = document.getElementById('round-badge');
+  const isNight = state.phase==='night' || state.phase==='lobby';
+  phaseBadge.innerHTML = `${isNight?ICONS.moon:ICONS.sun}<span>${isNight?'Night':'Day'}</span>`;
+  roundBadge.innerHTML = `${ICONS.eye}<span>Round ${state.round}</span>`;
+  document.getElementById('god-toggle').className = 'toggle' + (state.godView?' on':'');
+}
+
+function render(){
+  if(!state) return;
+  renderHeader();
+  renderPlayers();
+  renderFeed();
+  renderControls();
+}
+
+startGame();
+</script>
+</body>
+</html>
