@@ -31,7 +31,7 @@ export function useGameStream(sessionId: string): GameStreamState {
     return () => source.close();
   }, [sessionId]);
 
-  return { game, active, connected, errorMessage, currentNode, metrics };
+  return { game, active, connected, errorMessage, currentNode, metrics, activity };
 }
 ```
 ([useGameStream.ts](../../frontend/lib/useGameStream.ts))
@@ -65,19 +65,28 @@ Two things worth noticing in the `"log"` handler specifically:
 ## The debug panel: making the orchestration itself visible
 
 ```tsx
-/** Collapsible engineering debug panel: the live LangGraph orchestration
- * graph (introspected from the compiled graph itself... with the
- * currently-executing node highlighted from "node" SSE events) and a
+/** Engineering debug panel, embedded directly in the page (not a sliding
+ * overlay) so the live LangGraph orchestration graph (introspected from the
+ * compiled graph itself -- see routers/graph.py -- with the
+ * currently-executing node highlighted from "node" SSE events) and the
  * per-agent token/latency metrics table (accumulated from "decision" SSE
- * events...). This is the part of the project meant to showcase the
- * agentic-engineering internals, not just play the game. */
+ * events emitted in agent_turn.py) are both visible to watch update live
+ * while a game plays, with no click required to reveal them. This is the
+ * part of the project meant to showcase the agentic-engineering internals,
+ * not just play the game. */
 ```
-([DebugPanel.tsx:8-14](../../frontend/components/DebugPanel.tsx#L8-L14))
+([DebugPanel.tsx:15-23](../../frontend/components/DebugPanel.tsx#L15-L23))
 
 This panel exists for a different audience than the rest of the UI: not
 "someone playing Werewolf," but "someone who wants to see how the
-multi-agent orchestration actually works while it runs." It has two halves,
-each fed by a different concept from earlier in this guide:
+multi-agent orchestration actually works while it runs." It's worth being
+explicit about a design choice baked into that docstring: earlier this panel
+was a collapsible slide-in overlay you had to click a floating button to
+open. It's now a plain embedded section of the page, always rendered, no
+toggle — because "click to reveal" is the wrong default for something meant
+to be watched continuously *while a game plays*, not inspected occasionally
+after the fact. The panel has three parts, each fed by a different concept
+from earlier in this guide:
 
 **The graph-flow diagram is introspected, not hand-drawn.**
 
@@ -122,7 +131,7 @@ source.addEventListener("decision", (e) => {
   });
 });
 ```
-([useGameStream.ts:80-97](../../frontend/lib/useGameStream.ts#L80-L97))
+([useGameStream.ts:113-131](../../frontend/lib/useGameStream.ts#L113-L131))
 
 Every `"decision"` event (published from `_record_decision` in
 `agent_turn.py` — see
@@ -136,12 +145,132 @@ no real API response to measure) surfaces in the UI as a small "est." badge
 next to the model name, so it's honest about which numbers are real API
 usage and which are a `len(text) // 4` guess.
 
-## Why this pairing matters as a concept, not just a feature
+**The live activity feed turns the same events into a chronological log.**
 
-Individually, "introspect the graph" and "log token usage" are both
-unremarkable. Put together and streamed live, they're the two questions
-someone auditing an agentic system actually asks first: *where is
-execution right now*, and *what is each agent call costing*. Building a
-debug view around exactly those two questions — rather than, say, a generic
-log viewer — is what makes this panel double as a teaching tool for how the
-whole system is wired, not just a game feature.
+The graph diagram answers "where is execution right now" and the metrics
+table answers "what has each agent cost so far" — but neither answers "what
+is happening, in order, right now," which is exactly what someone watching
+an agent system actually wants to follow moment to moment: whose turn it
+is, when the orchestrator moves between nodes, when an MCP session opens,
+which tool gets called, and when a decision finally lands. Rather than a
+fourth SSE event type, the feed is built entirely by re-reading events the
+hook already receives for other reasons — `"node"`, `"turn"`, and
+`"decision"` — plus one new one, `"mcp"`, added specifically for this (see
+[06-model-agnostic-adapters-and-tool-calling.md](06-model-agnostic-adapters-and-tool-calling.md)
+for where it's published):
+
+```ts
+function pushActivity(kind: ActivityEntry["kind"], text: string) {
+  activityIdRef.current += 1;
+  const entry: ActivityEntry = { id: activityIdRef.current, kind, text };
+  setActivity((prev) => [entry, ...prev].slice(0, MAX_ACTIVITY_ENTRIES));
+}
+...
+source.addEventListener("mcp", (e) => {
+  const data: McpEvent = JSON.parse((e as MessageEvent).data);
+  pushActivity(
+    "mcp",
+    data.action === "bind"
+      ? `${data.name} opened an MCP session (${data.phase})`
+      : `${data.name} called MCP tool “${data.tool}”`
+  );
+});
+```
+([useGameStream.ts:52-56, 103-111](../../frontend/lib/useGameStream.ts#L52-L56))
+
+Each existing listener (`"turn"`, `"node"`, `"decision"`) got one extra line
+calling `pushActivity(...)` alongside whatever it already did — the feed is
+additive to logic that was already there, not a parallel system. Entries
+are capped at `MAX_ACTIVITY_ENTRIES` (60) and prepended newest-first, so the
+feed reads like a live ticker rather than an ever-growing page. In
+[DebugPanel.tsx](../../frontend/components/DebugPanel.tsx), this renders as
+a plain list appended *below* the existing metrics table, in space that was
+previously just empty — the graph and metrics table markup are untouched;
+the feed is a pure addition sharing the same column.
+
+## Pan and zoom without a pan/zoom library
+
+The graph diagram is a fixed-size SVG (`520×740`) hand-positioned to match
+the real node layout (see [02](02-langgraph-state-machine.md)) — with 14+
+nodes stacked vertically, it doesn't fit legibly at any one fixed scale, so
+[`GraphFlow.tsx`](../../frontend/components/GraphFlow.tsx) implements its
+own drag-to-pan, scroll-to-zoom canvas rather than pulling in a diagramming
+library for a graph this small and static.
+
+The trick that keeps the math simple: instead of manipulating the SVG's
+`viewBox` (which would mean converting every mouse position between screen
+pixels and viewBox units), the pan/zoom state is applied as a plain CSS
+`transform` on the SVG element itself, with `transform-origin: 0 0`:
+
+```tsx
+<svg
+  className="graph-flow-svg"
+  width={VIEW_W}
+  height={VIEW_H}
+  viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+  style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`, transformOrigin: "0 0" }}
+>
+```
+([GraphFlow.tsx:186-192](../../frontend/components/GraphFlow.tsx#L186-L192))
+
+Because `translate` is applied in the *parent's* screen-pixel coordinate
+system (CSS composes `translate(...) scale(...)` as translate-after-scale),
+a pointer drag's `(dx, dy)` in screen pixels maps straight onto `(view.x,
+view.y)` with no unit conversion at all, regardless of the current zoom
+level:
+
+```tsx
+const drag = dragRef.current;
+if (!drag) return;
+const dx = e.clientX - drag.startClientX;
+const dy = e.clientY - drag.startClientY;
+setView((v) => ({ ...v, x: drag.startX + dx, y: drag.startY + dy }));
+```
+([GraphFlow.tsx:138-142](../../frontend/components/GraphFlow.tsx#L138-L142))
+
+Zooming toward a fixed point (the cursor, on scroll; the container's center,
+on the `+`/`−` buttons) uses the standard "keep that point's screen
+position fixed while scale changes" formula — convert the target point to
+*pre-transform* local coordinates at the old scale, then solve for the new
+translate that puts the same local point back under the same screen
+position at the new scale:
+
+```tsx
+const zoomToward = useCallback((factor: number, screenX: number, screenY: number) => {
+  setView((v) => {
+    const kNew = clampScale(v.k * factor);
+    const localX = (screenX - v.x) / v.k;
+    const localY = (screenY - v.y) / v.k;
+    return { x: screenX - kNew * localX, y: screenY - kNew * localY, k: kNew };
+  });
+}, []);
+```
+([GraphFlow.tsx:103-110](../../frontend/components/GraphFlow.tsx#L103-L110))
+
+A `fitView()` helper runs once when the graph data first arrives, measuring
+the container via `getBoundingClientRect()` and picking a scale that fits
+the whole diagram (`Math.min(rect.width / VIEW_W, rect.height / VIEW_H)`,
+[GraphFlow.tsx:86-95](../../frontend/components/GraphFlow.tsx#L86-L95)) —
+the same "⤾ fit to view" button re-runs it on demand after you've zoomed in
+and want to reorient.
+
+**A bug this actually hit, worth knowing if you build something similar:**
+the first version read `dragRef.current!.startX` *inside* the `setView`
+updater callback. That's a real race — React can batch and defer that
+updater's execution until *after* a `pointerup` in the same gesture has
+already run `endDrag()` and set `dragRef.current = null`, so the `!`
+non-null assertion throws with nothing to catch it, crashing the page
+mid-drag. The fix is the `const drag = dragRef.current; if (!drag) return;`
+guard shown above — capture the snapshot into a local *before* handing a
+closure to `setState`, never re-read a mutable ref from inside a state
+updater that might run later than you think.
+
+## Why these three pieces matter together, not just individually
+
+"Introspect the graph," "log token usage," and "narrate what's happening
+live" are each unremarkable alone. Together, they're the three questions
+someone auditing an agentic system actually asks: *where is execution right
+now*, *what is each agent call costing*, and *what, exactly, just
+happened*. Building a debug view around those three questions — rather
+than, say, a generic log viewer — is what makes this panel double as a
+teaching tool for how the whole system is wired, not just a game feature.

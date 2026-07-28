@@ -22,8 +22,10 @@ to multi-agent orchestration rather than general web-app plumbing.
    the one function that stands between "the model knows everything" and
    "the model knows only what its character would know."
 5. [MCP tool server with connection-bound identity](05-mcp-tool-server-identity.md) —
-   why every agent action goes through a real MCP tool call, and how the
-   server knows *which seat* is calling without ever asking the model.
+   why every agent action goes through a real MCP tool call, how the
+   server knows *which seat* is calling without ever asking the model, and
+   a real double-mount routing bug this exact setup hit (and how the test
+   that should have caught it didn't).
 6. [Model-agnostic adapters and the tool-calling loop](06-model-agnostic-adapters-and-tool-calling.md) —
    swapping Claude/OpenAI/Gemini/Ollama/mock behind one interface, and why
    "let the model call a tool" beats "ask the model for JSON and parse it."
@@ -35,12 +37,15 @@ to multi-agent orchestration rather than general web-app plumbing.
    *tables* that record game history for humans to read later. Easy to
    conflate; they solve different problems.
 9. [Streaming state out over SSE](09-sse-streaming-and-broadcast.md) — why
-   Server-Sent Events instead of WebSockets, and the broadcast/pub-sub
-   redesign that fixed a real race condition this project hit.
+   Server-Sent Events instead of WebSockets, the broadcast/pub-sub redesign
+   that fixed a real race condition this project hit, and a second
+   catch-up-on-connect fix for browsers that join mid-game.
 10. [Frontend: turning events into UI](10-frontend-observability.md) — the
-    `useGameStream` reducer, and the debug panel that turns the graph and
-    the per-agent token metrics into a live "showcase agentic engineering"
-    view.
+    `useGameStream` reducer; the debug panel, now permanently embedded
+    rather than a click-to-open overlay; a hand-rolled drag/zoom canvas for
+    the graph diagram (and the stale-ref race it crashed on); and a live
+    activity feed that narrates node transitions, turns, MCP calls, and
+    decisions as they happen.
 11. [Application walkthrough](11-application-walkthrough.md) — trace one
     complete turn, end to end, through every layer above, using a concrete
     example (an AI werewolf's night action).

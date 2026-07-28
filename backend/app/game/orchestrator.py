@@ -41,6 +41,13 @@ class GameOrchestrator:
         # object being swapped out from under it on every resume (see
         # nodes.py's `_sync` docstring for why that swap happens at all).
         self.pause_requested = False
+        # Last node name reported by _sync (nodes.py), so a browser that
+        # connects mid-game (a page refresh, or joining after the graph
+        # already suspended on an interrupt) can show the real current node
+        # immediately instead of waiting for a "node" event that may never
+        # come again before the human answers. Same "not GameState" reasoning
+        # as pause_requested above.
+        self.current_node: str | None = None
 
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue()

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createGame } from "@/lib/api";
 import { defaultSeats } from "@/lib/seatDefaults";
@@ -52,9 +53,14 @@ export default function SetupPage() {
 
   return (
     <div className="app">
-      <header style={{ marginBottom: 22 }}>
-        <h1 className="village-title">Village of Shadows</h1>
-        <div className="subtitle">Configure the seven seats, then begin.</div>
+      <header style={{ marginBottom: 22, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <h1 className="village-title">Village of Shadows</h1>
+          <div className="subtitle">Configure the seven seats, then begin.</div>
+        </div>
+        <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/how-to-play">
+          How to play
+        </Link>
       </header>
 
       <div className="setup-card">

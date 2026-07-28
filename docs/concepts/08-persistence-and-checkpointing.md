@@ -79,7 +79,7 @@ def _sync(config: RunnableConfig, game: GameState):
     orch.state = game
     ...
 ```
-([nodes.py:32-53](../../backend/app/game/nodes.py#L32-L53))
+([nodes.py:32-54](../../backend/app/game/nodes.py#L32-L54))
 
 The `game` object a resumed node receives is a *freshly deserialized copy*
 from the checkpoint, not the same Python object `orch.state` pointed at

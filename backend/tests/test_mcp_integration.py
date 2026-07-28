@@ -31,8 +31,14 @@ def _parse_result(call_tool_result) -> dict:
 
 def _asgi_http_client_factory(app):
     def factory(headers=None, timeout=None, auth=None):
+        # follow_redirects=True: mounting the sub-app at "/mcp" (below) means
+        # a request to exactly "/mcp" gets a 307 to "/mcp/" before the
+        # sub-app's own route matches -- the same redirect real agents'
+        # httpx clients (via langchain-mcp-adapters) already follow
+        # transparently in production.
         return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), headers=headers, timeout=timeout, auth=auth
+            transport=httpx.ASGITransport(app=app), headers=headers, timeout=timeout, auth=auth,
+            follow_redirects=True,
         )
 
     return factory
@@ -62,7 +68,18 @@ async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
     orch = GameOrchestrator(session_id, state, conn, graph)
     registry.register(orch)
 
-    app_asgi = mcp.streamable_http_app()
+    # Mount at "/mcp" exactly like main.py does -- rather than pointing the
+    # client straight at the unwrapped sub-app -- so this test actually
+    # exercises the real routing agents connect through in production. This
+    # is what catches the double-mount bug where FastMCP's own internal
+    # route (also "/mcp" by default) plus this mount prefix would silently
+    # require "/mcp/mcp", 404-ing every real agent's MCP connection while
+    # every other test kept passing because none of them went through a
+    # mount at all.
+    from starlette.applications import Starlette
+
+    app_asgi = Starlette(routes=[])
+    app_asgi.mount("/mcp", mcp.streamable_http_app())
     token = identity.mint_token(session_id, "seat_0")
 
     async with mcp.session_manager.run():

@@ -13,6 +13,13 @@ from app.game import actions, registry
 from app.mcp_server import identity
 
 mcp = FastMCP("game-tools")
+# FastMCP's streamable_http_app() registers its own internal route at
+# "/mcp" by default. main.py mounts that whole app *again* under "/mcp",
+# which would make the real endpoint "/mcp/mcp" while every client (see
+# settings.mcp_url) expects plain "/mcp". Pointing the internal route at
+# "/" instead means mount prefix + internal route == "/mcp", matching what
+# clients actually connect to.
+mcp.settings.streamable_http_path = "/"
 
 # Tools a model is allowed to see and call. `bind_seat` is deliberately
 # excluded — see agent_turn.py, which filters the tool list by this set

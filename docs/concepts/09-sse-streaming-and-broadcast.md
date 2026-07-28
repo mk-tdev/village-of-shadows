@@ -30,6 +30,8 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
             yield {"event": "state", "data": json.dumps(orch.state.model_dump())}
             if orch.state.awaiting is not None:
                 yield {"event": "awaiting_input", "data": json.dumps(orch.state.awaiting.model_dump())}
+            if orch.current_node is not None:
+                yield {"event": "node", "data": json.dumps({"node": orch.current_node})}
             while True:
                 if await request.is_disconnected():
                     break
@@ -48,18 +50,66 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
 On connect, the route immediately yields a full `"state"` snapshot (so a
 browser that connects mid-game — or reconnects after a refresh — doesn't
 have to wait for the next event to know anything) plus the current
-`awaiting_input` if a human turn is pending. After that it just drains
-`queue.get()` in a loop, translating whatever the orchestrator publishes
-into SSE frames, checking every 15 seconds whether the client disconnected
-so the generator doesn't loop forever after the browser tab closes.
+`awaiting_input` if a human turn is pending, and the current `"node"` if
+the graph has one (see the next section for why that last one was added
+after the fact). After that it just drains `queue.get()` in a loop,
+translating whatever the orchestrator publishes into SSE frames, checking
+every 15 seconds whether the client disconnected so the generator doesn't
+loop forever after the browser tab closes.
+
+## A second staleness bug the same "catch-up on connect" idea fixes
+
+The `"node"` catch-up line above wasn't there from the start, and its
+absence caused a real, if minor, bug: the debug panel's graph diagram (see
+[10-frontend-observability.md](10-frontend-observability.md)) highlights
+whichever node a `"node"` SSE event most recently named. That's fine for a
+browser that's been connected since the game started — it's received every
+transition. But a browser that connects *mid-game* (a page refresh, or
+opening the game page again after navigating away) has received none of
+them, so the highlight sits at whatever its initial value was — visibly
+wrong the moment the graph is paused on a human's turn, since no further
+`"node"` event will fire until that human answers and there's nothing to
+correct the stale highlight in the meantime.
+
+The fix follows the exact same shape as `pause_requested`
+(see [07](07-pausing-with-interrupt.md)): a plain attribute on
+`GameOrchestrator`, not `GameState`, updated every time a node actually
+runs:
+
+```python
+self.current_node: str | None = None
+```
+([orchestrator.py:44-50](../../backend/app/game/orchestrator.py#L44-L50))
+
+```python
+node_name = config.get("metadata", {}).get("langgraph_node")
+if node_name:
+    orch.current_node = node_name
+    orch.publish("node", {"node": node_name})
+```
+([nodes.py:50-53](../../backend/app/game/nodes.py#L50-L53))
+
+`_sync` (see [02](02-langgraph-state-machine.md)) already ran on every node
+execution to re-point `orch.state` — recording the node name there too was
+a one-line addition, not a new mechanism. The connection route then just
+checks it, exactly like it already checked `orch.state.awaiting`:
+if a node has run at all, a freshly-connecting browser catches up
+immediately instead of waiting for a transition that may not come for a
+while. Verified directly: created a game via the API, let a real (Ollama)
+turn run partway, then opened the game page fresh — the graph highlighted
+the correct in-progress node on first paint, matched against the backend's
+own `/state` response.
 
 ## Publishing events from inside a graph node
 
 Graph nodes never write to the HTTP response directly — they call
 `orch.publish(event, data)` (see e.g. `_emit_turn`,
-[nodes.py:56-57](../../backend/app/game/nodes.py#L56-L57), or the "decision"
+[nodes.py:57-58](../../backend/app/game/nodes.py#L57-L58), or the "decision"
 event in `agent_turn.py`,
-[agent_turn.py:240-250](../../backend/app/game/agent_turn.py#L240-L250)),
+[agent_turn.py:247-257](../../backend/app/game/agent_turn.py#L247-L257) —
+there's also a `"mcp"` event published from the same file on every MCP
+session bind and tool call, see
+[06](06-model-agnostic-adapters-and-tool-calling.md)),
 and the orchestrator is what actually gets the data to any listening
 browser. This indirection matters for the same reason `_sync` exists (see
 [08](08-persistence-and-checkpointing.md)): a node has no idea whether zero,
@@ -107,7 +157,7 @@ def publish(self, event: str, data: dict) -> None:
     for queue in self._subscribers:
         queue.put_nowait({"event": event, "data": data})
 ```
-([orchestrator.py:37-56](../../backend/app/game/orchestrator.py#L37-L56))
+([orchestrator.py:37-63](../../backend/app/game/orchestrator.py#L37-L63))
 
 Every SSE connection now gets its **own independent queue** via
 `subscribe()`, and `publish()` fans an event out to *every* subscriber's

@@ -1,5 +1,14 @@
-import type { Player } from "@/lib/types";
-import { SkullIcon } from "./icons";
+import type { Player, Role } from "@/lib/types";
+import { DoctorIcon, EyeIcon, SkullIcon, VillagerIcon, WolfIcon } from "./icons";
+
+type IconComponent = (props: { className?: string }) => ReturnType<typeof WolfIcon>;
+
+const ROLE_ICON: Record<Role, IconComponent> = {
+  werewolf: WolfIcon,
+  seer: EyeIcon,
+  doctor: DoctorIcon,
+  villager: VillagerIcon,
+};
 
 export function PlayerCard({
   player,
@@ -11,11 +20,12 @@ export function PlayerCard({
   godView: boolean;
 }) {
   const roleKnown = player.controller === "human" || !player.alive || godView;
+  const RoleIcon = roleKnown && player.role ? ROLE_ICON[player.role] : null;
 
   return (
     <div className={`player-card ${active ? "active" : ""} ${!player.alive ? "dead" : ""}`}>
-      <div className="avatar">
-        {player.name[0]}
+      <div className={`avatar ${RoleIcon ? `avatar-${player.role}` : ""}`}>
+        {RoleIcon ? <RoleIcon className="avatar-icon" /> : player.name[0]}
         {active && <div className="pulse-ring" />}
       </div>
       <div className="p-info">

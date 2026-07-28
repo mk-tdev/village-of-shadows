@@ -99,6 +99,9 @@ async def _run_model_turn(
     async with create_session({"transport": "streamable_http", "url": settings.mcp_url}) as session:
         await session.initialize()
         await session.call_tool("bind_seat", {"token": token})
+        orch.publish(
+            "mcp", {"seat_id": player.seat_id, "name": player.name, "phase": phase, "action": "bind", "tool": None}
+        )
         try:
             all_tools = await load_mcp_tools(session)
             model_tools = [t for t in all_tools if t.name in MODEL_VISIBLE_TOOLS]
@@ -131,6 +134,10 @@ async def _run_model_turn(
                     if tool is None:
                         continue
                     tool_message = await tool.ainvoke(tc)
+                    orch.publish(
+                        "mcp",
+                        {"seat_id": player.seat_id, "name": player.name, "phase": phase, "action": "call", "tool": tc["name"]},
+                    )
                     messages.append(tool_message)
                     result = _extract_structured_result(tool_message)
                     tool_calls_log.append({"tool": tc["name"], "args": tc["args"], "result": result})

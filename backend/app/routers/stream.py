@@ -27,6 +27,8 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
             yield {"event": "state", "data": json.dumps(orch.state.model_dump())}
             if orch.state.awaiting is not None:
                 yield {"event": "awaiting_input", "data": json.dumps(orch.state.awaiting.model_dump())}
+            if orch.current_node is not None:
+                yield {"event": "node", "data": json.dumps({"node": orch.current_node})}
 
             while True:
                 if await request.is_disconnected():

@@ -67,7 +67,7 @@ _emit_turn(orch, wolf.seat_id, wolf.name)          # "turn" SSE event -- feed sh
 await run_agent_turn(orch, wolf, phase="night", ...,
                       commit_tool_name="submit_night_action", fallback={"pool": pool})
 ```
-([nodes.py:146-181](../../backend/app/game/nodes.py#L146-L181))
+([nodes.py:147-182](../../backend/app/game/nodes.py#L147-L182))
 
 **6. `run_agent_turn` resolves this seat's provider and opens an MCP session.**
 ```python
@@ -83,10 +83,18 @@ async with create_session({"transport": "streamable_http", "url": settings.mcp_u
 ([agent_turn.py:92-106](../../backend/app/game/agent_turn.py#L92-L106))
 
 This is the moment identity gets bound to a real MCP connection — see
-[05-mcp-tool-server-identity.md](05-mcp-tool-server-identity.md). Note
-this is a real HTTP round-trip to `http://127.0.0.1:8000/mcp`, the mounted
-sub-app from [main.py](../../backend/app/main.py) — even though it's the
-same process, it goes through the actual MCP protocol.
+[05-mcp-tool-server-identity.md](05-mcp-tool-server-identity.md), including
+the double-mount routing pitfall this exact HTTP round-trip once hit before
+`mcp.settings.streamable_http_path` was corrected. Note this is a real
+round-trip to `http://127.0.0.1:8000/mcp`, the mounted sub-app from
+[main.py](../../backend/app/main.py) — even though it's the same process,
+it goes through the actual MCP protocol. Right after `bind_seat` succeeds,
+the orchestrator also publishes an `"mcp"` SSE event
+(`{"action": "bind", "seat_id": ..., "phase": "night"}`,
+[agent_turn.py:102-104](../../backend/app/game/agent_turn.py#L102-L104)) —
+the debug panel's live activity feed shows "Bob opened an MCP session
+(night)" the instant this happens, well before the model has said anything
+(see [10](10-frontend-observability.md)).
 
 **7. The tool-calling loop runs.**
 ```python
@@ -96,6 +104,7 @@ for _ in range(MAX_TOOL_ITERATIONS):
     ...
     for tc in ai_msg.tool_calls:
         tool_message = await tool.ainvoke(tc)          # -> MCP call -> submit_night_action handler
+        orch.publish("mcp", {"action": "call", "tool": tc["name"], ...})  # activity feed: "Bob called submit_night_action"
         ...
         if tc["name"] == commit_tool_name and result is not None:
             committed_result = result
@@ -103,7 +112,7 @@ for _ in range(MAX_TOOL_ITERATIONS):
         return committed_result
 ```
 The system prompt here is `_persona(wolf, game)`
-([nodes.py:426-443](../../backend/app/game/nodes.py#L426-L443)) — which
+([nodes.py:427-444](../../backend/app/game/nodes.py#L427-L444)) — which
 tells this seat its personality, its secret role, and (only because it's a
 werewolf) its teammate's name. This is hand-built per-call rather than
 routed through `build_agent_view`, but it follows the identical
@@ -167,8 +176,17 @@ or hits a real `interrupt()` (a human's turn, or a pause).
 **12. The frontend has been updating live the entire time.**
 Every `publish()` call in steps 4–11 above reached the browser within
 milliseconds via the SSE connection opened in step 3 — the "X is thinking"
-indicator, the graph-flow highlight, the new log line, and the metrics
-table row all appeared as this sequence played out, not after it finished.
+indicator, the graph-flow highlight, the new log line, the metrics table
+row, and the debug panel's live activity feed (which shows this entire
+sequence — node entered, turn started, MCP session bound, tool called,
+decision committed — as a running, chronological list, see
+[10](10-frontend-observability.md)) all appeared as this sequence played
+out, not after it finished. A browser that instead connects *partway*
+through all this — a page refresh, say — doesn't get to replay steps 4–11
+retroactively, but it does immediately get the *current* node from
+`orch.current_node` in the connection handshake (see
+[09](09-sse-streaming-and-broadcast.md)), so the graph highlight is never
+stuck showing something stale.
 
 ## Part C: the human seat's turn (where it diverges)
 

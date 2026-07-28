@@ -49,6 +49,7 @@ def _sync(config: RunnableConfig, game: GameState):
     orch.state = game
     node_name = config.get("metadata", {}).get("langgraph_node")
     if node_name:
+        orch.current_node = node_name
         orch.publish("node", {"node": node_name})
     return orch
 

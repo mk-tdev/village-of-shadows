@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { streamUrl } from "./api";
-import type { AwaitingInput, DecisionEvent, GameState, LogEntry, SeatMetrics, TurnEvent } from "./types";
+import type {
+  ActivityEntry,
+  AwaitingInput,
+  DecisionEvent,
+  GameState,
+  LogEntry,
+  McpEvent,
+  SeatMetrics,
+  TurnEvent,
+} from "./types";
 
 export interface GameStreamState {
   game: GameState | null;
@@ -11,17 +20,21 @@ export interface GameStreamState {
   errorMessage: string | null;
   currentNode: string | null;
   metrics: Record<string, SeatMetrics>;
+  activity: ActivityEntry[];
 }
+
+const MAX_ACTIVITY_ENTRIES = 60;
 
 /** Subscribes to /games/{id}/stream and reduces incoming SSE events into a
  * client-side GameState, mirroring the shape the werewolf_game.html
  * prototype rendered directly off of. See plan §9 / §5 -- SSE replaces the
  * WebSocket channel there, human input still goes over its own POST.
  *
- * Also tracks two things purely for the debug panel: which LangGraph node
- * is currently executing ("node" events) and per-seat token/latency
- * metrics accumulated from "decision" events -- see routers/graph.py and
- * agent_turn.py on the backend for where these originate. */
+ * Also tracks three things purely for the debug panel: which LangGraph node
+ * is currently executing ("node" events), per-seat token/latency metrics
+ * accumulated from "decision" events, and a rolling live-activity feed built
+ * from "node"/"turn"/"mcp"/"decision" events together -- see routers/graph.py
+ * and agent_turn.py on the backend for where these originate. */
 export function useGameStream(sessionId: string): GameStreamState {
   const [game, setGame] = useState<GameState | null>(null);
   const [active, setActive] = useState<TurnEvent | null>(null);
@@ -29,10 +42,18 @@ export function useGameStream(sessionId: string): GameStreamState {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentNode, setCurrentNode] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<Record<string, SeatMetrics>>({});
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const gameRef = useRef<GameState | null>(null);
+  const activityIdRef = useRef(0);
 
   useEffect(() => {
     const source = new EventSource(streamUrl(sessionId));
+
+    function pushActivity(kind: ActivityEntry["kind"], text: string) {
+      activityIdRef.current += 1;
+      const entry: ActivityEntry = { id: activityIdRef.current, kind, text };
+      setActivity((prev) => [entry, ...prev].slice(0, MAX_ACTIVITY_ENTRIES));
+    }
 
     source.addEventListener("open", () => setConnected(true));
 
@@ -70,15 +91,28 @@ export function useGameStream(sessionId: string): GameStreamState {
     source.addEventListener("turn", (e) => {
       const data: TurnEvent = JSON.parse((e as MessageEvent).data);
       setActive(data.seat_id ? data : null);
+      if (data.seat_id) pushActivity("turn", `${data.name} is taking their turn`);
     });
 
     source.addEventListener("node", (e) => {
       const data: { node: string } = JSON.parse((e as MessageEvent).data);
       setCurrentNode(data.node);
+      pushActivity("node", `Orchestrator entered ${data.node}`);
+    });
+
+    source.addEventListener("mcp", (e) => {
+      const data: McpEvent = JSON.parse((e as MessageEvent).data);
+      pushActivity(
+        "mcp",
+        data.action === "bind"
+          ? `${data.name} opened an MCP session (${data.phase})`
+          : `${data.name} called MCP tool “${data.tool}”`
+      );
     });
 
     source.addEventListener("decision", (e) => {
       const data: DecisionEvent = JSON.parse((e as MessageEvent).data);
+      pushActivity("decision", `${data.name} committed a decision — ${data.latency_ms}ms`);
       setMetrics((prev) => {
         const existing = prev[data.seat_id];
         const merged: SeatMetrics = {
@@ -156,5 +190,5 @@ export function useGameStream(sessionId: string): GameStreamState {
     return () => source.close();
   }, [sessionId]);
 
-  return { game, active, connected, errorMessage, currentNode, metrics };
+  return { game, active, connected, errorMessage, currentNode, metrics, activity };
 }

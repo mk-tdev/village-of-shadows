@@ -50,11 +50,24 @@ export const PROVIDER_MODEL_SUGGESTIONS: Record<Provider, SelectOption[]> = {
   ],
 
   ollama: [
+    { value: "gemma4:latest", label: "gemma4:latest", sublabel: "tool-calling · your local pull" },
     { value: "llama3.1", label: "llama3.1", sublabel: "general purpose" },
     { value: "qwen2.5:14b", label: "qwen2.5:14b", sublabel: "general purpose, larger" },
     { value: "qwen2.5:7b", label: "qwen2.5:7b", sublabel: "cheaper / smaller" },
     { value: "deepseek-r1:7b", label: "deepseek-r1:7b", sublabel: "reasoning / thinking model" },
     { value: "phi3", label: "phi3", sublabel: "small, fast" },
+  ],
+
+  // Ollama Cloud (ollama.com's hosted models) -- not a local server, needs
+  // OLLAMA_API_KEY set in backend/.env. Model names carry the "-cloud" tag
+  // Ollama uses to mark hosted-only variants; best-effort, verify against
+  // ollama.com/search?c=cloud before relying on them.
+  ollama_cloud: [
+    { value: "gpt-oss:120b-cloud", label: "gpt-oss:120b-cloud", sublabel: "flagship-tier, tool-calling" },
+    { value: "gpt-oss:20b-cloud", label: "gpt-oss:20b-cloud", sublabel: "cheaper / faster" },
+    { value: "qwen3-coder:480b-cloud", label: "qwen3-coder:480b-cloud", sublabel: "large, coding-tuned" },
+    { value: "deepseek-v3.1:671b-cloud", label: "deepseek-v3.1:671b-cloud", sublabel: "large general purpose" },
+    { value: "kimi-k2:1t-cloud", label: "kimi-k2:1t-cloud", sublabel: "very large" },
   ],
 };
 

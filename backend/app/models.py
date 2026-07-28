@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 Role = Literal["werewolf", "seer", "doctor", "villager"]
 Controller = Literal["ai", "human"]
-Provider = Literal["claude", "openai", "gemini", "ollama", "mock"]
+Provider = Literal["claude", "openai", "gemini", "ollama", "ollama_cloud", "mock"]
 Phase = Literal[
     "lobby",
     "night",

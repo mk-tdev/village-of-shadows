@@ -24,7 +24,7 @@ if wolf.controller == "human":
     )
     await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
 ```
-([nodes.py:161-165](../../backend/app/game/nodes.py#L161-L165))
+([nodes.py:162-166](../../backend/app/game/nodes.py#L162-L166))
 
 `interrupt(payload)` does something that looks like a blocking call but
 isn't: it raises a special LangGraph exception that unwinds execution all
@@ -47,11 +47,11 @@ async def _run(self, input_: Any) -> None:
                 return
         ...
 ```
-([orchestrator.py:74-87](../../backend/app/game/orchestrator.py#L74-L87))
+([orchestrator.py:81-96](../../backend/app/game/orchestrator.py#L81-L96))
 
 `GameOrchestrator._run` drives the graph with `graph.astream(...)` inside a
 background `asyncio.Task` (see `start()`,
-[orchestrator.py:58-59](../../backend/app/game/orchestrator.py#L58-L59)).
+[orchestrator.py:65-66](../../backend/app/game/orchestrator.py#L65-L66)).
 When it sees an `"__interrupt__"` event, it stores the payload as
 `AwaitingInput` on the game's state and publishes an `awaiting_input` SSE
 event, then **returns** — the background task ends. There is nothing left
@@ -66,7 +66,7 @@ def resume(self, value: Any) -> None:
     self.state.awaiting = None
     self._task = asyncio.create_task(self._run(Command(resume=value)))
 ```
-([orchestrator.py:61-63](../../backend/app/game/orchestrator.py#L61-L63))
+([orchestrator.py:68-70](../../backend/app/game/orchestrator.py#L68-L70))
 
 ```python
 @router.post("/{session_id}/input")

@@ -21,7 +21,7 @@ answering a human prompt. No second suspend/resume system, no separate
 def request_pause(self) -> None:
     self.pause_requested = True
 ```
-([orchestrator.py:65-66](../../backend/app/game/orchestrator.py#L65-L66))
+([orchestrator.py:72-73](../../backend/app/game/orchestrator.py#L72-L73))
 
 ```python
 @router.post("/{session_id}/pause")
@@ -60,6 +60,14 @@ every resume — which is exactly wrong for a signal that's supposed to mean
 "the very next thing that runs should act on this," not "whatever was true
 at the moment of the last checkpoint."
 
+The orchestrator gained a second field with the identical justification
+later on: `current_node`, tracking the last node `_sync` reported, so a
+browser connecting mid-game can show the right graph highlight immediately
+instead of a stale one — see
+[09-sse-streaming-and-broadcast.md](09-sse-streaming-and-broadcast.md) for
+the full story. Same reasoning, same "orchestrator, not `GameState`" home
+for it.
+
 ## Pausing: the second `interrupt()` call
 
 ```python
@@ -73,7 +81,7 @@ def _maybe_pause(orch, game: GameState) -> None:
     game.paused = False
     orch.publish("resumed", {})
 ```
-([nodes.py:60-88](../../backend/app/game/nodes.py#L60-L88))
+([nodes.py:61-89](../../backend/app/game/nodes.py#L61-L89))
 
 `_maybe_pause` is called at the tail end of **every** node in `nodes.py` (12
 call sites). Most of the time `pause_requested` is `False` and it's a no-op.
@@ -94,7 +102,7 @@ if isinstance(event, dict) and "__interrupt__" in event:
     self.state.awaiting = AwaitingInput(**payload)
     ...
 ```
-([orchestrator.py:77-87](../../backend/app/game/orchestrator.py#L77-L87))
+([orchestrator.py:84-92](../../backend/app/game/orchestrator.py#L84-L92))
 
 `GameOrchestrator._run` distinguishes a pause-interrupt from a
 human-turn-interrupt purely by the `"kind"` field in the payload — a pause
@@ -111,7 +119,7 @@ def continue_game(self) -> None:
     # this is a plain truthy sentinel the pause interrupt discards.
     self.resume(True)
 ```
-([orchestrator.py:68-72](../../backend/app/game/orchestrator.py#L68-L72))
+([orchestrator.py:75-79](../../backend/app/game/orchestrator.py#L75-L79))
 
 `continue_game()` calls the exact same `resume()` method
 `POST /input` calls for a human answer — see
@@ -169,7 +177,7 @@ shift and steal an answer meant for an earlier call.
 always *after* any human `interrupt()` call earlier in that same node body
 (e.g. night_wolves' human branch) -- never before it."""
 ```
-([nodes.py:60-65](../../backend/app/game/nodes.py#L60-L65))
+([nodes.py:61-64](../../backend/app/game/nodes.py#L61-L64))
 
 This was caught by careful reasoning about LangGraph's position-based
 resume matching *before* writing the code — and then confirmed with a

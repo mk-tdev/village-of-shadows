@@ -12,7 +12,7 @@ import { DebugPanel } from "./DebugPanel";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 
 export function GameView({ sessionId }: { sessionId: string }) {
-  const { game, active, connected, errorMessage, currentNode, metrics } = useGameStream(sessionId);
+  const { game, active, connected, errorMessage, currentNode, metrics, activity } = useGameStream(sessionId);
   const [godView, setGodView] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -143,7 +143,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
         </div>
       )}
 
-      <DebugPanel currentNode={currentNode} metrics={metrics} />
+      <DebugPanel currentNode={currentNode} metrics={metrics} activity={activity} />
     </div>
   );
 }

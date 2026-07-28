@@ -83,14 +83,14 @@ MODEL_VISIBLE_TOOLS = {
     "submit_night_action", "submit_statement", "submit_vote",
 }
 ```
-([server.py:20-30](../../backend/app/mcp_server/server.py#L20-L30))
+([server.py:27-37](../../backend/app/mcp_server/server.py#L27-L37))
 
 ```python
 all_tools = await load_mcp_tools(session)
 model_tools = [t for t in all_tools if t.name in MODEL_VISIBLE_TOOLS]
 bound_model = chat_model.bind_tools(model_tools)
 ```
-([agent_turn.py:103-105](../../backend/app/game/agent_turn.py#L103-L105))
+([agent_turn.py:106-108](../../backend/app/game/agent_turn.py#L106-L108))
 
 `load_mcp_tools` (from `langchain-mcp-adapters`) would happily return
 *every* tool the server defines, `bind_seat` included — filtering by
@@ -99,8 +99,57 @@ actually keeps `bind_seat` out of the model's hands. Notice this isn't
 security through obscurity ("the model probably won't guess the tool
 name") — even if a model somehow emitted a `bind_seat` tool call, it isn't
 in `tools_by_name` (built from the same filtered list,
-[agent_turn.py:106](../../backend/app/game/agent_turn.py#L106)), so there's
+[agent_turn.py:109](../../backend/app/game/agent_turn.py#L109)), so there's
 no code path that would execute it.
+
+## A routing pitfall this exact setup hit: the double mount
+
+Identity binding assumes agents can actually *reach* the MCP server in the
+first place — and for a while in this project, real-provider seats
+couldn't, because of a mistake specific to mounting a `FastMCP` app inside
+another ASGI app rather than running it standalone.
+
+```python
+mcp = FastMCP("game-tools")
+# FastMCP's streamable_http_app() registers its own internal route at
+# "/mcp" by default. main.py mounts that whole app *again* under "/mcp",
+# which would make the real endpoint "/mcp/mcp" while every client (see
+# settings.mcp_url) expects plain "/mcp". Pointing the internal route at
+# "/" instead means mount prefix + internal route == "/mcp", matching what
+# clients actually connect to.
+mcp.settings.streamable_http_path = "/"
+```
+([server.py:15-22](../../backend/app/mcp_server/server.py#L15-L22))
+
+`FastMCP.streamable_http_app()` builds an ASGI app with its own internal
+route already fixed at `/mcp` (that's a library default, not something this
+project set). [main.py](../../backend/app/main.py) then mounts that whole
+app *again* under the prefix `/mcp` — so without the line above, the only
+path that actually resolves is `/mcp/mcp`, while every agent's MCP client
+(via `settings.mcp_url`, see [01](01-fastapi-app-shape.md)) connects to
+plain `/mcp` and gets a 404. Concretely, that 404 doesn't surface as a
+clean error — it blows up the client transport's internal `anyio` task
+group, and the orchestrator's broad `except Exception` in
+`GameOrchestrator._run` (see [03](03-human-in-the-loop-interrupt.md)) ends
+up catching an `ExceptionGroup` whose default string is the unhelpful
+*"unhandled errors in a TaskGroup (1 sub-exception)"* — a real symptom this
+project hit, with the actual 404 several layers down in the traceback. The
+mock provider never triggers this at all (it skips MCP entirely — see
+[06](06-model-agnostic-adapters-and-tool-calling.md)), which is exactly why
+the bug could sit unnoticed until a real provider seat was tried.
+
+The fix is the one-line `streamable_http_path = "/"` override above, so the
+mount prefix alone supplies the `/mcp` path and the sub-app's own internal
+route contributes nothing extra. It's also why
+[`test_mcp_integration.py`](../../backend/tests/test_mcp_integration.py) was
+rewritten to actually build a Starlette app and `.mount("/mcp",
+mcp.streamable_http_app())` the same way `main.py` does, instead of pointing
+a test client straight at the unwrapped sub-app — the original test passed
+throughout, because it never exercised the real mount at all. The general
+lesson: if a test double-checks a component in isolation but the real bug
+lives specifically in *how it's wired together*, the test can stay green
+while production is broken. Test the actual integration point, not a
+convenient stand-in for it.
 
 ## Resolving identity inside a tool handler
 
@@ -112,7 +161,7 @@ async def submit_vote(target: str, thought: str = "", ctx: Context = None) -> di
     orch = registry.get(game_id)
     return await actions.apply_vote(orch, seat_id, target, thought)
 ```
-([server.py:106-111](../../backend/app/mcp_server/server.py#L106-L111))
+([server.py:113-118](../../backend/app/mcp_server/server.py#L113-L118))
 
 Every gameplay tool follows this exact shape: pull `(game_id, seat_id)` from
 `identity.resolve(ctx.session)` — a lookup keyed by the *session object
@@ -135,6 +184,6 @@ def release(session: object) -> None:
 ([identity.py:43-44](../../backend/app/mcp_server/identity.py#L43-L44))
 
 Called in `agent_turn.py`'s `finally` block
-([agent_turn.py:143](../../backend/app/game/agent_turn.py#L143)) once a
+([agent_turn.py:150](../../backend/app/game/agent_turn.py#L150)) once a
 turn's MCP session closes — the binding is scoped to exactly one seat's one
 turn, not left dangling for the lifetime of the server.

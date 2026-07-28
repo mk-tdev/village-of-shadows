@@ -2,7 +2,7 @@
 
 export type Role = "werewolf" | "seer" | "doctor" | "villager";
 export type Controller = "ai" | "human";
-export type Provider = "claude" | "openai" | "gemini" | "ollama" | "mock";
+export type Provider = "claude" | "openai" | "gemini" | "ollama" | "ollama_cloud" | "mock";
 
 export interface AgentConfig {
   seat_id: string;
@@ -112,4 +112,23 @@ export interface SeatMetrics {
   output_tokens: number;
   last_latency_ms: number;
   estimated: boolean;
+}
+
+export interface McpEvent {
+  seat_id: string;
+  name: string;
+  phase: string;
+  action: "bind" | "call";
+  tool: string | null;
+}
+
+/** One line in the debug panel's live activity feed. Built client-side from
+ * SSE events that already flow for other reasons ("node" drives the graph
+ * highlight, "turn" drives the "X is thinking" indicator, "decision" feeds
+ * the metrics table) plus the "mcp" event added specifically for this feed
+ * -- see agent_turn.py's orch.publish("mcp", ...) calls. */
+export interface ActivityEntry {
+  id: number;
+  kind: "node" | "turn" | "mcp" | "decision";
+  text: string;
 }
