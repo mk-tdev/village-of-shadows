@@ -37,6 +37,17 @@ async def finish_game(conn: aiosqlite.Connection, session_id: str, winner: str) 
     await conn.commit()
 
 
+async def stop_game(conn: aiosqlite.Connection, session_id: str) -> None:
+    """A user-initiated abandon, distinct from finish_game's natural
+    win/loss conclusion -- 'stopped' rather than 'finished', with no
+    winner, so a later look at the games table can tell the two apart."""
+    await conn.execute(
+        "UPDATE games SET status = 'stopped' WHERE id = ?",
+        (session_id,),
+    )
+    await conn.commit()
+
+
 async def record_log_entry(conn: aiosqlite.Connection, session_id: str, entry: LogEntry) -> None:
     await conn.execute(
         """INSERT INTO log_entries (game_id, seq, round, phase, type, seat_id, text, thought, private)

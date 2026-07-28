@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createGame } from "@/lib/api";
-import { defaultSeats } from "@/lib/seatDefaults";
+import { defaultSeats, PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
 import { SeatRow } from "@/components/SeatRow";
 import { Select } from "@/components/Select";
-import type { AgentConfig } from "@/lib/types";
+import { Combobox } from "@/components/Combobox";
+import type { AgentConfig, Provider } from "@/lib/types";
 
 export default function SetupPage() {
   const router = useRouter();
@@ -15,6 +16,13 @@ export default function SetupPage() {
   const [seats, setSeats] = useState<AgentConfig[]>(() => defaultSeats(0));
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The master picker's own selection -- kept separate from any one seat's
+  // provider/model so it still has a sensible value to apply even after
+  // per-seat edits have made the seats disagree with each other, and so a
+  // seat that later flips from human to AI (see updateHumanIndex) has a
+  // more useful fallback than always defaulting back to "mock".
+  const [masterProvider, setMasterProvider] = useState<Provider>("mock");
+  const [masterModel, setMasterModel] = useState<string>(PROVIDER_MODEL_SUGGESTIONS.mock[0].value);
 
   const duplicateNames = useMemo(() => {
     const names = seats.map((s) => s.display_name.trim().toLowerCase());
@@ -29,14 +37,42 @@ export default function SetupPage() {
       prev.map((s, i) => ({
         ...s,
         controller: i === index ? "human" : "ai",
-        provider: i === index ? null : s.provider ?? "mock",
-        model_name: i === index ? null : s.model_name ?? "mock-v1",
+        provider: i === index ? null : s.provider ?? masterProvider,
+        model_name: i === index ? null : s.model_name ?? masterModel,
       }))
     );
   }
 
   function updateSeat(index: number, next: AgentConfig) {
     setSeats((prev) => prev.map((s, i) => (i === index ? next : s)));
+  }
+
+  function applyMasterToAllAiSeats(provider: Provider, modelName: string) {
+    setSeats((prev) =>
+      prev.map((s, i) =>
+        i === humanIndex
+          ? s
+          : {
+              ...s,
+              provider,
+              model_name: modelName,
+              endpoint: provider === "ollama" ? "http://localhost:11434" : null,
+            }
+      )
+    );
+  }
+
+  function handleMasterProviderChange(value: string) {
+    const provider = value as Provider;
+    const defaultModel = PROVIDER_MODEL_SUGGESTIONS[provider][0].value;
+    setMasterProvider(provider);
+    setMasterModel(defaultModel);
+    applyMasterToAllAiSeats(provider, defaultModel);
+  }
+
+  function handleMasterModelChange(value: string) {
+    setMasterModel(value);
+    applyMasterToAllAiSeats(masterProvider, value);
   }
 
   async function handleStart() {
@@ -71,6 +107,31 @@ export default function SetupPage() {
             options={seats.map((s, i) => ({ value: String(i), label: s.display_name || s.seat_id }))}
             onChange={(value) => updateHumanIndex(Number(value))}
           />
+        </div>
+
+        <label className="field-label">Set every AI seat to</label>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            maxWidth: 420,
+            marginBottom: 16,
+            paddingBottom: 16,
+            borderBottom: "1px solid rgba(232, 163, 61, 0.12)",
+          }}
+        >
+          <div style={{ minWidth: 150 }}>
+            <Select value={masterProvider} options={PROVIDER_OPTIONS} onChange={handleMasterProviderChange} />
+          </div>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <Combobox
+              value={masterModel}
+              options={PROVIDER_MODEL_SUGGESTIONS[masterProvider]}
+              onChange={handleMasterModelChange}
+              placeholder="Model name"
+            />
+          </div>
         </div>
 
         {seats.map((seat, i) => (

@@ -14,23 +14,45 @@ from app.models import AgentConfig
 
 
 def get_chat_model(config: AgentConfig):
+    """Every real branch below passes its API key explicitly from
+    `settings`, never relying on the provider SDK reading it from a bare
+    `os.environ` itself. That's not just belt-and-suspenders: pydantic-
+    settings parses `.env` straight into the `settings` object's own
+    fields -- it does not also export those values into the process
+    environment (confirmed directly: `os.environ` has no entry for
+    anything in `.env` unless something else put it there). An SDK's own
+    "read OPENAI_API_KEY/ANTHROPIC_API_KEY/... from the environment"
+    fallback therefore never actually fires here, `.env` file or not --
+    passing the key straight from `settings` is the only path that works,
+    matching what the ollama_cloud branch already had to do for the same
+    reason.
+    """
     if config.provider == "mock" or config.provider is None:
         return None
 
     if config.provider == "claude":
         from langchain_anthropic import ChatAnthropic
 
-        return ChatAnthropic(model=config.model_name or "claude-sonnet-4-6")
+        return ChatAnthropic(
+            model=config.model_name or "claude-sonnet-4-6",
+            anthropic_api_key=settings.anthropic_api_key,
+        )
 
     if config.provider == "openai":
         from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(model=config.model_name or "gpt-4.1")
+        return ChatOpenAI(
+            model=config.model_name or "gpt-4.1",
+            openai_api_key=settings.openai_api_key,
+        )
 
     if config.provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        return ChatGoogleGenerativeAI(model=config.model_name or "gemini-2.5-flash")
+        return ChatGoogleGenerativeAI(
+            model=config.model_name or "gemini-2.5-flash",
+            google_api_key=settings.google_api_key,
+        )
 
     if config.provider == "ollama":
         from langchain_ollama import ChatOllama
@@ -43,17 +65,16 @@ def get_chat_model(config: AgentConfig):
     if config.provider == "ollama_cloud":
         from langchain_ollama import ChatOllama
 
-        # Ollama Cloud (hosted models like "gpt-oss:120b-cloud") is a
-        # different host, not a local server, and needs bearer-token auth --
-        # unlike claude/openai/gemini above, the underlying `ollama` package
-        # only auto-reads OLLAMA_API_KEY from a bare `os.environ`, which
-        # this app's `.env` file is never loaded into (pydantic-settings
-        # parses `.env` into `settings` itself, not into the process
-        # environment). Passing the header explicitly via `client_kwargs`
-        # sidesteps needing that env var to exist at the OS level at all.
+        # Ollama Cloud (hosted models, e.g. "gpt-oss:120b" -- most cloud
+        # models are just their plain name; a "-cloud" suffix is only a
+        # valid alias for a handful that also exist as local pulls, see
+        # seatDefaults.ts) needs bearer-token auth over `client_kwargs`
+        # rather than a constructor api-key field, since ChatOllama doesn't
+        # expose one directly -- same underlying reason as the other
+        # branches above, just a different mechanism for this one client.
         headers = {"Authorization": f"Bearer {settings.ollama_api_key}"} if settings.ollama_api_key else {}
         return ChatOllama(
-            model=config.model_name or "gpt-oss:120b-cloud",
+            model=config.model_name or "gpt-oss:120b",
             base_url=config.endpoint or settings.ollama_cloud_url,
             client_kwargs={"headers": headers},
         )

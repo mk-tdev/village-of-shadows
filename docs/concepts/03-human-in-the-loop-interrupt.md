@@ -24,7 +24,7 @@ if wolf.controller == "human":
     )
     await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
 ```
-([nodes.py:162-166](../../backend/app/game/nodes.py#L162-L166))
+([nodes.py:176-180](../../backend/app/game/nodes.py#L176-L180))
 
 `interrupt(payload)` does something that looks like a blocking call but
 isn't: it raises a special LangGraph exception that unwinds execution all
@@ -47,11 +47,11 @@ async def _run(self, input_: Any) -> None:
                 return
         ...
 ```
-([orchestrator.py:81-96](../../backend/app/game/orchestrator.py#L81-L96))
+([orchestrator.py:124-137](../../backend/app/game/orchestrator.py#L124-L137))
 
 `GameOrchestrator._run` drives the graph with `graph.astream(...)` inside a
 background `asyncio.Task` (see `start()`,
-[orchestrator.py:65-66](../../backend/app/game/orchestrator.py#L65-L66)).
+[orchestrator.py:92-94](../../backend/app/game/orchestrator.py#L92-L94)).
 When it sees an `"__interrupt__"` event, it stores the payload as
 `AwaitingInput` on the game's state and publishes an `awaiting_input` SSE
 event, then **returns** — the background task ends. There is nothing left
@@ -66,7 +66,7 @@ def resume(self, value: Any) -> None:
     self.state.awaiting = None
     self._task = asyncio.create_task(self._run(Command(resume=value)))
 ```
-([orchestrator.py:68-70](../../backend/app/game/orchestrator.py#L68-L70))
+([orchestrator.py:96-98](../../backend/app/game/orchestrator.py#L96-L98))
 
 ```python
 @router.post("/{session_id}/input")
@@ -117,6 +117,52 @@ matters" principle that shows up again in
 [05](05-mcp-tool-server-identity.md) — a resumed value with the wrong shape
 would otherwise sail straight into `actions.apply_night_action(...)` unless
 caught here first.
+
+## A pitfall in the failure path: `str()` on an `ExceptionGroup` hides the real error
+
+`_run`'s `try` block above has a partner `except` that this guide hasn't
+covered yet — what happens when a turn genuinely fails, not just suspends:
+
+```python
+except Exception as exc:  # surfaced to the SSE stream rather than swallowed
+    self.publish("error", {"message": _describe_exception(exc)})
+```
+([orchestrator.py:140-141](../../backend/app/game/orchestrator.py#L140-L141))
+
+The first version of this line was just `self.publish("error", {"message":
+str(exc)})` — reasonable-looking, and wrong in a way that only shows up
+once a real provider call actually fails. Every real-provider agent turn
+runs its MCP session inside the MCP client library's own internal `anyio`
+task group (see [05](05-mcp-tool-server-identity.md)), so *any* failure in
+there — a routing bug, an invalid model name, an auth error, a network
+blip — doesn't arrive here as the original exception. It arrives wrapped in
+an `ExceptionGroup`, and `str()` on an `ExceptionGroup` doesn't recurse into
+its `.exceptions` — it just says something like *"unhandled errors in a
+TaskGroup (1 sub-exception)"*, with the actual cause several layers down in
+a traceback nobody sees outside the server log. This project hit that exact
+message twice, from two unrelated root causes (see
+[05](05-mcp-tool-server-identity.md)'s double-mount bug and
+[06](06-model-agnostic-adapters-and-tool-calling.md)'s invalid-model-name
+bug) — both looked identical from the frontend's side, which is precisely
+the problem with trusting an `ExceptionGroup`'s default string.
+
+```python
+def _describe_exception(exc: BaseException) -> str:
+    if isinstance(exc, BaseExceptionGroup):
+        return "; ".join(_describe_exception(sub) for sub in exc.exceptions)
+    return f"{type(exc).__name__}: {exc}"
+```
+([orchestrator.py:22-36](../../backend/app/game/orchestrator.py#L22-L36))
+
+The fix recurses through nested `BaseExceptionGroup`s (an `ExceptionGroup`
+can itself contain another one) until it reaches actual leaf exceptions,
+then joins their real class name and message — so a failed turn now
+surfaces something like `HTTPStatusError: Client error '410 Gone' for url
+'https://ollama.com/api/chat'` instead of a content-free wrapper string.
+The general lesson, independent of anything specific to MCP: never pass an
+`ExceptionGroup` straight to `str()` when the message is going to be shown
+to a person — always unwrap it first, or the real cause is lost the moment
+it's caught.
 
 ## A pitfall worth knowing before you touch this code: `None` can't be a resume value
 

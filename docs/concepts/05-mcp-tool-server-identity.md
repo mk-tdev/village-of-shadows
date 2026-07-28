@@ -151,6 +151,27 @@ lives specifically in *how it's wired together*, the test can stay green
 while production is broken. Test the actual integration point, not a
 convenient stand-in for it.
 
+**This symptom is generic, not specific to this one bug.** The double
+mount was the *first* thing to produce *"unhandled errors in a TaskGroup (1
+sub-exception)"*, but it's not the only thing that can: `str()` on an
+`ExceptionGroup` never recurses into `.exceptions` by default, so *any*
+failure inside the MCP client's own internal `anyio` task group — a 404
+from a routing bug, an HTTP 410 from an invalid model name, an auth
+failure, a network error — arrives at `GameOrchestrator._run`'s `except
+Exception` as an opaque wrapper with the real cause several layers down
+and no way for a user to see it. That's exactly what happened a second
+time in this project, independent of this bug: an invalid Ollama Cloud
+model name (see the "guessed model names silently 410" pitfall in
+[06](06-model-agnostic-adapters-and-tool-calling.md)) produced the
+identical-looking generic error, with a completely different root cause.
+`orchestrator.py`'s `_describe_exception` helper (see
+[03](03-human-in-the-loop-interrupt.md)) now recursively unwraps
+`BaseExceptionGroup` so the frontend shows the actual leaf exception
+instead of this wrapper — worth knowing about both because it explains why
+the *same-looking* error can have unrelated causes, and because it's a
+general lesson about `ExceptionGroup`: always unwrap it before surfacing
+its message to a user, never trust its default `str()`.
+
 ## Resolving identity inside a tool handler
 
 ```python

@@ -30,7 +30,7 @@ you'd write for any app with a database.
 
 This is the layer that makes the "showcase agentic engineering" debug view
 possible after the fact: `GET /games/{id}/decisions`
-([routers/games.py:56-59](../../backend/app/routers/games.py#L56-L59))
+([routers/games.py:78-81](../../backend/app/routers/games.py#L78-L81))
 reads straight out of `agent_decisions` to answer "show me every model call
 this game made, with its prompt, raw response, and latency." Nothing about
 LangGraph or `interrupt()` is involved in this layer at all — it would work
@@ -59,7 +59,7 @@ tables (managed entirely by LangGraph internally — not the tables in
 ```python
 self.config = {"configurable": {"thread_id": session_id, "session_id": session_id}}
 ```
-([orchestrator.py:28](../../backend/app/game/orchestrator.py#L28))
+([orchestrator.py:45](../../backend/app/game/orchestrator.py#L45))
 
 Every game's `session_id` doubles as its checkpointer thread ID. When
 `resume()` calls `graph.astream(Command(resume=value), self.config)`, the
@@ -79,7 +79,7 @@ def _sync(config: RunnableConfig, game: GameState):
     orch.state = game
     ...
 ```
-([nodes.py:32-54](../../backend/app/game/nodes.py#L32-L54))
+([nodes.py:32-68](../../backend/app/game/nodes.py#L32-L68))
 
 The `game` object a resumed node receives is a *freshly deserialized copy*
 from the checkpoint, not the same Python object `orch.state` pointed at

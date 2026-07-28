@@ -59,17 +59,36 @@ export const PROVIDER_MODEL_SUGGESTIONS: Record<Provider, SelectOption[]> = {
   ],
 
   // Ollama Cloud (ollama.com's hosted models) -- not a local server, needs
-  // OLLAMA_API_KEY set in backend/.env. Model names carry the "-cloud" tag
-  // Ollama uses to mark hosted-only variants; best-effort, verify against
-  // ollama.com/search?c=cloud before relying on them.
+  // OLLAMA_API_KEY set in backend/.env. Unlike a guessed "-cloud"-suffixed
+  // name, every value below was pulled live from a real account's
+  // GET https://ollama.com/api/tags and confirmed working against
+  // POST /api/chat (a "-cloud" suffix is only a valid alias for a handful
+  // of models, like gpt-oss, that also exist as local pulls -- most cloud
+  // models are just their plain name, and guessing wrong 410s instead of
+  // giving a useful error). Still not a closed set -- ollama.com's catalog
+  // changes over time, so re-verify against your own account's /api/tags
+  // if a model here stops resolving.
   ollama_cloud: [
-    { value: "gpt-oss:120b-cloud", label: "gpt-oss:120b-cloud", sublabel: "flagship-tier, tool-calling" },
-    { value: "gpt-oss:20b-cloud", label: "gpt-oss:20b-cloud", sublabel: "cheaper / faster" },
-    { value: "qwen3-coder:480b-cloud", label: "qwen3-coder:480b-cloud", sublabel: "large, coding-tuned" },
-    { value: "deepseek-v3.1:671b-cloud", label: "deepseek-v3.1:671b-cloud", sublabel: "large general purpose" },
-    { value: "kimi-k2:1t-cloud", label: "kimi-k2:1t-cloud", sublabel: "very large" },
+    { value: "gpt-oss:20b", label: "gpt-oss:20b", sublabel: "small / fast, tool-calling" },
+    { value: "gpt-oss:120b", label: "gpt-oss:120b", sublabel: "larger, tool-calling" },
+    { value: "minimax-m2.7", label: "minimax-m2.7", sublabel: "general purpose" },
+    { value: "kimi-k2.6", label: "kimi-k2.6", sublabel: "large" },
+    { value: "deepseek-v4-flash", label: "deepseek-v4-flash", sublabel: "cheaper / faster" },
+    { value: "glm-5.1", label: "glm-5.1", sublabel: "large" },
   ],
 };
+
+/** Shared by SeatRow's per-seat provider picker and the setup page's
+ * "apply to all AI seats" master picker -- one list, so the two can never
+ * drift apart. */
+export const PROVIDER_OPTIONS: SelectOption[] = [
+  { value: "mock", label: "mock", sublabel: "offline" },
+  { value: "claude", label: "Claude" },
+  { value: "openai", label: "OpenAI" },
+  { value: "gemini", label: "Gemini" },
+  { value: "ollama", label: "Ollama", sublabel: "local server" },
+  { value: "ollama_cloud", label: "Ollama Cloud", sublabel: "hosted, needs OLLAMA_API_KEY" },
+];
 
 export function defaultSeats(humanIndex: number): AgentConfig[] {
   return DEFAULT_NAMES.map((name, i) => ({

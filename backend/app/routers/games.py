@@ -39,9 +39,31 @@ async def create_game(configs: list[AgentConfig], request: Request) -> dict:
 
     orch = GameOrchestrator(session_id, state, conn, graph)
     registry.register(orch)
-    orch.start()
+    # Deliberately not orch.start() here -- see GameOrchestrator.started's
+    # docstring. The graph only begins advancing once the human clicks
+    # "Start Game" on the already-connected game page (begin_game below),
+    # so nothing can run ahead of a browser that hasn't opened its SSE
+    # connection yet.
 
     return {"session_id": session_id}
+
+
+@router.post("/{session_id}/begin")
+async def begin_game(session_id: str) -> dict:
+    """Actually starts the graph running. Split out from create_game so the
+    human's browser has a chance to open its SSE connection and see the
+    game sitting in the "lobby" phase first -- otherwise a fast (especially
+    mock-provider) game could advance several steps before the frontend
+    ever connects, and the player would land mid-story with no idea what
+    they missed."""
+    try:
+        orch = registry.get(session_id)
+    except KeyError:
+        raise HTTPException(404, "No such game.")
+    if orch.started:
+        raise HTTPException(409, "Game has already begun.")
+    orch.start()
+    return {"ok": True}
 
 
 @router.get("/{session_id}/state")
@@ -82,4 +104,21 @@ async def continue_game(session_id: str) -> dict:
     if not orch.state.paused:
         raise HTTPException(409, "Game is not paused.")
     orch.continue_game()
+    return {"ok": True}
+
+
+@router.post("/{session_id}/stop")
+async def stop_game(session_id: str, request: Request) -> dict:
+    """Abandons the game immediately, wherever it currently is -- unlike
+    pause, this doesn't wait for a natural checkpoint (see
+    GameOrchestrator.stop). The session is unregistered right after, so
+    every other route (state, stream, input, pause) 404s for it from this
+    point on, same as a session_id that never existed."""
+    try:
+        orch = registry.get(session_id)
+    except KeyError:
+        raise HTTPException(404, "No such game.")
+    orch.stop()
+    await persistence.stop_game(request.app.state.db_conn, session_id)
+    registry.unregister(session_id)
     return {"ok": True}

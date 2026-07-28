@@ -29,9 +29,12 @@ to multi-agent orchestration rather than general web-app plumbing.
 6. [Model-agnostic adapters and the tool-calling loop](06-model-agnostic-adapters-and-tool-calling.md) —
    swapping Claude/OpenAI/Gemini/Ollama/mock behind one interface, and why
    "let the model call a tool" beats "ask the model for JSON and parse it."
-7. [Pausing a live game with a second `interrupt()`](07-pausing-with-interrupt.md) —
-   reusing the human-turn suspend/resume machinery for pause/continue, and
-   the subtle ordering bug this reuse can cause if you're not careful.
+7. [Controlling a live game: starting, pausing, and stopping](07-pausing-with-interrupt.md) —
+   why a game doesn't start advancing the instant it's created (the
+   `started` flag and `begin_game`), reusing the human-turn suspend/resume
+   machinery for pause/continue, the subtle ordering bug that reuse can
+   cause if you're not careful, and `stop()`'s contrasting mechanism
+   (`Task.cancel()`) for ending a game outright instead of pausing it.
 8. [Two kinds of persistence](08-persistence-and-checkpointing.md) — the
    SQLite *checkpointer* that makes `interrupt()` durable vs. the SQLite
    *tables* that record game history for humans to read later. Easy to

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     google_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
-    # Ollama Cloud (ollama.com's hosted models, e.g. "gpt-oss:120b-cloud") --
+    # Ollama Cloud (ollama.com's hosted models, e.g. "gpt-oss:120b") --
     # distinct from a local Ollama install. Unlike the other providers, the
     # `ollama` python package doesn't read this from a bare os.getenv() at
     # request time in a way this app can rely on (see adapters.py's

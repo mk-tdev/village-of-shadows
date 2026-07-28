@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { continueGame, pauseGame, submitInput } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { beginGame, continueGame, pauseGame, stopGame, submitInput } from "@/lib/api";
 import { useGameStream } from "@/lib/useGameStream";
 import { PlayerCard } from "./PlayerCard";
 import { Feed } from "./Feed";
@@ -12,9 +13,12 @@ import { DebugPanel } from "./DebugPanel";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 
 export function GameView({ sessionId }: { sessionId: string }) {
+  const router = useRouter();
   const { game, active, connected, errorMessage, currentNode, metrics, activity } = useGameStream(sessionId);
   const [godView, setGodView] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [beginning, setBeginning] = useState(false);
 
   const isNight = !game || game.phase === "night" || game.phase === "lobby";
   // The "X is thinking" feed indicator only makes sense for an AI seat --
@@ -61,8 +65,30 @@ export function GameView({ sessionId }: { sessionId: string }) {
     }
   };
 
+  const handleBegin = async () => {
+    setBeginning(true);
+    try {
+      await beginGame(sessionId);
+    } catch (err) {
+      console.error(err);
+      setBeginning(false);
+    }
+  };
+
   const handlePause = () => pauseGame(sessionId).catch(console.error);
   const handleContinue = () => continueGame(sessionId).catch(console.error);
+
+  const handleStop = async () => {
+    if (!window.confirm("Stop this game and start over? This abandons the current game.")) return;
+    setStopping(true);
+    try {
+      await stopGame(sessionId);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      router.push("/");
+    }
+  };
 
   return (
     <div className="app">
@@ -90,7 +116,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
             <span>Round {game.round}</span>
           </div>
           <GodViewToggle on={godView} onToggle={() => setGodView((v) => !v)} />
-          {!game.winner && (
+          {!game.winner && game.phase !== "lobby" && (
             <button
               className="btn btn-secondary"
               style={{ padding: "7px 14px", fontSize: 12.5 }}
@@ -99,6 +125,14 @@ export function GameView({ sessionId }: { sessionId: string }) {
               {game.paused ? "▶ Continue" : "⏸ Pause"}
             </button>
           )}
+          <button
+            className="btn btn-secondary"
+            style={{ padding: "7px 14px", fontSize: 12.5 }}
+            onClick={handleStop}
+            disabled={stopping}
+          >
+            {stopping ? "Stopping..." : "⏹ New Game"}
+          </button>
         </div>
       </header>
 
@@ -126,6 +160,21 @@ export function GameView({ sessionId }: { sessionId: string }) {
           </div>
         </div>
       </div>
+
+      {game.phase === "lobby" && (
+        <div className="overlay">
+          <div className="overlay-card">
+            <h2>Ready when you are</h2>
+            <p>
+              Seats are configured and everyone’s connected. The game won’t advance a single
+              step until you start it — click below to assign roles and begin Night 1.
+            </p>
+            <button className="btn" onClick={handleBegin} disabled={beginning}>
+              {beginning ? "Starting..." : "▶ Start Game"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {game.winner && (
         <div className="overlay">

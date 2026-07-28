@@ -79,15 +79,15 @@ runs:
 ```python
 self.current_node: str | None = None
 ```
-([orchestrator.py:44-50](../../backend/app/game/orchestrator.py#L44-L50))
+([orchestrator.py:61-67](../../backend/app/game/orchestrator.py#L61-L67))
 
 ```python
 node_name = config.get("metadata", {}).get("langgraph_node")
 if node_name:
     orch.current_node = node_name
-    orch.publish("node", {"node": node_name})
+    orch.publish("node", {"node": node_name, "phase": game.phase, "round": game.round})
 ```
-([nodes.py:50-53](../../backend/app/game/nodes.py#L50-L53))
+([nodes.py:64-67](../../backend/app/game/nodes.py#L64-L67))
 
 `_sync` (see [02](02-langgraph-state-machine.md)) already ran on every node
 execution to re-point `orch.state` — recording the node name there too was
@@ -100,11 +100,20 @@ turn run partway, then opened the game page fresh — the graph highlighted
 the correct in-progress node on first paint, matched against the backend's
 own `/state` response.
 
+The `phase`/`round` fields alongside `"node"` were added later, for a
+related but distinct reason than the graph highlight: they're the *only*
+place a connected browser learns those values after its one-time initial
+`"state"` snapshot, since nothing else updates them on the frontend. See
+[10-frontend-observability.md](10-frontend-observability.md) for the real
+bug this caused — a lobby "Start Game" overlay that never closed once the
+game actually started, because `game.phase` was frozen at `"lobby"` from
+the snapshot with no live event ever correcting it.
+
 ## Publishing events from inside a graph node
 
 Graph nodes never write to the HTTP response directly — they call
 `orch.publish(event, data)` (see e.g. `_emit_turn`,
-[nodes.py:57-58](../../backend/app/game/nodes.py#L57-L58), or the "decision"
+[nodes.py:71-72](../../backend/app/game/nodes.py#L71-L72), or the "decision"
 event in `agent_turn.py`,
 [agent_turn.py:247-257](../../backend/app/game/agent_turn.py#L247-L257) —
 there's also a `"mcp"` event published from the same file on every MCP
@@ -157,7 +166,7 @@ def publish(self, event: str, data: dict) -> None:
     for queue in self._subscribers:
         queue.put_nowait({"event": event, "data": data})
 ```
-([orchestrator.py:37-63](../../backend/app/game/orchestrator.py#L37-L63))
+([orchestrator.py:54-90](../../backend/app/game/orchestrator.py#L54-L90))
 
 Every SSE connection now gets its **own independent queue** via
 `subscribe()`, and `publish()` fans an event out to *every* subscriber's
@@ -176,7 +185,7 @@ shared resource left for it to steal from.
 # from under the connection that actually survives -- each subscriber
 # getting its own copy makes that race harmless.
 ```
-([orchestrator.py:30-36](../../backend/app/game/orchestrator.py#L30-L36))
+([orchestrator.py:47-53](../../backend/app/game/orchestrator.py#L47-L53))
 
 The general lesson: a single shared consumer queue is only safe for
 fan-*out* delivery if you can guarantee there's ever exactly one consumer.

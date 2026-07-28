@@ -16,7 +16,8 @@ The frontend's setup page collects 7 seats (exactly one `controller:
 `POST /games` with the list as JSON
 ([frontend/lib/api.ts](../../frontend/lib/api.ts)).
 
-**2. `create_game` validates, builds `GameState`, and starts the graph.**
+**2. `create_game` validates and builds `GameState` — but deliberately
+does *not* start the graph yet.**
 ```python
 session_id = str(uuid.uuid4())
 players = [Player(...) for c in configs]
@@ -24,26 +25,55 @@ state = GameState(session_id=session_id, players=players)
 ...
 orch = GameOrchestrator(session_id, state, conn, graph)
 registry.register(orch)
-orch.start()
+# Deliberately not orch.start() here -- see GameOrchestrator.started's
+# docstring.
 return {"session_id": session_id}
 ```
-([routers/games.py:13-44](../../backend/app/routers/games.py#L13-L44))
+([routers/games.py:13-48](../../backend/app/routers/games.py#L13-L48))
 
-`orch.start()` calls `asyncio.create_task(self._run({"game": self.state}))`
-— the graph begins running **in the background**, immediately, before the
-HTTP response even returns. The route responds with just `{"session_id":
-...}` right away; it never waits for any part of the game to actually play
-out.
+The orchestrator exists and is registered — `GET /state` and `GET /stream`
+both work against it immediately — but its background task never gets
+created here. `GameState.phase` defaults to `"lobby"` and just sits there.
+This wasn't always the design: `create_game` used to call `orch.start()`
+immediately, and the graph would begin running **in the background**
+before the HTTP response even returned. In practice that meant a fast game
+(especially with mock-provider seats) could race ahead several nodes —
+`assign_roles`, a few `night_wolves` turns — before the frontend's browser
+had even navigated to the game page and opened its SSE connection, so a
+player would land on a game already a few steps deep with no idea what
+they'd missed. See [07](07-pausing-with-interrupt.md) for the
+`GameOrchestrator.started` flag and the `POST /{id}/begin` route that
+replaced the automatic start.
 
-**3. The frontend redirects to `/game/{session_id}` and opens the stream.**
+**3. The frontend redirects to `/game/{session_id}` and opens the stream
+— while the game is still sitting in `"lobby"`.**
 `useGameStream(sessionId)` opens `new EventSource(streamUrl(sessionId))` →
 `GET /games/{id}/stream`. The route calls `orch.subscribe()`, gets its own
-queue, and immediately yields a `"state"` event with the full current
-`GameState` — by now, the background graph task may already be a few nodes
-in (having run `assign_roles` and part of `start_night`), so this snapshot
-might already show roles assigned and night in progress. This is exactly
-why the initial snapshot exists at all: a slightly-delayed connection still
-gets caught up instantly rather than missing whatever already happened.
+queue, and immediately yields a `"state"` event with the current
+`GameState` — phase `"lobby"`, no roles assigned, nothing in the log yet,
+because nothing has run. `GameView.tsx` renders a "Ready when you are"
+overlay in exactly this state
+([GameView.tsx](../../frontend/components/GameView.tsx)) with a
+**Start Game** button.
+
+**3a. Clicking Start Game is what actually kicks off the graph.**
+```python
+@router.post("/{session_id}/begin")
+async def begin_game(session_id: str) -> dict:
+    ...
+    if orch.started:
+        raise HTTPException(409, "Game has already begun.")
+    orch.start()
+    return {"ok": True}
+```
+([routers/games.py:51-66](../../backend/app/routers/games.py#L51-L66))
+
+*Now* `orch.start()` calls `asyncio.create_task(self._run({"game":
+self.state}))` — but this time, the browser's SSE connection has already
+been open and receiving events since step 3, so every node transition from
+`assign_roles` onward streams in live from the very first one. There's no
+window left where the graph can run ahead of a connection that hasn't
+opened yet, because the human is the one who opens that door.
 
 ## Part B: one AI werewolf's night action
 
@@ -67,7 +97,7 @@ _emit_turn(orch, wolf.seat_id, wolf.name)          # "turn" SSE event -- feed sh
 await run_agent_turn(orch, wolf, phase="night", ...,
                       commit_tool_name="submit_night_action", fallback={"pool": pool})
 ```
-([nodes.py:147-182](../../backend/app/game/nodes.py#L147-L182))
+([nodes.py:161-196](../../backend/app/game/nodes.py#L161-L196))
 
 **6. `run_agent_turn` resolves this seat's provider and opens an MCP session.**
 ```python
@@ -112,7 +142,7 @@ for _ in range(MAX_TOOL_ITERATIONS):
         return committed_result
 ```
 The system prompt here is `_persona(wolf, game)`
-([nodes.py:427-444](../../backend/app/game/nodes.py#L427-L444)) — which
+([nodes.py:441-458](../../backend/app/game/nodes.py#L441-L458)) — which
 tells this seat its personality, its secret role, and (only because it's a
 werewolf) its teammate's name. This is hand-built per-call rather than
 routed through `build_agent_view`, but it follows the identical

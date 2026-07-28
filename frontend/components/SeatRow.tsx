@@ -1,16 +1,7 @@
 import type { AgentConfig, Provider } from "@/lib/types";
-import { PROVIDER_MODEL_SUGGESTIONS } from "@/lib/seatDefaults";
+import { PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
 import { Select } from "./Select";
 import { Combobox } from "./Combobox";
-
-const PROVIDER_OPTIONS = [
-  { value: "mock", label: "mock", sublabel: "offline" },
-  { value: "claude", label: "Claude" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "ollama", label: "Ollama", sublabel: "local server" },
-  { value: "ollama_cloud", label: "Ollama Cloud", sublabel: "hosted, needs OLLAMA_API_KEY" },
-];
 
 export function SeatRow({
   seat,

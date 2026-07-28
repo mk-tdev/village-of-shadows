@@ -11,13 +11,13 @@ def get_chat_model(config: AgentConfig):
         return None
     if config.provider == "claude":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=config.model_name or "claude-sonnet-4-6")
+        return ChatAnthropic(model=config.model_name or "claude-sonnet-4-6", anthropic_api_key=settings.anthropic_api_key)
     if config.provider == "openai":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=config.model_name or "gpt-4.1")
+        return ChatOpenAI(model=config.model_name or "gpt-4.1", openai_api_key=settings.openai_api_key)
     if config.provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(model=config.model_name or "gemini-2.5-flash")
+        return ChatGoogleGenerativeAI(model=config.model_name or "gemini-2.5-flash", google_api_key=settings.google_api_key)
     if config.provider == "ollama":
         from langchain_ollama import ChatOllama
         return ChatOllama(model=config.model_name or "llama3.1", base_url=config.endpoint or "http://localhost:11434")
@@ -25,7 +25,7 @@ def get_chat_model(config: AgentConfig):
         from langchain_ollama import ChatOllama
         headers = {"Authorization": f"Bearer {settings.ollama_api_key}"} if settings.ollama_api_key else {}
         return ChatOllama(
-            model=config.model_name or "gpt-oss:120b-cloud",
+            model=config.model_name or "gpt-oss:120b",
             base_url=config.endpoint or settings.ollama_cloud_url,
             client_kwargs={"headers": headers},
         )
@@ -51,22 +51,49 @@ seats never needs `langchain_openai`, `langchain_google_genai`, or
 `langchain_ollama` importable at all — useful if you haven't installed every
 provider's SDK.
 
-**Why `ollama_cloud` is a distinct branch, not just `ollama` with a
-different `base_url`:** Ollama Cloud (`ollama.com`'s hosted models, tagged
-with a `-cloud` suffix like `gpt-oss:120b-cloud`) needs bearer-token
-authentication that a purely local Ollama server never does — and that key
-can't be handled the same way `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/
-`GOOGLE_API_KEY` are handled above, i.e. left for each SDK to read from
-`os.environ` on its own. Those SDKs read real OS environment variables;
-this app's `.env` file is parsed by `pydantic-settings` straight into the
-`settings` object (see [01](01-fastapi-app-shape.md)) and never gets
-exported into `os.environ` for anything else to see. The underlying
-`ollama` package *does* have its own `os.getenv("OLLAMA_API_KEY")`
-auto-pickup built in, but relying on it here would only work by accident,
-if something else happened to export that variable into the process
-environment. Passing `client_kwargs={"headers": {...}}` explicitly, built
-from `settings.ollama_api_key`, works regardless of whether the OS
-environment has it — one less thing to get right by coincidence.
+**Every real branch passes its key explicitly from `settings` — none of
+them rely on the SDK's own "read it from the environment" fallback,** and
+that's not belt-and-suspenders, it's load-bearing: `pydantic-settings`
+parses `.env` straight into the `settings` object's own fields (see
+[01](01-fastapi-app-shape.md)) and never exports those values into the
+process's actual `os.environ`. The `anthropic`/`openai`/`google-genai`
+SDKs, and the underlying `ollama` package's own `os.getenv("OLLAMA_API_KEY")`
+auto-pickup, all only look at a bare `os.environ` — so relying on any of
+them would only work by accident, if something else happened to export
+that variable into the process environment first. This was a real bug,
+not a hypothetical: the first version of this file *did* rely on SDK
+auto-detection for claude/openai/gemini, and every one of them silently
+had no working credentials regardless of what was in `.env`, surfacing
+eventually as `"Missing credentials. Please pass an api_key... or set the
+OPENAI_API_KEY... environment variable"` the first time a real provider
+seat was actually tried. Passing the key straight from `settings` — the one
+place that reliably has it — sidesteps the whole question.
+
+**`ollama_cloud` needs one more mechanism beyond that,** since `ChatOllama`
+has no constructor field for an API key the way `ChatAnthropic`/`ChatOpenAI`/
+`ChatGoogleGenerativeAI` do: `client_kwargs={"headers": {...}}` passes a
+bearer token as an HTTP header instead, forwarded straight to the
+underlying `ollama.Client`/`ollama.AsyncClient`. Same underlying reason as
+the paragraph above, just a different mechanism for this one library.
+
+**A second real bug this surfaced: guessed model names silently 410.**
+Ollama Cloud's actual catalog (`gpt-oss:120b`, `minimax-m2.7`, `kimi-k2.6`,
+...) uses plain model names for almost everything — a `-cloud` suffix is
+only a valid alias for a handful of models, like `gpt-oss`, that also exist
+as local pulls, where the suffix disambiguates "run the cloud one"
+from "run whatever I have pulled locally under this same name." Guessing
+that *every* cloud model followed the `-cloud`-suffix convention (an
+earlier version of `PROVIDER_MODEL_SUGGESTIONS.ollama_cloud` in
+[`seatDefaults.ts`](../../frontend/lib/seatDefaults.ts) did exactly this)
+meant some entries pointed at names that don't exist at all, which
+`POST /api/chat` rejects with `410 Gone` — a real, reproduced failure, not
+a hypothetical one. The fix was mechanical once diagnosed: query
+`GET https://ollama.com/api/tags` with the same bearer token this app
+already uses, and replace every guessed name with one straight from that
+response. There's no way to derive Ollama Cloud's current catalog from
+first principles — it's an external, changing service — so re-verify
+against your own account's `/api/tags` if a listed model ever stops
+resolving.
 
 ## Why "let the model call a tool" beats "ask for JSON and parse it"
 

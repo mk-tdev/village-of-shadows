@@ -51,6 +51,16 @@ export async function continueGame(sessionId: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to continue game (${res.status})`);
 }
 
+export async function stopGame(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/stop`, { method: "POST" });
+  if (!res.ok) throw new Error(`Failed to stop game (${res.status})`);
+}
+
+export async function beginGame(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/begin`, { method: "POST" });
+  if (!res.ok) throw new Error(`Failed to begin game (${res.status})`);
+}
+
 export async function fetchGraphStructure(): Promise<GraphStructure> {
   const res = await fetch(`${API_BASE}/graph/structure`);
   if (!res.ok) throw new Error(`Failed to fetch graph structure (${res.status})`);

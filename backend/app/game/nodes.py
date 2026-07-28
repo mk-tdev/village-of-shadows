@@ -43,6 +43,20 @@ def _sync(config: RunnableConfig, game: GameState):
     reports itself for free, and `check_win` (registered twice, as
     check_win_night and check_win_vote) reports the correct one of the two
     rather than a single hardcoded name.
+
+    The event also carries `phase`/`round` -- the *only* place the frontend
+    otherwise learns those is the one-time initial "state" SSE snapshot on
+    connect (see routers/stream.py), which is never refreshed afterward.
+    Without this, `game.phase` on the frontend would freeze at whatever it
+    was when the browser connected -- harmless in the old
+    connect-after-auto-start design (the snapshot usually already showed a
+    phase past "lobby" by the time anyone was watching), but a real bug now
+    that a browser connects *before* the human clicks "Start Game" (see
+    07-pausing-with-interrupt.md's `begin_game`): the "Ready when you are"
+    overlay checks `game.phase === "lobby"` and had nothing that would ever
+    tell it the phase moved on, so it never closed. Piggy-backing on the
+    "node" event (already fires on every node transition) means phase/round
+    go stale for at most one node's worth of lag, not forever.
     """
     session_id = config["configurable"]["session_id"]
     orch = registry.get(session_id)
@@ -50,7 +64,7 @@ def _sync(config: RunnableConfig, game: GameState):
     node_name = config.get("metadata", {}).get("langgraph_node")
     if node_name:
         orch.current_node = node_name
-        orch.publish("node", {"node": node_name})
+        orch.publish("node", {"node": node_name, "phase": game.phase, "round": game.round})
     return orch
 
 

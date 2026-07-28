@@ -83,7 +83,21 @@ export function useGameStream(sessionId: string): GameStreamState {
           p.seat_id === entry.seat_id ? { ...p, alive: false } : p
         );
       }
-      const next: GameState = { ...current, players, log: [...current.log, entry] };
+      // Every log entry carries the phase/round that was current the
+      // instant it was logged (see nodes.py's _log/_append_log) -- without
+      // applying it here, `game.phase` would stay frozen at whatever the
+      // initial "state" snapshot showed (now "lobby", see 07's begin_game
+      // section) for the rest of the connection, since no other event
+      // updates it. That left the "Ready when you are" lobby overlay stuck
+      // open forever once the game actually started, even though the
+      // backend had moved on.
+      const next: GameState = {
+        ...current,
+        players,
+        phase: entry.phase,
+        round: entry.round,
+        log: [...current.log, entry],
+      };
       gameRef.current = next;
       setGame(next);
     });
@@ -95,9 +109,21 @@ export function useGameStream(sessionId: string): GameStreamState {
     });
 
     source.addEventListener("node", (e) => {
-      const data: { node: string } = JSON.parse((e as MessageEvent).data);
+      const data: { node: string; phase?: string; round?: number } = JSON.parse((e as MessageEvent).data);
       setCurrentNode(data.node);
       pushActivity("node", `Orchestrator entered ${data.node}`);
+
+      // phase/round otherwise only ever come from the one-time initial
+      // "state" snapshot -- nothing else updates them, so without this a
+      // browser that connected while the game was still in "lobby" (see
+      // GameView.tsx's "Ready when you are" overlay) would never learn the
+      // game had actually started.
+      const current = gameRef.current;
+      if (current && data.phase !== undefined && (current.phase !== data.phase || current.round !== data.round)) {
+        const next: GameState = { ...current, phase: data.phase, round: data.round ?? current.round };
+        gameRef.current = next;
+        setGame(next);
+      }
     });
 
     source.addEventListener("mcp", (e) => {

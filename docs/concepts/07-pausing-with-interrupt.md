@@ -1,4 +1,4 @@
-# 7. Pausing a live game with a second `interrupt()`
+# 7. Controlling a live game: starting, pausing, and stopping
 
 **Files:** [`backend/app/game/orchestrator.py`](../../backend/app/game/orchestrator.py),
 [`backend/app/game/nodes.py`](../../backend/app/game/nodes.py),
@@ -15,13 +15,70 @@ turn, and continuing is a `Command(resume=...)` call, identical in shape to
 answering a human prompt. No second suspend/resume system, no separate
 "paused" state machine running alongside the graph.
 
+## Not starting automatically: the `started` flag and `begin_game`
+
+Before pause/continue/stop even come into play, there's an earlier
+lifecycle question: *when* does a game's graph first start running at all?
+The obvious answer — the instant `POST /games` creates it — turned out to
+be wrong in practice:
+
+```python
+orch = GameOrchestrator(session_id, state, conn, graph)
+registry.register(orch)
+# Deliberately not orch.start() here -- see GameOrchestrator.started's
+# docstring.
+```
+([routers/games.py:40-46](../../backend/app/routers/games.py#L40-L46))
+
+`create_game` builds and registers the orchestrator, but never calls
+`orch.start()`. If it did — which is what this project's first version
+actually shipped — the graph would begin advancing in the background
+*immediately*, often before the browser had even navigated to the game
+page and opened its SSE connection. A fast game (mock-provider seats
+especially, since they never wait on a real API call) could race through
+`assign_roles` and several `night_wolves` turns before anyone was watching,
+so a player would land on a game already a few steps deep with no idea
+what they'd missed — a real, reported symptom ("it just skips 3 steps
+ahead before I even realize"), not a hypothetical one.
+
+The fix is a `started` flag (the same "plain attribute on the orchestrator,
+not `GameState`" reasoning as `pause_requested` below and `current_node`
+in [09](09-sse-streaming-and-broadcast.md)) and a dedicated route the human
+triggers explicitly:
+
+```python
+self.started = False
+```
+([orchestrator.py:68-77](../../backend/app/game/orchestrator.py#L68-L77))
+
+```python
+@router.post("/{session_id}/begin")
+async def begin_game(session_id: str) -> dict:
+    ...
+    if orch.started:
+        raise HTTPException(409, "Game has already begun.")
+    orch.start()
+    return {"ok": True}
+```
+([routers/games.py:51-66](../../backend/app/routers/games.py#L51-L66))
+
+`GameState.phase` starts at `"lobby"` and stays there until `begin_game`
+actually calls `orch.start()`. The frontend's game page already opens its
+SSE connection the moment it mounts — so by the time a human clicks the
+"Start Game" button it presents while `phase === "lobby"`
+([GameView.tsx](../../frontend/components/GameView.tsx)), the connection
+watching for events has been live for as long as the page has been open.
+Nothing can run ahead of a viewer who hasn't arrived yet, because starting
+is now an action the viewer takes, not a side effect of creating the game.
+See [11](11-application-walkthrough.md) for this traced through end to end.
+
 ## Requesting a pause: a flag, not an instant stop
 
 ```python
 def request_pause(self) -> None:
     self.pause_requested = True
 ```
-([orchestrator.py:72-73](../../backend/app/game/orchestrator.py#L72-L73))
+([orchestrator.py:100-101](../../backend/app/game/orchestrator.py#L100-L101))
 
 ```python
 @router.post("/{session_id}/pause")
@@ -33,7 +90,7 @@ async def pause_game(session_id: str) -> dict:
     orch.request_pause()
     return {"ok": True}
 ```
-([games.py:62-73](../../backend/app/routers/games.py#L62-L73))
+([games.py:84-95](../../backend/app/routers/games.py#L84-L95))
 
 `POST /pause` doesn't stop anything immediately — it just sets a plain
 boolean on the orchestrator. Whatever seat's turn is currently mid-flight
@@ -52,7 +109,7 @@ This flag deliberately lives on `GameOrchestrator`, **not** inside
 # docstring for why that swap happens at all).
 self.pause_requested = False
 ```
-([orchestrator.py:38-43](../../backend/app/game/orchestrator.py#L38-L43))
+([orchestrator.py:55-60](../../backend/app/game/orchestrator.py#L55-L60))
 
 If `pause_requested` were a `GameState` field instead, it would get
 serialized into the LangGraph checkpoint and restored from a snapshot on
@@ -81,7 +138,7 @@ def _maybe_pause(orch, game: GameState) -> None:
     game.paused = False
     orch.publish("resumed", {})
 ```
-([nodes.py:61-89](../../backend/app/game/nodes.py#L61-L89))
+([nodes.py:75-103](../../backend/app/game/nodes.py#L75-L103))
 
 `_maybe_pause` is called at the tail end of **every** node in `nodes.py` (12
 call sites). Most of the time `pause_requested` is `False` and it's a no-op.
@@ -102,7 +159,7 @@ if isinstance(event, dict) and "__interrupt__" in event:
     self.state.awaiting = AwaitingInput(**payload)
     ...
 ```
-([orchestrator.py:84-92](../../backend/app/game/orchestrator.py#L84-L92))
+([orchestrator.py:127-135](../../backend/app/game/orchestrator.py#L127-L135))
 
 `GameOrchestrator._run` distinguishes a pause-interrupt from a
 human-turn-interrupt purely by the `"kind"` field in the payload — a pause
@@ -119,7 +176,7 @@ def continue_game(self) -> None:
     # this is a plain truthy sentinel the pause interrupt discards.
     self.resume(True)
 ```
-([orchestrator.py:75-79](../../backend/app/game/orchestrator.py#L75-L79))
+([orchestrator.py:103-107](../../backend/app/game/orchestrator.py#L103-L107))
 
 `continue_game()` calls the exact same `resume()` method
 `POST /input` calls for a human answer — see
@@ -177,7 +234,7 @@ shift and steal an answer meant for an earlier call.
 always *after* any human `interrupt()` call earlier in that same node body
 (e.g. night_wolves' human branch) -- never before it."""
 ```
-([nodes.py:61-64](../../backend/app/game/nodes.py#L61-L64))
+([nodes.py:76-78](../../backend/app/game/nodes.py#L76-L78))
 
 This was caught by careful reasoning about LangGraph's position-based
 resume matching *before* writing the code — and then confirmed with a
@@ -188,3 +245,65 @@ requests a pause while a human turn is suspended and asserts the human's
 subsequently-submitted answer is actually applied — not silently discarded.
 If you ever add a node with more than one `interrupt()` call site, this is
 the exact failure mode to check for.
+
+## Stopping outright: the other way to end a game
+
+Pause and stop look similar from a UI button's perspective — both interrupt
+a running game — but they're deliberately built on two *different*
+mechanisms, not variations of one:
+
+```python
+def stop(self) -> None:
+    """Abandons this game outright -- cancels the background task
+    immediately, wherever it is (mid AI turn, mid human wait, anywhere),
+    rather than waiting for a natural checkpoint the way request_pause()
+    does. This is deliberately a different mechanism from pause/resume,
+    not a reuse of it: pausing means "come back to this later," stopping
+    means "this game is over, discard it." Task.cancel() raises
+    CancelledError at the task's next await point; that's a
+    BaseException, not an Exception, so it passes straight through
+    _run's `except Exception` handler below without publishing a
+    misleading "error" event -- the task just ends, cancelled.
+    """
+    if self._task is not None and not self._task.done():
+        self._task.cancel()
+```
+([orchestrator.py:109-122](../../backend/app/game/orchestrator.py#L109-L122))
+
+**Pause is cooperative: it asks, and waits for a safe point to say yes.**
+`request_pause()` just sets a flag; the *running* node keeps going until it
+naturally reaches `_maybe_pause()` at its own tail end (see above) before
+anything actually suspends. Nothing is ever interrupted mid-step — an
+in-flight tool call, a partially-built prompt, a DB write, all finish
+untouched. That's exactly right for "I want to come back to this game
+later": the state has to be coherent to resume from.
+
+**Stop is preemptive: it doesn't ask.** `orch._task.cancel()` schedules a
+`CancelledError` to be raised at whatever `await` the task happens to be
+sitting on right now — inside a slow real-model API call, in the middle of
+an MCP tool round-trip, anywhere. There's no equivalent of "wait for a safe
+point" because there's no plan to resume afterward; the game is being
+discarded, not parked. This is the right tool specifically for "stop a
+model call that might otherwise run for many more seconds" — pause
+wouldn't even help there, since `request_pause()`'s flag is only checked
+*after* the current turn finishes, and an in-flight provider call is
+exactly the thing pause can't interrupt.
+
+**Why cancellation doesn't trip the error-handling path.** `_run`'s loop
+(see [03](03-human-in-the-loop-interrupt.md)) wraps everything in `except
+Exception`, which publishes an `"error"` SSE event — appropriate for a
+genuine failure, wrong for a user-requested stop. `asyncio.CancelledError`
+inherits from `BaseException`, not `Exception`, specifically so cancellation
+isn't accidentally swallowed by ordinary exception handlers throughout a
+codebase — which is exactly the behavior this relies on here: cancelling
+`orch._task` unwinds past `_run`'s `except Exception` untouched, the task
+simply ends in a cancelled state, and no misleading error reaches the
+frontend.
+
+The router endpoint that drives this
+([routers/games.py](../../backend/app/routers/games.py)) also immediately
+calls `registry.unregister(session_id)` after `orch.stop()` — unlike pause,
+there's no notion of a stopped game still existing to be resumed later, so
+every other route (`/state`, `/stream`, `/input`, `/pause`) should 404 for
+it from that instant on, identical to a `session_id` that never existed.
+
