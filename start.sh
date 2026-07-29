@@ -22,10 +22,16 @@ if [ ! -f backend/.env ]; then
     echo "Warning: backend/.env not found -- real (non-mock) provider seats will fail." >&2
 fi
 
+if [ ! -f backend/.venv/bin/activate ]; then
+    echo "backend/.venv not found -- run 'uv sync' in backend/ first." >&2
+    exit 1
+fi
+
 echo "Starting backend on :$BACKEND_PORT ..."
 (
     cd backend
-    uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$BACKEND_PORT"
+    source .venv/bin/activate
+    uvicorn app.main:app --reload --host 127.0.0.1 --port "$BACKEND_PORT"
 ) > logs/backend.log 2>&1 &
 echo $! > .run/backend.pid
 
