@@ -24,7 +24,7 @@ if wolf.controller == "human":
     )
     await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
 ```
-([nodes.py:176-180](../../backend/app/game/nodes.py#L176-L180))
+([nodes.py:185-189](../../backend/app/game/nodes.py#L185-L189))
 
 `interrupt(payload)` does something that looks like a blocking call but
 isn't: it raises a special LangGraph exception that unwinds execution all

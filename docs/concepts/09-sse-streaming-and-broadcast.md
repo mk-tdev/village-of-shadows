@@ -109,6 +109,61 @@ bug this caused — a lobby "Start Game" overlay that never closed once the
 game actually started, because `game.phase` was frozen at `"lobby"` from
 the snapshot with no live event ever correcting it.
 
+## A third staleness bug: roles never reach an already-connected browser
+
+The exact same root cause hit a third field, with a more visible symptom.
+`game.players` — including each player's `role` — otherwise only ever comes
+from that one-time initial `"state"` snapshot too. Before `begin_game`
+existed (see [07](07-pausing-with-interrupt.md)), a game usually started
+advancing the instant it was created, so `assign_roles` had frequently
+already run by the time a browser's `EventSource` opened — the snapshot
+"by luck" often already had roles baked in. Once starting became a
+deliberate, later action the human takes, the snapshot is now taken
+*while the game is still `"lobby"`*, always before any role exists, and
+nothing ever refreshed `game.players` afterward.
+
+The visible symptom: "God view" ([10](10-frontend-observability.md)) is
+supposed to reveal every seat's role and role icon the instant it's
+toggled on. Instead, every seat showed no role at all until the page was
+manually refreshed — a refresh re-fetches a `"state"` snapshot taken
+*after* `assign_roles` had already run, so it "fixed itself" the same
+misleading way the lobby-overlay bug in the previous section did before
+its own fix.
+
+The fix follows the same shape again — publish the data a node just
+computed, right when it computes it, rather than waiting for a browser to
+eventually reconnect and re-fetch it:
+
+```python
+orch.publish("roles_assigned", {"players": [p.model_dump() for p in game.players]})
+```
+([nodes.py:147](../../backend/app/game/nodes.py#L147))
+
+```typescript
+source.addEventListener("roles_assigned", (e) => {
+  const data: { players: Player[] } = JSON.parse((e as MessageEvent).data);
+  const current = gameRef.current;
+  if (!current) return;
+  const next: GameState = { ...current, players: data.players };
+  gameRef.current = next;
+  setGame(next);
+});
+```
+([useGameStream.ts:73-80](../../frontend/lib/useGameStream.ts#L73-L80))
+
+Three fields (`current_node`, `phase`/`round`, now `players`) have hit this
+exact same shape of bug for the exact same reason: `begin_game` decoupled
+"a browser is connected" from "the game has started," so the one-time
+initial snapshot increasingly under-represents reality by the time
+anything interesting has happened. The general lesson isn't "add another
+one-off event per field" — it's that *any* piece of `GameState` a node
+mutates needs either its own catch-up event like this, or to be re-sent
+wholesale (a fresh `"state"` broadcast) whenever a node changes it. This
+project has so far reached for the narrower, per-field event each time a
+new staleness bug was actually hit, rather than broadcasting the full
+`GameState` on every node transition — cheaper per-event, at the cost of
+being the kind of bug that only surfaces one missed field at a time.
+
 ## Publishing events from inside a graph node
 
 Graph nodes never write to the HTTP response directly — they call

@@ -137,6 +137,15 @@ async def assign_roles(state: dict, config: RunnableConfig) -> dict:
         player.role = role
         await persistence.set_seat_role(orch.conn, orch.session_id, player.seat_id, role)
 
+    # The frontend's `game.players` otherwise only ever comes from the
+    # one-time initial "state" SSE snapshot (see stream.py) -- since
+    # begin_game (07-pausing-with-interrupt.md) now decouples game creation
+    # from graph start, that snapshot is always taken *before* roles exist,
+    # and no other event refreshes the player list afterward. Without this,
+    # "god mode" (PlayerCard.tsx's roleKnown) has nothing to reveal until the
+    # browser is refreshed and re-fetches a snapshot from after this point.
+    orch.publish("roles_assigned", {"players": [p.model_dump() for p in game.players]})
+
     await _log_system(
         orch, "Seven villagers gather as the sun sets. Among them, some are not what they seem."
     )

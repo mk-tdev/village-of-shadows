@@ -41,8 +41,9 @@ to multi-agent orchestration rather than general web-app plumbing.
    conflate; they solve different problems.
 9. [Streaming state out over SSE](09-sse-streaming-and-broadcast.md) — why
    Server-Sent Events instead of WebSockets, the broadcast/pub-sub redesign
-   that fixed a real race condition this project hit, and a second
-   catch-up-on-connect fix for browsers that join mid-game.
+   that fixed a real race condition this project hit, and three separate
+   catch-up-on-connect fixes (current node, phase/round, and player roles)
+   for browsers that connect before or during a game.
 10. [Frontend: turning events into UI](10-frontend-observability.md) — the
     `useGameStream` reducer; the debug panel, now permanently embedded
     rather than a click-to-open overlay; a hand-rolled drag/zoom canvas for

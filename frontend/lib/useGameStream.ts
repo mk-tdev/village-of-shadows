@@ -9,6 +9,7 @@ import type {
   GameState,
   LogEntry,
   McpEvent,
+  Player,
   SeatMetrics,
   TurnEvent,
 } from "./types";
@@ -61,6 +62,21 @@ export function useGameStream(sessionId: string): GameStreamState {
       const data: GameState = JSON.parse((e as MessageEvent).data);
       gameRef.current = data;
       setGame(data);
+    });
+
+    // Fired once, right after assign_roles runs (see nodes.py). The initial
+    // "state" snapshot above is taken at connect time, which (since a game
+    // no longer auto-starts -- see 07-pausing-with-interrupt.md) is almost
+    // always *before* roles exist, and nothing else ever refreshes
+    // game.players afterward. Without this, "god mode" has nothing to
+    // reveal until the browser is refreshed.
+    source.addEventListener("roles_assigned", (e) => {
+      const data: { players: Player[] } = JSON.parse((e as MessageEvent).data);
+      const current = gameRef.current;
+      if (!current) return;
+      const next: GameState = { ...current, players: data.players };
+      gameRef.current = next;
+      setGame(next);
     });
 
     source.addEventListener("log", (e) => {

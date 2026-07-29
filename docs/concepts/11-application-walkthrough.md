@@ -97,7 +97,7 @@ _emit_turn(orch, wolf.seat_id, wolf.name)          # "turn" SSE event -- feed sh
 await run_agent_turn(orch, wolf, phase="night", ...,
                       commit_tool_name="submit_night_action", fallback={"pool": pool})
 ```
-([nodes.py:161-196](../../backend/app/game/nodes.py#L161-L196))
+([nodes.py:170-205](../../backend/app/game/nodes.py#L170-L205))
 
 **6. `run_agent_turn` resolves this seat's provider and opens an MCP session.**
 ```python
@@ -142,7 +142,7 @@ for _ in range(MAX_TOOL_ITERATIONS):
         return committed_result
 ```
 The system prompt here is `_persona(wolf, game)`
-([nodes.py:441-458](../../backend/app/game/nodes.py#L441-L458)) — which
+([nodes.py:450-467](../../backend/app/game/nodes.py#L450-L467)) — which
 tells this seat its personality, its secret role, and (only because it's a
 werewolf) its teammate's name. This is hand-built per-call rather than
 routed through `build_agent_view`, but it follows the identical

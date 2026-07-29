@@ -72,6 +72,13 @@ Nothing can run ahead of a viewer who hasn't arrived yet, because starting
 is now an action the viewer takes, not a side effect of creating the game.
 See [11](11-application-walkthrough.md) for this traced through end to end.
 
+This same decoupling is *why* three separate fields — the current node,
+`phase`/`round`, and player roles — each needed their own catch-up-on-connect
+SSE event after this change: the browser's one-time initial `"state"`
+snapshot is now reliably taken before the game (and therefore those fields)
+exists, where it previously often wasn't. See
+[09](09-sse-streaming-and-broadcast.md) for all three.
+
 ## Requesting a pause: a flag, not an instant stop
 
 ```python
