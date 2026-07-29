@@ -79,7 +79,7 @@ runs:
 ```python
 self.current_node: str | None = None
 ```
-([orchestrator.py:61-67](../../backend/app/game/orchestrator.py#L61-L67))
+([orchestrator.py:73-79](../../backend/app/game/orchestrator.py#L73-L79))
 
 ```python
 node_name = config.get("metadata", {}).get("langgraph_node")
@@ -87,7 +87,7 @@ if node_name:
     orch.current_node = node_name
     orch.publish("node", {"node": node_name, "phase": game.phase, "round": game.round})
 ```
-([nodes.py:64-67](../../backend/app/game/nodes.py#L64-L67))
+([nodes.py:65-68](../../backend/app/game/nodes.py#L65-L68))
 
 `_sync` (see [02](02-langgraph-state-machine.md)) already ran on every node
 execution to re-point `orch.state` — recording the node name there too was
@@ -137,7 +137,7 @@ eventually reconnect and re-fetch it:
 ```python
 orch.publish("roles_assigned", {"players": [p.model_dump() for p in game.players]})
 ```
-([nodes.py:147](../../backend/app/game/nodes.py#L147))
+([nodes.py:219](../../backend/app/game/nodes.py#L219))
 
 ```typescript
 source.addEventListener("roles_assigned", (e) => {
@@ -168,9 +168,9 @@ being the kind of bug that only surfaces one missed field at a time.
 
 Graph nodes never write to the HTTP response directly — they call
 `orch.publish(event, data)` (see e.g. `_emit_turn`,
-[nodes.py:71-72](../../backend/app/game/nodes.py#L71-L72), or the "decision"
+[nodes.py:72-73](../../backend/app/game/nodes.py#L72-L73), or the "decision"
 event in `agent_turn.py`,
-[agent_turn.py:247-257](../../backend/app/game/agent_turn.py#L247-L257) —
+[agent_turn.py:306-316](../../backend/app/game/agent_turn.py#L306-L316) —
 there's also a `"mcp"` event published from the same file on every MCP
 session bind and tool call, see
 [06](06-model-agnostic-adapters-and-tool-calling.md)),
@@ -221,7 +221,7 @@ def publish(self, event: str, data: dict) -> None:
     for queue in self._subscribers:
         queue.put_nowait({"event": event, "data": data})
 ```
-([orchestrator.py:54-90](../../backend/app/game/orchestrator.py#L54-L90))
+([orchestrator.py:66-102](../../backend/app/game/orchestrator.py#L66-L102))
 
 Every SSE connection now gets its **own independent queue** via
 `subscribe()`, and `publish()` fans an event out to *every* subscriber's
@@ -240,7 +240,7 @@ shared resource left for it to steal from.
 # from under the connection that actually survives -- each subscriber
 # getting its own copy makes that race harmless.
 ```
-([orchestrator.py:47-53](../../backend/app/game/orchestrator.py#L47-L53))
+([orchestrator.py:59-65](../../backend/app/game/orchestrator.py#L59-L65))
 
 The general lesson: a single shared consumer queue is only safe for
 fan-*out* delivery if you can guarantee there's ever exactly one consumer.

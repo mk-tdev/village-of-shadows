@@ -8,6 +8,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from app.config import settings
 from app.db import init_schema
 from app.game.graph import build_graph
+from app.game.seat_mind import build_seat_mind
 from app.mcp_server.server import mcp
 from app.routers import games, graph, input, stream
 
@@ -22,6 +23,10 @@ async def lifespan(app: FastAPI):
 
     app.state.db_conn = conn
     app.state.graph = build_graph(checkpointer)
+    # Same checkpointer as the game graph: a seat's memory and the game's own
+    # interrupt/resume state are both just threads in the one SQLite store,
+    # separated by thread_id (see game/seat_mind.py).
+    app.state.seat_mind = build_seat_mind(checkpointer)
 
     async with mcp.session_manager.run():
         yield

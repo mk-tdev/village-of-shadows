@@ -70,16 +70,33 @@ skips this function. Concretely:
 
 ## Where this gets called
 
-`build_agent_view` isn't called directly by graph nodes — it's called from
-inside the `get_my_private_context` MCP tool
+There are two callers, and the difference between them is worth
+understanding, because it changed.
+
+**Reactively, as an MCP tool.** `build_agent_view` backs the
+`get_my_private_context` tool
 ([mcp_server/server.py:48-55](../../backend/app/mcp_server/server.py#L48-L55)),
-which means the *only* way any code path — model or human — learns "what do
-I, personally, know right now" is by going through this function via a real
-tool call. There's no second, informal path where a node just reads
-`game.seer_knowledge[seat_id]` directly and stuffs it into a prompt string;
-if there were, that path would be exactly the kind of leak the docstring
-warns about, invisible until someone notices a werewolf "guessing" the
-seer's secret suspiciously well.
+so a model that wants to ask "what do I, personally, know right now?" gets
+its answer through this function and no other route.
+
+**Proactively, as the input contract for every AI turn.** This is the newer
+one. When each seat gained a persistent conversation
+([12](12-per-seat-agent-memory-subgraphs.md)), something had to decide what
+that conversation gets told at the start of each turn — and `_briefing` in
+`nodes.py` builds it entirely out of this view
+([nodes.py:95-127](../../backend/app/game/nodes.py#L95-L127)), never off raw
+`GameState`.
+
+That second caller matters more than it might look. Previously this function
+was only reachable if a model *chose* to call the tool — plenty of turns never
+did, which meant the boundary was well-designed but frequently unexercised,
+while the actual prompt text was assembled by hand in each node. Now the
+boundary is on the default path: a werewolf's agent cannot be handed the
+seer's knowledge, because the only code that composes what an agent sees goes
+through the function that filters by role. There is still no informal second
+path where a node reads `game.seer_knowledge[seat_id]` directly and stuffs it
+into a prompt string — and that's now true of the main path, not just the
+optional one.
 
 ## Why this matters more here than in a typical web app
 

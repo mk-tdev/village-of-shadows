@@ -37,11 +37,23 @@ def _describe_exception(exc: BaseException) -> str:
 
 
 class GameOrchestrator:
-    def __init__(self, session_id: str, state: GameState, conn: aiosqlite.Connection, graph: Any):
+    def __init__(
+        self,
+        session_id: str,
+        state: GameState,
+        conn: aiosqlite.Connection,
+        graph: Any,
+        seat_mind: Any = None,
+    ):
         self.session_id = session_id
         self.state = state
         self.conn = conn
         self.graph = graph
+        # The per-seat agent subgraph (see game/seat_mind.py). One compiled
+        # graph shared by every seat; each seat's *memory* is separated by its
+        # own thread_id, not by having its own graph object. Optional so a test
+        # can construct an orchestrator without one.
+        self.seat_mind = seat_mind
         self.config = {"configurable": {"thread_id": session_id, "session_id": session_id}}
         self._task: asyncio.Task | None = None
         # Broadcast fan-out, not a single shared queue: every /stream

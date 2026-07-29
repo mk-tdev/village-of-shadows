@@ -101,7 +101,7 @@ A simpler-looking design would prompt the model with "respond with JSON like
 `{"target": "Alice"}`" and `json.loads()` the reply. This project
 deliberately doesn't do that — every action goes through LangChain's
 `bind_tools` + tool-calling loop instead
-([agent_turn.py:105-148](../../backend/app/game/agent_turn.py#L105-L148)).
+([agent_turn.py:125-166](../../backend/app/game/agent_turn.py#L125-L166)).
 The reasons:
 
 - **Structure is enforced by the API, not by hoping the model formats
@@ -124,11 +124,11 @@ The reasons:
 
 ```python
 for _ in range(MAX_TOOL_ITERATIONS):
-    ai_msg: AIMessage = await bound_model.ainvoke(messages)
-    messages.append(ai_msg)
+    ai_msg: AIMessage = await bound_model.ainvoke(history + appended)
+    appended.append(ai_msg)
     ...
     if not ai_msg.tool_calls:
-        messages.append(HumanMessage(content=f"You must act by calling one of the provided tools, in particular `{commit_tool_name}`..."))
+        appended.append(HumanMessage(content=f"You must act by calling one of the provided tools, in particular `{commit_tool_name}`..."))
         continue
 
     committed_result = None
@@ -137,16 +137,23 @@ for _ in range(MAX_TOOL_ITERATIONS):
         if tool is None:
             continue
         tool_message = await tool.ainvoke(tc)
-        messages.append(tool_message)
+        appended.append(tool_message)
         result = _extract_structured_result(tool_message)
         tool_calls_log.append({"tool": tc["name"], "args": tc["args"], "result": result})
         if tc["name"] == commit_tool_name and result is not None:
             committed_result = result
 
     if committed_result is not None:
-        return committed_result
+        return committed_result, appended
 ```
-([agent_turn.py:113-148](../../backend/app/game/agent_turn.py#L113-L148))
+([agent_turn.py:131-166](../../backend/app/game/agent_turn.py#L131-L166))
+
+`history` is what this seat already remembers of the game and `appended` is
+what this turn adds — the loop reads the first and grows the second, then
+hands the delta back to the caller. That split is what lets the same loop
+serve a seat with a game-long memory
+([12](12-per-seat-agent-memory-subgraphs.md)); everything else about it is
+unchanged, and none of it is provider-specific.
 
 Each turn allows up to `MAX_TOOL_ITERATIONS` (4) round-trips. A model can
 call read-only tools first — `get_my_private_context`,
@@ -161,7 +168,7 @@ while one that wants to check its notes first gets the room to do that.
 Every real MCP touchpoint here also calls `orch.publish("mcp", ...)` — once
 right after `bind_seat` succeeds, and once per tool call inside this loop
 (`orch.publish("mcp", {"action": "call", "tool": tc["name"], ...})`,
-[agent_turn.py:137-140](../../backend/app/game/agent_turn.py#L137-L140)).
+[agent_turn.py:155-158](../../backend/app/game/agent_turn.py#L155-L158)).
 This has no effect on the loop's own logic — it exists purely so the
 frontend's live activity feed can show *when* an MCP session opens and
 *which* tool gets called, as it happens, rather than only after the fact
@@ -174,7 +181,7 @@ tools), the loop falls through to `_apply_fallback` at the bottom of
 `_run_model_turn` — a safe scripted default (e.g. a random legal target) so
 one uncooperative model never hangs or crashes the whole game. Robustness
 against a flaky model matters more here than perfect turn quality; see
-`_apply_fallback` ([agent_turn.py:264-276](../../backend/app/game/agent_turn.py#L264-L276)).
+`_apply_fallback` ([agent_turn.py:323-335](../../backend/app/game/agent_turn.py#L323-L335)).
 
 ## The mock provider: exercising everything with no API key
 
@@ -184,13 +191,13 @@ def get_chat_model(config: AgentConfig):
         return None
 ```
 
-`agent_turn.run_agent_turn` checks for exactly this:
+`agent_turn.run_turn_with_history` checks for exactly this:
 `if chat_model is None: return await _run_mock_turn(...)`
-([agent_turn.py:63-67](../../backend/app/game/agent_turn.py#L63-L67)). The
+([agent_turn.py:80-85](../../backend/app/game/agent_turn.py#L80-L85)). The
 mock path picks a random legal choice via the *same* `_apply_fallback`
 helper a real model's failure path would use, and records a decision with
 *estimated* token counts (`len(text) // 4`,
-[agent_turn.py:260-261](../../backend/app/game/agent_turn.py#L260-L261))
+[agent_turn.py:319-320](../../backend/app/game/agent_turn.py#L319-L320))
 instead of real usage metadata — there's no API response to read real
 counts from. The point isn't to simulate a convincing AI player; it's that
 every seat, mock or real, ends up calling the exact same `actions.py`
@@ -212,7 +219,7 @@ def _extract_structured_result(tool_message) -> dict | None:
     # fall back to parsing the text content it always produces instead.
     ...
 ```
-([agent_turn.py:165-184](../../backend/app/game/agent_turn.py#L165-L184))
+([agent_turn.py:218-237](../../backend/app/game/agent_turn.py#L218-L237))
 
 A minor but real MCP quirk worth knowing: FastMCP's `structuredContent`
 field — the "typed" result of a tool call — only gets populated when a

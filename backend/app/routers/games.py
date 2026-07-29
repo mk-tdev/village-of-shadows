@@ -37,7 +37,7 @@ async def create_game(configs: list[AgentConfig], request: Request) -> dict:
     graph = request.app.state.graph
     await persistence.create_game(conn, session_id, configs)
 
-    orch = GameOrchestrator(session_id, state, conn, graph)
+    orch = GameOrchestrator(session_id, state, conn, graph, request.app.state.seat_mind)
     registry.register(orch)
     # Deliberately not orch.start() here -- see GameOrchestrator.started's
     # docstring. The graph only begins advancing once the human clicks

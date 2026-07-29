@@ -11,6 +11,7 @@ from app.db import init_schema
 from app.game import registry
 from app.game.graph import build_graph
 from app.game.orchestrator import GameOrchestrator
+from app.game.seat_mind import build_seat_mind
 from app.models import AgentConfig, GameState, Player
 
 
@@ -21,6 +22,7 @@ async def make_orchestrator(tmp_path, controllers: list[str]) -> GameOrchestrato
     checkpointer = AsyncSqliteSaver(conn)
     await checkpointer.setup()
     graph = build_graph(checkpointer)
+    seat_mind = build_seat_mind(checkpointer)
 
     session_id = str(uuid.uuid4())
     names = ["Mara", "Tomas", "Elin", "Bram", "Sable", "Corvin", "Petra"]
@@ -42,7 +44,7 @@ async def make_orchestrator(tmp_path, controllers: list[str]) -> GameOrchestrato
     state = GameState(session_id=session_id, players=players)
     await persistence.create_game(conn, session_id, configs)
 
-    orch = GameOrchestrator(session_id, state, conn, graph)
+    orch = GameOrchestrator(session_id, state, conn, graph, seat_mind)
     registry.register(orch)
     return orch
 

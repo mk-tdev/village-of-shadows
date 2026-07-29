@@ -20,7 +20,8 @@ from langgraph.types import interrupt
 
 from app import persistence
 from app.game import actions, registry
-from app.game.agent_turn import run_agent_turn
+from app.game.seat_mind import remember, run_seat_turn
+from app.game.views import build_agent_view
 from app.models import GameState, Role
 
 
@@ -70,6 +71,77 @@ def _sync(config: RunnableConfig, game: GameState):
 
 def _emit_turn(orch, seat_id: str | None, name: str | None) -> None:
     orch.publish("turn", {"seat_id": seat_id, "name": name})
+
+
+def _turn_stamp(game: GameState, phase: str, index: int) -> str:
+    """Identifies one seat's one turn, so its mind can tell a genuinely new
+    turn from the same turn being replayed after a pause/resume (see
+    seat_mind.py's `_ingest` for the corruption this prevents). Every
+    component is read from the checkpointed GameState, so a replay
+    reconstructs an identical stamp."""
+    return f"{game.round}:{phase}:{index}"
+
+
+def _describe_entry(entry: dict) -> str:
+    kind = entry.get("type")
+    name = entry.get("name")
+    if kind == "statement" and name:
+        return f'{name} said: "{entry.get("text") or ""}"'
+    if kind == "vote" and name:
+        return f"{name} voted for {entry.get('target')}"
+    return entry.get("text") or ""
+
+
+def _briefing(game: GameState, seat, instruction: str) -> str:
+    """What this seat is told at the start of its turn — deliberately only the
+    *delta* since it last acted, never a restatement of the whole game.
+
+    That's the payoff of giving each seat a persistent mind (seat_mind.py):
+    it already remembers its own role, its own past actions, and everything it
+    was told on previous turns, so repeating any of that would just be paying
+    tokens to tell an agent what it already knows. What it genuinely cannot
+    know is what happened while it wasn't acting, which is exactly this.
+
+    Everything here comes through `build_agent_view` (views.py) rather than
+    off `GameState` directly, so the partial-observability boundary is the
+    thing feeding the agent rather than an afterthought — a werewolf's mind
+    physically cannot be handed the seer's knowledge from here.
+
+    The read cursor lives in `GameState`, so it is checkpointed and rolled
+    back with everything else: a replayed turn recomputes the identical
+    briefing rather than seeing an empty delta because the first attempt
+    already consumed it."""
+    view = build_agent_view(game, seat.seat_id)
+    cursor = game.seat_log_cursor.get(seat.seat_id, 0)
+    fresh = [
+        e for e in view["public_transcript"]
+        if e.get("seq", 0) >= cursor
+        # Skip what this seat did itself. Its own statement and vote are
+        # already in its conversation (it produced them -- the tool call and
+        # the tool's result are both recorded there), so echoing them back as
+        # news would be paying tokens to tell an agent what it just said.
+        and not (e.get("seat_id") == seat.seat_id and e.get("type") in ("statement", "vote"))
+    ]
+    game.seat_log_cursor[seat.seat_id] = game.next_seq()
+
+    lines: list[str] = []
+    if fresh:
+        lines.append("Since your last turn:")
+        lines.extend(f"  - {text}" for e in fresh if (text := _describe_entry(e)))
+    else:
+        lines.append("Nothing new has happened since your last turn.")
+
+    lines.append("")
+    lines.append(f"Still alive: {', '.join(view['alive_players'])}.")
+    if view.get("known_roles"):
+        # The seer learned each of these on one of its own past turns, so it
+        # is in its memory already -- restated compactly because it's small
+        # and it's the seer's whole edge, not because the memory is untrusted.
+        known = ", ".join(f"{name} is a {role}" for name, role in view["known_roles"].items())
+        lines.append(f"You have secretly confirmed: {known}.")
+    lines.append("")
+    lines.append(instruction)
+    return "\n".join(lines)
 
 
 def _maybe_pause(orch, game: GameState) -> None:
@@ -188,15 +260,15 @@ async def night_wolves(state: dict, config: RunnableConfig) -> dict:
         )
         await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
     else:
-        await run_agent_turn(
+        await run_seat_turn(
             orch, wolf, phase="night",
-            system_prompt=_persona(wolf, game),
-            user_prompt=(
+            briefing=_briefing(game, wolf, (
                 f"It is night {game.round}. Choose which villager the werewolves should attack tonight.\n"
                 f"Options: {', '.join(pool)}\n"
                 "Call `submit_night_action` with your chosen target."
-            ),
-            commit_tool_name="submit_night_action",
+            )),
+            turn_stamp=_turn_stamp(game, "night-wolves", game.wolf_index),
+            commit_tool="submit_night_action",
             fallback={"pool": pool},
         )
     game.wolf_index += 1
@@ -220,15 +292,15 @@ async def night_doctor(state: dict, config: RunnableConfig) -> dict:
         )
         await actions.apply_night_action(orch, doctor.seat_id, answer["target"], answer.get("thought", ""))
     else:
-        await run_agent_turn(
+        await run_seat_turn(
             orch, doctor, phase="night",
-            system_prompt=_persona(doctor, game),
-            user_prompt=(
+            briefing=_briefing(game, doctor, (
                 f"It is night {game.round}. Choose who to secretly protect tonight (you may protect yourself).\n"
                 f"Options: {', '.join(pool)}\n"
                 "Call `submit_night_action` with your chosen target."
-            ),
-            commit_tool_name="submit_night_action",
+            )),
+            turn_stamp=_turn_stamp(game, "night-doctor", 0),
+            commit_tool="submit_night_action",
             fallback={"pool": pool},
         )
     _emit_turn(orch, None, None)
@@ -254,15 +326,15 @@ async def night_seer(state: dict, config: RunnableConfig) -> dict:
         )
         await actions.apply_night_action(orch, seer.seat_id, answer["target"], answer.get("thought", ""))
     else:
-        await run_agent_turn(
+        await run_seat_turn(
             orch, seer, phase="night",
-            system_prompt=_persona(seer, game),
-            user_prompt=(
+            briefing=_briefing(game, seer, (
                 f"It is night {game.round}. Choose one player to secretly investigate — you will learn their true role.\n"
                 f"Options: {', '.join(pool)}\n"
                 "Call `submit_night_action` with your chosen target."
-            ),
-            commit_tool_name="submit_night_action",
+            )),
+            turn_stamp=_turn_stamp(game, "night-seer", 0),
+            commit_tool="submit_night_action",
             fallback={"pool": pool},
         )
     _emit_turn(orch, None, None)
@@ -319,23 +391,20 @@ async def day_discussion(state: dict, config: RunnableConfig) -> dict:
         return {"game": game}
 
     speaker = alive[game.day_index]
-    transcript = _round_transcript(game)
     _emit_turn(orch, speaker.seat_id, speaker.name)
 
     if speaker.controller == "human":
         answer = interrupt({"kind": "statement", "seat_id": speaker.seat_id, "prompt": "What do you want to say to the village?", "options": []})
         await actions.apply_statement(orch, speaker.seat_id, answer.get("text", "(says nothing)"))
     else:
-        await run_agent_turn(
+        await run_seat_turn(
             orch, speaker, phase="day-discuss",
-            system_prompt=_persona(speaker, game),
-            user_prompt=(
-                f"It is day {game.round}. Discussion so far this round:\n{transcript}\n"
-                f"Alive players: {', '.join(p.name for p in alive)}.\n"
-                "Give a short in-character spoken statement — accuse someone, defend yourself, or share a "
-                "suspicion. Call `submit_statement` with what you say aloud."
-            ),
-            commit_tool_name="submit_statement",
+            briefing=_briefing(game, speaker, (
+                f"It is day {game.round}. Give a short in-character spoken statement — accuse someone, "
+                "defend yourself, or share a suspicion. Call `submit_statement` with what you say aloud."
+            )),
+            turn_stamp=_turn_stamp(game, "day-discuss", game.day_index),
+            commit_tool="submit_statement",
             fallback={"text": "stays quiet, watching the others."},
         )
     game.day_index += 1
@@ -365,22 +434,21 @@ async def voting(state: dict, config: RunnableConfig) -> dict:
 
     voter = alive[game.vote_index]
     pool = [p.name for p in alive if p.name != voter.name]
-    transcript = _round_transcript(game)
     _emit_turn(orch, voter.seat_id, voter.name)
 
     if voter.controller == "human":
         answer = interrupt({"kind": "vote", "seat_id": voter.seat_id, "prompt": "Cast your vote.", "options": pool})
         await actions.apply_vote(orch, voter.seat_id, answer["target"], answer.get("thought", ""))
     else:
-        await run_agent_turn(
+        await run_seat_turn(
             orch, voter, phase="day-vote",
-            system_prompt=_persona(voter, game),
-            user_prompt=(
-                f"It is time to vote in round {game.round}. Full discussion this round:\n{transcript}\n"
-                f"Alive players you can vote for: {', '.join(pool)}.\n"
+            briefing=_briefing(game, voter, (
+                f"It is time to vote in round {game.round}.\n"
+                f"Players you can vote for: {', '.join(pool)}.\n"
                 "Call `submit_vote` with who you choose to eliminate."
-            ),
-            commit_tool_name="submit_vote",
+            )),
+            turn_stamp=_turn_stamp(game, "day-vote", game.vote_index),
+            commit_tool="submit_vote",
             fallback={"pool": pool},
         )
     game.vote_index += 1
@@ -439,6 +507,18 @@ async def check_win(state: dict, config: RunnableConfig) -> dict:
         await persistence.finish_game(orch.conn, orch.session_id, winner)
         orch.publish("log", entry.model_dump())
         orch.publish("game_over", {"winner": winner})
+
+        # Close out every agent's own record of the game. Nobody gets another
+        # turn after this, so there is no future briefing to carry the result
+        # -- without this, each seat's remembered game would just stop
+        # mid-round with no idea how it ended. Written straight into the
+        # conversation with no model call (see seat_mind.remember), and safe
+        # from the pause/resume replay other nodes have to guard against
+        # because this branch deliberately never calls `_maybe_pause`.
+        if orch.seat_mind is not None:
+            for player in game.players:
+                if player.controller == "ai":
+                    await remember(orch, player.seat_id, text)
     else:
         # Pausing a game that just ended is a no-op the player would never
         # ask for -- only check when there's more game left to play.
@@ -465,12 +545,3 @@ def _persona(player, game: GameState) -> str:
     elif player.role == "doctor":
         ctx += " Each night you may secretly protect one player (including yourself) from being killed."
     return ctx
-
-
-def _round_transcript(game: GameState) -> str:
-    lines = [
-        f"{e.name}: {e.text}"
-        for e in game.log
-        if e.round == game.round and e.type == "statement"
-    ]
-    return "\n".join(lines) if lines else "(no one has spoken yet)"

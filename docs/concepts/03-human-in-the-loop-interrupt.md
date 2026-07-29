@@ -24,7 +24,7 @@ if wolf.controller == "human":
     )
     await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
 ```
-([nodes.py:185-189](../../backend/app/game/nodes.py#L185-L189))
+([nodes.py:257-261](../../backend/app/game/nodes.py#L257-L261))
 
 `interrupt(payload)` does something that looks like a blocking call but
 isn't: it raises a special LangGraph exception that unwinds execution all
@@ -47,11 +47,11 @@ async def _run(self, input_: Any) -> None:
                 return
         ...
 ```
-([orchestrator.py:124-137](../../backend/app/game/orchestrator.py#L124-L137))
+([orchestrator.py:136-149](../../backend/app/game/orchestrator.py#L136-L149))
 
 `GameOrchestrator._run` drives the graph with `graph.astream(...)` inside a
 background `asyncio.Task` (see `start()`,
-[orchestrator.py:92-94](../../backend/app/game/orchestrator.py#L92-L94)).
+[orchestrator.py:104-106](../../backend/app/game/orchestrator.py#L104-L106)).
 When it sees an `"__interrupt__"` event, it stores the payload as
 `AwaitingInput` on the game's state and publishes an `awaiting_input` SSE
 event, then **returns** — the background task ends. There is nothing left
@@ -66,7 +66,7 @@ def resume(self, value: Any) -> None:
     self.state.awaiting = None
     self._task = asyncio.create_task(self._run(Command(resume=value)))
 ```
-([orchestrator.py:96-98](../../backend/app/game/orchestrator.py#L96-L98))
+([orchestrator.py:108-110](../../backend/app/game/orchestrator.py#L108-L110))
 
 ```python
 @router.post("/{session_id}/input")
@@ -127,7 +127,7 @@ covered yet — what happens when a turn genuinely fails, not just suspends:
 except Exception as exc:  # surfaced to the SSE stream rather than swallowed
     self.publish("error", {"message": _describe_exception(exc)})
 ```
-([orchestrator.py:140-141](../../backend/app/game/orchestrator.py#L140-L141))
+([orchestrator.py:152-153](../../backend/app/game/orchestrator.py#L152-L153))
 
 The first version of this line was just `self.publish("error", {"message":
 str(exc)})` — reasonable-looking, and wrong in a way that only shows up

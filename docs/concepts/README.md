@@ -7,8 +7,8 @@ file points at real file:line locations in `backend/` and `frontend/` so you
 can read the actual code alongside the explanation.
 
 Read them in order — later ones assume the earlier ones. If you only have
-time for a few, read 02, 03, 05, and 09; those are the concepts most specific
-to multi-agent orchestration rather than general web-app plumbing.
+time for a few, read 02, 03, 05, 09, and 12; those are the concepts most
+specific to multi-agent orchestration rather than general web-app plumbing.
 
 1. [FastAPI app shape](01-fastapi-app-shape.md) — routers, lifespan, one
    shared process, dependency injection via `app.state`.
@@ -53,3 +53,9 @@ to multi-agent orchestration rather than general web-app plumbing.
 11. [Application walkthrough](11-application-walkthrough.md) — trace one
     complete turn, end to end, through every layer above, using a concrete
     example (an AI werewolf's night action).
+12. [Giving each agent a memory](12-per-seat-agent-memory-subgraphs.md) — how
+    each seat got a persistent conversation spanning the whole game (one
+    subgraph, one checkpoint thread per seat), why the orchestrator sends
+    only what changed since that seat last acted, and the memory-corrupting
+    replay bug that appears the moment agent state lives outside the main
+    graph's rollback.

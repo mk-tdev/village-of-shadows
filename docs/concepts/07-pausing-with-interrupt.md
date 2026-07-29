@@ -49,7 +49,7 @@ triggers explicitly:
 ```python
 self.started = False
 ```
-([orchestrator.py:68-77](../../backend/app/game/orchestrator.py#L68-L77))
+([orchestrator.py:80-89](../../backend/app/game/orchestrator.py#L80-L89))
 
 ```python
 @router.post("/{session_id}/begin")
@@ -85,7 +85,7 @@ exists, where it previously often wasn't. See
 def request_pause(self) -> None:
     self.pause_requested = True
 ```
-([orchestrator.py:100-101](../../backend/app/game/orchestrator.py#L100-L101))
+([orchestrator.py:112-113](../../backend/app/game/orchestrator.py#L112-L113))
 
 ```python
 @router.post("/{session_id}/pause")
@@ -116,7 +116,7 @@ This flag deliberately lives on `GameOrchestrator`, **not** inside
 # docstring for why that swap happens at all).
 self.pause_requested = False
 ```
-([orchestrator.py:55-60](../../backend/app/game/orchestrator.py#L55-L60))
+([orchestrator.py:67-72](../../backend/app/game/orchestrator.py#L67-L72))
 
 If `pause_requested` were a `GameState` field instead, it would get
 serialized into the LangGraph checkpoint and restored from a snapshot on
@@ -145,7 +145,7 @@ def _maybe_pause(orch, game: GameState) -> None:
     game.paused = False
     orch.publish("resumed", {})
 ```
-([nodes.py:75-103](../../backend/app/game/nodes.py#L75-L103))
+([nodes.py:147-175](../../backend/app/game/nodes.py#L147-L175))
 
 `_maybe_pause` is called at the tail end of **every** node in `nodes.py` (12
 call sites). Most of the time `pause_requested` is `False` and it's a no-op.
@@ -166,7 +166,7 @@ if isinstance(event, dict) and "__interrupt__" in event:
     self.state.awaiting = AwaitingInput(**payload)
     ...
 ```
-([orchestrator.py:127-135](../../backend/app/game/orchestrator.py#L127-L135))
+([orchestrator.py:139-147](../../backend/app/game/orchestrator.py#L139-L147))
 
 `GameOrchestrator._run` distinguishes a pause-interrupt from a
 human-turn-interrupt purely by the `"kind"` field in the payload — a pause
@@ -183,7 +183,7 @@ def continue_game(self) -> None:
     # this is a plain truthy sentinel the pause interrupt discards.
     self.resume(True)
 ```
-([orchestrator.py:103-107](../../backend/app/game/orchestrator.py#L103-L107))
+([orchestrator.py:115-119](../../backend/app/game/orchestrator.py#L115-L119))
 
 `continue_game()` calls the exact same `resume()` method
 `POST /input` calls for a human answer — see
@@ -241,7 +241,7 @@ shift and steal an answer meant for an earlier call.
 always *after* any human `interrupt()` call earlier in that same node body
 (e.g. night_wolves' human branch) -- never before it."""
 ```
-([nodes.py:76-78](../../backend/app/game/nodes.py#L76-L78))
+([nodes.py:148-150](../../backend/app/game/nodes.py#L148-L150))
 
 This was caught by careful reasoning about LangGraph's position-based
 resume matching *before* writing the code — and then confirmed with a
@@ -275,7 +275,7 @@ def stop(self) -> None:
     if self._task is not None and not self._task.done():
         self._task.cancel()
 ```
-([orchestrator.py:109-122](../../backend/app/game/orchestrator.py#L109-L122))
+([orchestrator.py:121-134](../../backend/app/game/orchestrator.py#L121-L134))
 
 **Pause is cooperative: it asks, and waits for a safe point to say yes.**
 `request_pause()` just sets a flag; the *running* node keeps going until it

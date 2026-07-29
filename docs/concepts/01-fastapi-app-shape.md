@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 
     await conn.close()
 ```
-([main.py:15-29](../../backend/app/main.py#L15-L29))
+([main.py:16-33](../../backend/app/main.py#L16-L33))
 
 FastAPI's `lifespan` context manager runs once when the server starts and
 once when it stops — not per-request. Three things get created here that
@@ -63,7 +63,7 @@ app.include_router(stream.router)
 app.include_router(input.router)
 app.include_router(graph.router)
 ```
-([main.py:41-44](../../backend/app/main.py#L41-L44))
+([main.py:45-48](../../backend/app/main.py#L45-L48))
 
 Each router (`games.py`, `stream.py`, `input.py`, `graph.py`) owns one slice
 of the API surface and is mounted under a shared prefix
@@ -78,7 +78,7 @@ create, state) independently readable despite touching the same
 ```python
 app.mount("/mcp", mcp.streamable_http_app())
 ```
-([main.py:45](../../backend/app/main.py#L45))
+([main.py:49](../../backend/app/main.py#L49))
 
 The MCP tool server (see
 [05-mcp-tool-server-identity.md](05-mcp-tool-server-identity.md)) is a

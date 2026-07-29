@@ -44,7 +44,7 @@ await checkpointer.setup()
 ...
 app.state.graph = build_graph(checkpointer)
 ```
-([main.py:20-24](../../backend/app/main.py#L20-L24))
+([main.py:21-29](../../backend/app/main.py#L21-L29))
 
 This is a *second*, separate concern, answering a different question
 entirely: "if this graph is suspended mid-execution — inside a
@@ -59,7 +59,7 @@ tables (managed entirely by LangGraph internally — not the tables in
 ```python
 self.config = {"configurable": {"thread_id": session_id, "session_id": session_id}}
 ```
-([orchestrator.py:45](../../backend/app/game/orchestrator.py#L45))
+([orchestrator.py:57](../../backend/app/game/orchestrator.py#L57))
 
 Every game's `session_id` doubles as its checkpointer thread ID. When
 `resume()` calls `graph.astream(Command(resume=value), self.config)`, the
@@ -79,7 +79,7 @@ def _sync(config: RunnableConfig, game: GameState):
     orch.state = game
     ...
 ```
-([nodes.py:32-68](../../backend/app/game/nodes.py#L32-L68))
+([nodes.py:33-70](../../backend/app/game/nodes.py#L33-L70))
 
 The `game` object a resumed node receives is a *freshly deserialized copy*
 from the checkpoint, not the same Python object `orch.state` pointed at

@@ -94,6 +94,14 @@ class GameState(BaseModel):
     awaiting: AwaitingInput | None = None
     paused: bool = False
 
+    # seat_id -> the log seq that seat has already been briefed up to. Each AI
+    # seat keeps a persistent conversation of its own (see game/seat_mind.py),
+    # so on its turn it only needs telling what happened *since it last acted*;
+    # this is how the orchestrator knows where that starts. It belongs in
+    # GameState precisely so it gets checkpointed and rolled back with
+    # everything else -- see nodes.py's `_briefing`.
+    seat_log_cursor: dict[str, int] = Field(default_factory=dict)
+
     def next_seq(self) -> int:
         return len(self.log)
 

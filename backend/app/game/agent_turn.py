@@ -11,6 +11,17 @@ Every turn also emits a "decision" SSE event carrying token usage — this is
 the data behind the frontend debug panel's per-agent context/token metrics,
 the other half of the "showcase agentic engineering" ask alongside the
 graph-flow view (see routers/graph.py).
+
+This module owns the *mechanics* of executing one turn (provider resolution,
+MCP session + identity binding, the tool loop, telemetry) but deliberately
+does **not** own a seat's memory. `run_turn_with_history` takes whatever
+conversation a caller has accumulated and returns the messages to append to
+it, leaving the question of where that history lives — and how long it
+survives — to `seat_mind.py`, which keeps one continuously-checkpointed
+conversation per seat for a whole game. Keeping the split here means the MCP
+identity boundary stays exactly as it was (a fresh session, freshly bound,
+per turn — see 05-mcp-tool-server-identity.md) even though the *reasoning*
+either side of it is now long-lived.
 """
 
 from __future__ import annotations
@@ -20,7 +31,7 @@ import random
 import time
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app import persistence
 from app.adapters import get_chat_model
@@ -35,18 +46,24 @@ if TYPE_CHECKING:
 MAX_TOOL_ITERATIONS = 4
 
 
-async def run_agent_turn(
+async def run_turn_with_history(
     orch: "GameOrchestrator",
     player: "Player",
     *,
     phase: str,
-    system_prompt: str,
-    user_prompt: str,
+    history: list[Any],
     commit_tool_name: str,
     fallback: dict[str, Any],
-) -> dict[str, Any]:
-    """Returns the commit tool's result dict — either the model's real
-    choice, or the fallback if it never commits."""
+) -> tuple[dict[str, Any], list[Any]]:
+    """Runs one turn as a *continuation* of `history` rather than from a
+    blank slate, and returns `(committed_result, messages_to_append)`.
+
+    The caller owns the conversation; this function only reads it and reports
+    back what happened, so the same tool-calling machinery serves both a
+    one-shot turn and a seat whose memory spans a whole game. Note it returns
+    the new messages instead of mutating `history` in place: `seat_mind.py`
+    folds them into LangGraph state through an `add_messages` reducer, which
+    needs the delta, not a mutated list."""
     from app.models import AgentConfig
 
     config = AgentConfig(
@@ -62,13 +79,13 @@ async def run_agent_turn(
 
     if chat_model is None:
         return await _run_mock_turn(
-            orch, player, phase=phase, system_prompt=system_prompt, user_prompt=user_prompt,
+            orch, player, phase=phase, history=history,
             commit_tool_name=commit_tool_name, fallback=fallback,
         )
 
     return await _run_model_turn(
         orch, player, chat_model,
-        phase=phase, system_prompt=system_prompt, user_prompt=user_prompt,
+        phase=phase, history=history,
         commit_tool_name=commit_tool_name, fallback=fallback,
     )
 
@@ -79,11 +96,10 @@ async def _run_model_turn(
     chat_model,
     *,
     phase: str,
-    system_prompt: str,
-    user_prompt: str,
+    history: list[Any],
     commit_tool_name: str,
     fallback: dict[str, Any],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], list[Any]]:
     from langchain_mcp_adapters.sessions import create_session
     from langchain_mcp_adapters.tools import load_mcp_tools
 
@@ -95,6 +111,10 @@ async def _run_model_turn(
     input_tokens = 0
     output_tokens = 0
     start = time.monotonic()
+    # Everything this turn adds to the conversation. `history` itself is
+    # never mutated -- the caller merges this delta into whatever store it
+    # keeps the seat's memory in.
+    appended: list[Any] = []
 
     async with create_session({"transport": "streamable_http", "url": settings.mcp_url}) as session:
         await session.initialize()
@@ -108,11 +128,9 @@ async def _run_model_turn(
             bound_model = chat_model.bind_tools(model_tools)
             tools_by_name = {t.name: t for t in model_tools}
 
-            messages: list[Any] = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
-
             for _ in range(MAX_TOOL_ITERATIONS):
-                ai_msg: AIMessage = await bound_model.ainvoke(messages)
-                messages.append(ai_msg)
+                ai_msg: AIMessage = await bound_model.ainvoke(history + appended)
+                appended.append(ai_msg)
                 raw_responses.append(ai_msg.text() if hasattr(ai_msg, "text") else str(ai_msg.content))
                 usage = getattr(ai_msg, "usage_metadata", None)
                 if usage:
@@ -120,7 +138,7 @@ async def _run_model_turn(
                     output_tokens += usage.get("output_tokens") or 0
 
                 if not ai_msg.tool_calls:
-                    messages.append(
+                    appended.append(
                         HumanMessage(
                             content="You must act by calling one of the provided tools, "
                             f"in particular `{commit_tool_name}` to finish your turn."
@@ -138,20 +156,20 @@ async def _run_model_turn(
                         "mcp",
                         {"seat_id": player.seat_id, "name": player.name, "phase": phase, "action": "call", "tool": tc["name"]},
                     )
-                    messages.append(tool_message)
+                    appended.append(tool_message)
                     result = _extract_structured_result(tool_message)
                     tool_calls_log.append({"tool": tc["name"], "args": tc["args"], "result": result})
                     if tc["name"] == commit_tool_name and result is not None:
                         committed_result = result
 
                 if committed_result is not None:
-                    return committed_result
+                    return committed_result, appended
         finally:
             identity.release(session)
             latency_ms = int((time.monotonic() - start) * 1000)
             await _record_decision(
                 orch, player, phase=phase,
-                prompt=f"{system_prompt}\n---\n{user_prompt}",
+                prompt=_describe_prompt(history),
                 raw_response="\n".join(raw_responses),
                 tool_calls=tool_calls_log,
                 latency_ms=latency_ms,
@@ -159,7 +177,42 @@ async def _run_model_turn(
                 output_tokens=output_tokens or None,
             )
 
-    return await _apply_fallback(orch, player, commit_tool_name, fallback)
+    result = await _apply_fallback(orch, player, commit_tool_name, fallback)
+    appended.append(AIMessage(content=f"(no tool committed; fell back to) {json.dumps(result)}"))
+    return result, appended
+
+
+def _describe_prompt(history: list[Any]) -> str:
+    """What to store as this turn's "prompt" for the debug panel. Once a seat
+    has a game-long conversation, dumping the whole thing per turn would make
+    every decision row enormous and near-identical; the useful part is the
+    persona it's operating under plus the briefing it was just handed, so
+    record the first message and the last one, with a marker for the depth of
+    accumulated memory in between."""
+    if not history:
+        return ""
+    first = _message_text(history[0])
+    if len(history) == 1:
+        return first
+    last = _message_text(history[-1])
+    if len(history) == 2:
+        return f"{first}\n---\n{last}"
+    return f"{first}\n--- [+{len(history) - 2} remembered messages] ---\n{last}"
+
+
+def _message_text(message: Any) -> str:
+    # `.text` is a property on current LangChain messages but was a method on
+    # older ones, so accept either rather than pinning to one.
+    text = getattr(message, "text", None)
+    if isinstance(text, str):
+        return text
+    if callable(text):
+        try:
+            return text()
+        except Exception:
+            pass
+    content = getattr(message, "content", message)
+    return content if isinstance(content, str) else str(content)
 
 
 def _extract_structured_result(tool_message) -> dict | None:
@@ -189,32 +242,38 @@ async def _run_mock_turn(
     player: "Player",
     *,
     phase: str,
-    system_prompt: str,
-    user_prompt: str,
+    history: list[Any],
     commit_tool_name: str,
     fallback: dict[str, Any],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], list[Any]]:
     """Offline stand-in for a real model: picks a random legal option and
     routes it through the exact same `actions.py` call a real tool
     invocation would make, so the rest of the pipeline (validation,
     persistence, SSE) is exercised identically. Token counts are estimated
     from text length (~4 chars/token) rather than real API usage — there is
     no API call to measure — so the debug panel still has something to show
-    when running fully offline."""
+    when running fully offline.
+
+    It still returns a message to append, even though no model was consulted.
+    That keeps a mock seat's remembered conversation structurally identical to
+    a real one (briefing, then what it did, then the next briefing), so the
+    memory mechanism in `seat_mind.py` is genuinely exercised by the offline
+    test suite rather than only on paths that cost money."""
     start = time.monotonic()
     result = await _apply_fallback(orch, player, commit_tool_name, fallback)
     latency_ms = int((time.monotonic() - start) * 1000)
     raw_response = json.dumps(result)
+    prompt = _describe_prompt(history)
     await _record_decision(
         orch, player, phase=phase,
-        prompt=f"{system_prompt}\n---\n{user_prompt}",
+        prompt=prompt,
         raw_response=raw_response,
         tool_calls=[{"tool": commit_tool_name, "args": result, "result": result}],
         latency_ms=latency_ms,
-        input_tokens=_estimate_tokens(system_prompt) + _estimate_tokens(user_prompt),
+        input_tokens=_estimate_tokens(prompt),
         output_tokens=_estimate_tokens(raw_response),
     )
-    return result
+    return result, [AIMessage(content=f"(mock) called {commit_tool_name} with {raw_response}")]
 
 
 async def _record_decision(
