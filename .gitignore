@@ -14,6 +14,8 @@ frontend/.env.local
 # General
 .DS_Store
 *.log
+logs/
+.run/
 
 .venv
 venv
