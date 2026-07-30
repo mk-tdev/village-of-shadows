@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchGraphStructure } from "@/lib/api";
-import type { ActivityEntry, GraphStructure, SeatMetrics } from "@/lib/types";
+import type { ActivityEntry, GraphStructure, MindNodeEvent, SeatMetrics } from "@/lib/types";
 import { GraphFlow } from "./GraphFlow";
 import { SeatMindFlow } from "./SeatMindFlow";
 
@@ -25,10 +25,14 @@ const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
  * not just play the game. */
 export function DebugPanel({
   currentNode,
+  mindNode,
+  mindNodeCounts,
   metrics,
   activity,
 }: {
   currentNode: string | null;
+  mindNode: MindNodeEvent | null;
+  mindNodeCounts: Record<string, number>;
   metrics: Record<string, SeatMetrics>;
   activity: ActivityEntry[];
 }) {
@@ -63,12 +67,19 @@ export function DebugPanel({
               whole game. Introspected from the real compiled subgraph, same as
               the diagram above, so it can't drift either. */}
           <p className="debug-section-title" style={{ marginTop: 20 }}>
-            Per-seat agent subgraph — one persistent conversation per seat
+            Per-seat agent subgraph{" "}
+            {mindNode ? (
+              <span className="debug-live">— {mindNode.name}: {mindNode.node}</span>
+            ) : (
+              <span>— one persistent conversation per seat</span>
+            )}
           </p>
           <div className="graph-flow-wrap seat-mind-wrap">
             <SeatMindFlow
               nodes={graph?.seat_mind?.nodes ?? []}
               edges={graph?.seat_mind?.edges ?? []}
+              currentNode={mindNode?.node}
+              counts={mindNodeCounts}
             />
           </div>
         </div>

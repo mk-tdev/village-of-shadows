@@ -150,7 +150,7 @@ source.addEventListener("roles_assigned", (e) => {
   setGame(next);
 });
 ```
-([useGameStream.ts:73-80](../../frontend/lib/useGameStream.ts#L73-L80))
+([useGameStream.ts:86-93](../../frontend/lib/useGameStream.ts#L86-L93))
 
 Three fields (`current_node`, `phase`/`round`, now `players`) have hit this
 exact same shape of bug for the exact same reason: `begin_game` decoupled
@@ -181,15 +181,21 @@ browser. This indirection matters for the same reason `_sync` exists (see
 one, or several browser tabs are currently connected to this game's stream,
 and it shouldn't need to.
 
-The same `publish` is reached from one place that *isn't* a graph node: a
-seat's mind emits a `"memory"` event after each turn, carrying how many
-messages that agent's own conversation now holds
-([seat_mind.py:231-236](../../backend/app/game/seat_mind.py#L231-L236), see
-[12](12-per-seat-agent-memory-subgraphs.md)). It reaches the orchestrator the
-same way and needs no special handling on the stream side — which is the
-payoff of `publish` being a plain fan-out method rather than something wired
-into the node lifecycle: a second graph could start reporting into the same
-stream without the SSE layer knowing anything had changed.
+The same `publish` is reached from a place that *isn't* a node of this graph:
+the per-seat mind subgraph ([12](12-per-seat-agent-memory-subgraphs.md)) emits
+two events of its own — `"mind_node"` as each of its nodes executes, and
+`"memory"` after each turn, carrying how many messages that agent's
+conversation now holds
+([seat_mind.py:315-320](../../backend/app/game/seat_mind.py#L315-L320)).
+
+Both reach the orchestrator exactly the way a game node's events do, and needed
+no change at all on the stream side. That's the payoff of `publish` being a
+plain fan-out method rather than something wired into the node lifecycle: an
+entire second graph started reporting into the same stream without the SSE
+layer knowing anything had changed. The one rule that *did* matter is that
+they're separate event names rather than reuses of `"node"` — a browser that
+folded them together would show a mind's `deliberate` as the game graph's
+current node, which it isn't.
 
 ## The bug this project actually hit: a shared queue loses events under a real race
 

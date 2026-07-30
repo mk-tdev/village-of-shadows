@@ -150,6 +150,14 @@ export interface Timeline {
   seats: TimelineSeat[];
 }
 
+/** Published as each node of a seat's mind subgraph executes, so the debug
+ * panel can highlight it the way it already highlights the main graph. */
+export interface MindNodeEvent {
+  node: string;
+  seat_id: string;
+  name: string;
+}
+
 /** Published after each AI seat's turn, carrying how many messages that
  * seat's persistent conversation now holds. */
 export interface MemoryEvent {

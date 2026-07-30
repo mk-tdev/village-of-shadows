@@ -10,6 +10,7 @@ import type {
   LogEntry,
   McpEvent,
   MemoryEvent,
+  MindNodeEvent,
   Player,
   SeatMetrics,
   TurnEvent,
@@ -21,6 +22,15 @@ export interface GameStreamState {
   connected: boolean;
   errorMessage: string | null;
   currentNode: string | null;
+  /** Which node of which seat's mind ran most recently, for the subgraph
+   * diagram. Separate from `currentNode`: that's the *game* graph. */
+  mindNode: MindNodeEvent | null;
+  /** How many times each mind node has executed this game. The highlight alone
+   * is unreadable with mock seats (a turn passes through in under a
+   * millisecond), so these make the traffic visible even when it can't be
+   * watched -- and they show at a glance that `reapply` only fires on a
+   * pause/resume replay. */
+  mindNodeCounts: Record<string, number>;
   metrics: Record<string, SeatMetrics>;
   activity: ActivityEntry[];
 }
@@ -43,6 +53,8 @@ export function useGameStream(sessionId: string): GameStreamState {
   const [connected, setConnected] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentNode, setCurrentNode] = useState<string | null>(null);
+  const [mindNode, setMindNode] = useState<MindNodeEvent | null>(null);
+  const [mindNodeCounts, setMindNodeCounts] = useState<Record<string, number>>({});
   const [metrics, setMetrics] = useState<Record<string, SeatMetrics>>({});
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const gameRef = useRef<GameState | null>(null);
@@ -143,6 +155,12 @@ export function useGameStream(sessionId: string): GameStreamState {
         gameRef.current = next;
         setGame(next);
       }
+    });
+
+    source.addEventListener("mind_node", (e) => {
+      const data: MindNodeEvent = JSON.parse((e as MessageEvent).data);
+      setMindNode(data);
+      setMindNodeCounts((prev) => ({ ...prev, [data.node]: (prev[data.node] ?? 0) + 1 }));
     });
 
     source.addEventListener("mcp", (e) => {
@@ -253,6 +271,9 @@ export function useGameStream(sessionId: string): GameStreamState {
       gameRef.current = next;
       setGame(next);
       setCurrentNode(null);
+      // The game is over, so no mind is mid-thought either. Counts stay --
+      // they're the record of the finished game, not live state.
+      setMindNode(null);
     });
 
     source.addEventListener("error", (e) => {
@@ -272,5 +293,8 @@ export function useGameStream(sessionId: string): GameStreamState {
     return () => source.close();
   }, [sessionId]);
 
-  return { game, active, connected, errorMessage, currentNode, metrics, activity };
+  return {
+    game, active, connected, errorMessage, currentNode,
+    mindNode, mindNodeCounts, metrics, activity,
+  };
 }

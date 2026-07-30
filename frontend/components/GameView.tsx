@@ -15,7 +15,8 @@ import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 
 export function GameView({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-  const { game, active, connected, errorMessage, currentNode, metrics, activity } = useGameStream(sessionId);
+  const { game, active, connected, errorMessage, currentNode, mindNode, mindNodeCounts, metrics, activity } =
+    useGameStream(sessionId);
   const [godView, setGodView] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -229,7 +230,13 @@ export function GameView({ sessionId }: { sessionId: string }) {
         </section>
       )}
 
-      <DebugPanel currentNode={currentNode} metrics={metrics} activity={activity} />
+      <DebugPanel
+        currentNode={currentNode}
+        mindNode={mindNode}
+        mindNodeCounts={mindNodeCounts}
+        metrics={metrics}
+        activity={activity}
+      />
     </div>
   );
 }

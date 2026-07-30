@@ -1135,3 +1135,12 @@ select:focus {
   height: auto;
   min-height: 140px;
 }
+
+/* Live "whose mind, which node" readout next to the subgraph heading. With
+   mock seats this changes faster than it can be read, which is what the per-node
+   ×N counters in the diagram are for. */
+.debug-live {
+  color: var(--amber);
+  text-transform: none;
+  letter-spacing: 0;
+}

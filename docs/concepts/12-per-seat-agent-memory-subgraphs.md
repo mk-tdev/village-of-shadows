@@ -68,7 +68,7 @@ return {
     }
 }
 ```
-([seat_mind.py:229-235](../../backend/app/game/seat_mind.py#L229-L235))
+([seat_mind.py:266-272](../../backend/app/game/seat_mind.py#L266-L272))
 
 The mind is compiled **once** at startup, sharing the very same
 `AsyncSqliteSaver` the main game graph already uses for interrupt/resume:
@@ -253,7 +253,7 @@ stamp = state.get("turn_stamp")
 if stamp is not None and stamp == state.get("last_turn_stamp"):
     return {"replayed": True}
 ```
-([seat_mind.py:124-126](../../backend/app/game/seat_mind.py#L124-L126))
+([seat_mind.py:159-161](../../backend/app/game/seat_mind.py#L159-L161))
 
 A replayed turn takes the other branch out of `ingest`
 ([seat_mind.py:148-149](../../backend/app/game/seat_mind.py#L148-L149)) instead
@@ -369,7 +369,35 @@ Nested rather than merged into the main node list, because these are nodes of
 a *different* graph running under a different checkpoint thread — flattening
 them would draw edges between the two that don't exist. The rendered diagram
 shows `START → ingest → deliberate → END` plus the conditional shortcut from
-`ingest` straight to `END`, which is the replay guard above made visible.
+`ingest` to `reapply`, which is the replay guard above made visible.
+
+**Which node is executing, and whose mind it is.** The structure diagram alone
+was static — a shape with nothing moving in it, which tells you the
+architecture exists but not that it runs. Each mind node reports itself the
+same way `_sync` does for the main graph:
+
+```python
+node = (config.get("metadata") or {}).get("langgraph_node")
+...
+orch.publish("mind_node", {"node": node, "seat_id": seat_id, "name": name})
+```
+([seat_mind.py:96-127](../../backend/app/game/seat_mind.py#L96-L127))
+
+Reading `langgraph_node` from the invocation metadata rather than hardcoding a
+name means a node can't be renamed out from under its own telemetry. It goes on
+its own event rather than reusing `"node"`, because these belong to a different
+graph — folding them together would show `deliberate` as the *game's* current
+node, which it isn't.
+
+**A caveat that shaped the design:** with mock seats an entire turn passes
+through `ingest → deliberate` in well under a millisecond, so the highlight
+flashes rather than reads. It's genuinely watchable only against a real
+provider, where `deliberate` holds for the length of the model call — which is
+the interesting case anyway, since that's the agent actually thinking. Because
+the flash isn't readable at mock speed, the diagram also carries a per-node
+`×N` execution count, which makes the traffic visible to anyone who blinked and
+incidentally shows at a glance that `reapply` stays at zero until a pause
+actually forces a replay.
 
 **How much each agent actually remembers**, which is the more interesting
 half, because it changes as a game runs:
@@ -382,7 +410,7 @@ orch.publish("memory", {
     "replayed": bool(state.get("replayed")),
 })
 ```
-([seat_mind.py:278-283](../../backend/app/game/seat_mind.py#L278-L283))
+([seat_mind.py:315-320](../../backend/app/game/seat_mind.py#L315-L320))
 
 Published after every turn and shown as a `Mem` column beside the token
 metrics. The count is read off the checkpointed state the turn already

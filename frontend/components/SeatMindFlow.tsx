@@ -6,8 +6,8 @@ const BOX_W = 130;
 const BOX_H = 28;
 const ROW_H = 48;
 const TOP = 24;
-const COL_X = 82;
-const VIEW_W = 380;
+const COL_X = 116;
+const VIEW_W = 410;
 
 /** `ingest` branches: a normal turn goes to `deliberate`, a turn being replayed
  * after a pause goes to `reapply` instead (see seat_mind.py). Ordering by this
@@ -33,9 +33,17 @@ const NOTES: Record<string, string> = {
 export function SeatMindFlow({
   nodes,
   edges,
+  currentNode,
+  counts,
 }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  /** Node of a seat's mind that ran most recently, from "mind_node" events. */
+  currentNode?: string | null;
+  /** Executions per node this game. The highlight alone is unreadable with
+   * mock seats -- a turn passes through in under a millisecond -- so the
+   * counts carry the same information for anyone who blinked. */
+  counts?: Record<string, number>;
 }) {
   if (nodes.length === 0) {
     return <p className="metrics-empty">No seat-mind subgraph reported by the backend.</p>;
@@ -121,19 +129,33 @@ export function SeatMindFlow({
         const isTerminal = n.id === "__start__" || n.id === "__end__";
         const width = isTerminal ? 66 : BOX_W;
         const text = n.id === "__start__" ? "START" : n.id === "__end__" ? "END" : n.name;
+        const active = n.id === currentNode;
+        const ran = counts?.[n.id];
+        // Same .active classes the main graph diagram uses, so both highlights
+        // look like one system.
         return (
           <g key={n.id}>
             <rect
-              className="graph-node-box"
+              className={`graph-node-box ${active ? "active" : ""}`}
               x={p.x - width / 2}
               y={p.y - BOX_H / 2}
               width={width}
               height={BOX_H}
               rx={isTerminal ? 14 : 7}
             />
-            <text className="graph-node-label" x={p.x} y={p.y + 3} textAnchor="middle">
+            <text
+              className={`graph-node-label ${active ? "active" : ""}`}
+              x={p.x}
+              y={p.y + 3}
+              textAnchor="middle"
+            >
               {text}
             </text>
+            {ran !== undefined && (
+              <text className="graph-node-loop" x={p.x - width / 2 - 8} y={p.y + 3} textAnchor="end">
+                ×{ran}
+              </text>
+            )}
             {NOTES[n.id] && (
               <text className="graph-node-loop" x={p.x + width / 2 + 10} y={p.y + 3}>
                 {NOTES[n.id]}

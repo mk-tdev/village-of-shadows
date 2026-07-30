@@ -93,6 +93,40 @@ class MindState(TypedDict, total=False):
     replayed: bool
 
 
+def _report_node(config: RunnableConfig) -> None:
+    """Announce which node of *this seat's mind* is executing, so the debug
+    panel's subgraph diagram can light up the way the main graph's already
+    does.
+
+    Same trick as nodes.py's `_sync`: `langgraph_node` is metadata LangGraph
+    attaches to every node invocation, so each node reports itself without
+    having to name itself and risk the two drifting apart. Published on its own
+    event rather than reusing `"node"` because these are nodes of a different
+    graph -- a browser that folded them into the main graph's highlight would
+    show `deliberate` as the game's current node, which it isn't.
+
+    Note what this looks like in practice: with mock seats a whole turn passes
+    through in well under a millisecond, so the highlight flashes rather than
+    reads. It's genuinely watchable only with a real provider, where
+    `deliberate` holds for the length of the model call -- which is exactly the
+    thing worth seeing.
+    """
+    node = (config.get("metadata") or {}).get("langgraph_node")
+    if not node:
+        return
+    configurable = config.get("configurable") or {}
+    session_id = configurable.get("session_id")
+    seat_id = configurable.get("seat_id")
+    if not session_id or not seat_id:
+        return
+    try:
+        orch = registry.get(session_id)
+        name = orch.state.find_seat(seat_id).name
+    except (KeyError, StopIteration):
+        return
+    orch.publish("mind_node", {"node": node, "seat_id": seat_id, "name": name})
+
+
 def _ingest(state: MindState, config: RunnableConfig) -> dict[str, Any]:
     """Seeds the persona exactly once, appends this turn's briefing, and
     detects a replayed turn.
@@ -121,6 +155,7 @@ def _ingest(state: MindState, config: RunnableConfig) -> dict[str, Any]:
     GameState. Skipping it entirely is what silently dropped a paused seat's
     vote before this node existed.
     """
+    _report_node(config)
     stamp = state.get("turn_stamp")
     if stamp is not None and stamp == state.get("last_turn_stamp"):
         return {"replayed": True}
@@ -162,6 +197,7 @@ async def _reapply(state: MindState, config: RunnableConfig) -> dict[str, Any]:
 
     Only the game action repeats. `messages` is untouched, so memory still
     records this turn exactly once."""
+    _report_node(config)
     args = state.get("commit_args")
     if not args:
         # Nothing recorded to re-apply (a turn that never committed). Hand back
@@ -192,6 +228,7 @@ async def _deliberate(state: MindState, config: RunnableConfig) -> dict[str, Any
     for the same reason nodes.py's `_sync` does it: a live orchestrator holds
     an open DB connection and SSE subscriber queues, none of which can be
     serialized into a checkpoint."""
+    _report_node(config)
     session_id = config["configurable"]["session_id"]
     seat_id = config["configurable"]["seat_id"]
     orch = registry.get(session_id)
