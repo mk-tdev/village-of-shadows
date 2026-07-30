@@ -9,6 +9,7 @@ import type {
   GameState,
   LogEntry,
   McpEvent,
+  MemoryEvent,
   Player,
   SeatMetrics,
   TurnEvent,
@@ -169,6 +170,34 @@ export function useGameStream(sessionId: string): GameStreamState {
           estimated: data.estimated,
         };
         return { ...prev, [data.seat_id]: merged };
+      });
+    });
+
+    // Folded into the same per-seat metrics record the "decision" handler
+    // builds, so the debug table can show memory depth next to token usage.
+    // Merged rather than replaced because a "memory" event carries only the
+    // message count -- it must not clobber provider/model/token fields that
+    // only "decision" events know about, and it can arrive for a seat that
+    // has no metrics row yet.
+    source.addEventListener("memory", (e) => {
+      const data: MemoryEvent = JSON.parse((e as MessageEvent).data);
+      setMetrics((prev) => {
+        const existing = prev[data.seat_id];
+        return {
+          ...prev,
+          [data.seat_id]: {
+            seat_id: data.seat_id,
+            name: data.name,
+            provider: existing?.provider ?? null,
+            model_name: existing?.model_name ?? null,
+            calls: existing?.calls ?? 0,
+            input_tokens: existing?.input_tokens ?? 0,
+            output_tokens: existing?.output_tokens ?? 0,
+            last_latency_ms: existing?.last_latency_ms ?? 0,
+            estimated: existing?.estimated ?? false,
+            memory_messages: data.messages,
+          },
+        };
       });
     });
 

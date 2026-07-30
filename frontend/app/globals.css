@@ -729,6 +729,16 @@ select:focus {
   border-radius: 10px;
   padding: 8px;
 }
+/* The seat-mind subgraph is a short static diagram, not the big pan/zoom
+   canvas -- it sizes to its content instead of a fixed viewport height, and
+   scrolls sideways on narrow screens rather than squashing its labels. */
+.seat-mind-wrap {
+  overflow-x: auto;
+}
+.seat-mind-wrap .graph-flow-svg {
+  min-width: 380px;
+  display: block;
+}
 .graph-flow-canvas-outer {
   position: relative;
 }

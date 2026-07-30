@@ -180,6 +180,16 @@ browser. This indirection matters for the same reason `_sync` exists (see
 one, or several browser tabs are currently connected to this game's stream,
 and it shouldn't need to.
 
+The same `publish` is reached from one place that *isn't* a graph node: a
+seat's mind emits a `"memory"` event after each turn, carrying how many
+messages that agent's own conversation now holds
+([seat_mind.py:231-236](../../backend/app/game/seat_mind.py#L231-L236), see
+[12](12-per-seat-agent-memory-subgraphs.md)). It reaches the orchestrator the
+same way and needs no special handling on the stream side — which is the
+payoff of `publish` being a plain fan-out method rather than something wired
+into the node lifecycle: a second graph could start reporting into the same
+stream without the SSE layer knowing anything had changed.
+
 ## The bug this project actually hit: a shared queue loses events under a real race
 
 The first implementation gave each `GameOrchestrator` **one** shared

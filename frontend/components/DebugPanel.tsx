@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchGraphStructure } from "@/lib/api";
 import type { ActivityEntry, GraphStructure, SeatMetrics } from "@/lib/types";
 import { GraphFlow } from "./GraphFlow";
+import { SeatMindFlow } from "./SeatMindFlow";
 
 const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
   node: "⚙",
@@ -54,6 +55,21 @@ export function DebugPanel({
           <div className="graph-flow-wrap">
             <GraphFlow nodes={graph?.nodes ?? []} edges={graph?.edges ?? []} currentNode={currentNode} />
           </div>
+
+          {/* The second compiled graph in the app. Every AI turn in the graph
+              above runs through this one, under a checkpoint thread private to
+              that seat -- which is what gives each agent a memory spanning the
+              whole game. Introspected from the real compiled subgraph, same as
+              the diagram above, so it can't drift either. */}
+          <p className="debug-section-title" style={{ marginTop: 20 }}>
+            Per-seat agent subgraph — one persistent conversation per seat
+          </p>
+          <div className="graph-flow-wrap seat-mind-wrap">
+            <SeatMindFlow
+              nodes={graph?.seat_mind?.nodes ?? []}
+              edges={graph?.seat_mind?.edges ?? []}
+            />
+          </div>
         </div>
 
         <div>
@@ -72,6 +88,11 @@ export function DebugPanel({
                   <th className="num">In</th>
                   <th className="num">Out</th>
                   <th className="num">Last ms</th>
+                  {/* Depth of this seat's own remembered conversation --
+                      grows all game, unlike the per-call token columns. */}
+                  <th className="num" title="Messages in this seat's own persistent conversation">
+                    Mem
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -86,6 +107,7 @@ export function DebugPanel({
                     <td className="num">{r.input_tokens}</td>
                     <td className="num">{r.output_tokens}</td>
                     <td className="num">{r.last_latency_ms}</td>
+                    <td className="num">{r.memory_messages ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -290,6 +290,53 @@ opens a fresh session and re-binds the seat with a fresh token, even though the
 reasoning either side of it is now long-lived. Memory got persistent;
 authorization deliberately did not.
 
+## Making it visible in the debug panel
+
+A persistent-memory design you can't observe is indistinguishable from a
+claim, so both halves of it are surfaced in the debug panel
+([10](10-frontend-observability.md)).
+
+**The subgraph's structure**, introspected from the compiled graph exactly the
+way the main diagram already was — `/graph/structure` now reports both graphs:
+
+```python
+return {
+    **_describe(request.app.state.graph),
+    "seat_mind": _describe(seat_mind) if seat_mind is not None else None,
+}
+```
+([routers/graph.py:32-41](../../backend/app/routers/graph.py#L32-L41))
+
+Nested rather than merged into the main node list, because these are nodes of
+a *different* graph running under a different checkpoint thread — flattening
+them would draw edges between the two that don't exist. The rendered diagram
+shows `START → ingest → deliberate → END` plus the conditional shortcut from
+`ingest` straight to `END`, which is the replay guard above made visible.
+
+**How much each agent actually remembers**, which is the more interesting
+half, because it changes as a game runs:
+
+```python
+orch.publish("memory", {
+    "seat_id": player.seat_id,
+    "name": player.name,
+    "messages": len(messages),
+    "replayed": bool(state.get("replayed")),
+})
+```
+([seat_mind.py:231-236](../../backend/app/game/seat_mind.py#L231-L236))
+
+Published after every turn and shown as a `Mem` column beside the token
+metrics. The count is read off the checkpointed state the turn already
+returned, so reporting it costs nothing extra. Watching those numbers diverge
+is the whole point: a seat that died in round 1 stops at a handful of
+messages while a survivor climbs past a dozen, and the difference is exactly
+the context its next decision is made against.
+
+Worth noting what this column is *not*: the `In`/`Out` token columns next to
+it are per-call figures, so they don't obviously reveal that context is
+growing. `Mem` is cumulative by construction.
+
 ## Cost, and when this stops working
 
 Raw whole-game accumulation is viable here because the games are short. By its

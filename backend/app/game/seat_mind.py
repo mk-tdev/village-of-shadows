@@ -220,6 +220,21 @@ async def run_seat_turn(
         },
         config=mind_config(orch.session_id, player.seat_id),
     )
+
+    # How much this agent is now carrying. Published so the debug panel can
+    # show memory actually growing per seat as a game runs -- the static shape
+    # of this subgraph is only mildly interesting, but "Corvin is reasoning
+    # over 14 messages of its own history" is the thing that makes persistent
+    # agents visible rather than merely claimed. Derived from the checkpointed
+    # state we just got back, so it costs nothing extra to report.
+    messages = state.get("messages") or []
+    orch.publish("memory", {
+        "seat_id": player.seat_id,
+        "name": player.name,
+        "messages": len(messages),
+        "replayed": bool(state.get("replayed")),
+    })
+
     return state.get("result") or {}
 
 

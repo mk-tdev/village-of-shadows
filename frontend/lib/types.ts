@@ -88,6 +88,19 @@ export interface GraphEdge {
 export interface GraphStructure {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  /** The per-seat agent subgraph (backend/app/game/seat_mind.py) — a second,
+   * separate compiled graph, not part of the node list above. Null if the
+   * backend was built without one. */
+  seat_mind?: { nodes: GraphNode[]; edges: GraphEdge[] } | null;
+}
+
+/** Published after each AI seat's turn, carrying how many messages that
+ * seat's persistent conversation now holds. */
+export interface MemoryEvent {
+  seat_id: string;
+  name: string;
+  messages: number;
+  replayed: boolean;
 }
 
 export interface DecisionEvent {
@@ -112,6 +125,9 @@ export interface SeatMetrics {
   output_tokens: number;
   last_latency_ms: number;
   estimated: boolean;
+  /** Size of this seat's own remembered conversation, from "memory" events.
+   * Undefined until that seat has taken its first turn. */
+  memory_messages?: number;
 }
 
 export interface McpEvent {

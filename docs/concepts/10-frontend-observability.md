@@ -112,6 +112,19 @@ of sync with what `graph.py` actually builds — if someone adds a node or
 changes an edge, the diagram updates itself with no separate doc to
 remember to touch.
 
+**A second diagram, for the second graph.** Once each seat gained a
+persistent agent subgraph ([12](12-per-seat-agent-memory-subgraphs.md)), this
+panel was quietly telling half the story: it showed the orchestration and
+omitted the agents' own reasoning loop entirely. `/graph/structure` now
+reports both compiled graphs, and the seat-mind one renders below the main
+diagram via `SeatMindFlow.tsx` — a separate, deliberately simpler component.
+That's a judgement call worth naming: `GraphFlow` carries a hand-positioned
+layout table for 15 nodes plus the pan/zoom pointer handling described below,
+and the mind graph is four nodes in a straight line. Parameterising a working
+component with a fiddly drag implementation, to gain nothing a reader would
+see, is a worse trade than a second small renderer that shares its CSS
+classes.
+
 **The token/latency table accumulates from `"decision"` events.**
 
 ```ts
@@ -144,6 +157,16 @@ call. The `estimated` flag (`true` for mock-provider turns, since there's
 no real API response to measure) surfaces in the UI as a small "est." badge
 next to the model name, so it's honest about which numbers are real API
 usage and which are a `len(text) // 4` guess.
+
+The table's `Mem` column comes from a *different* event — `"memory"`, emitted
+per seat after each turn ([12](12-per-seat-agent-memory-subgraphs.md)) — and
+its handler in `useGameStream.ts` **merges** into the same per-seat record
+rather than replacing it. That merge is load-bearing rather than defensive: a
+`"memory"` event carries only a message count, so overwriting the record would
+wipe the provider/model/token fields only `"decision"` events know about, and
+it can arrive for a seat that has no metrics row yet. Two independent event
+types feeding one table row is the case where a reducer has to be written as
+an update, not an assignment.
 
 **The live activity feed turns the same events into a chronological log.**
 
