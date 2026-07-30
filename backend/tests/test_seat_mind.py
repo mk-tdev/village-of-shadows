@@ -5,9 +5,11 @@ path deliberately still appends to a seat's conversation (see
 agent_turn.py's `_run_mock_turn`), which means the thing under test here is
 the real checkpoint-backed memory, not a stub of it.
 
-See docs/concepts/ for the full picture; the three properties covered are the
-ones the whole design rests on: memory accumulates across turns, it is
-per-seat rather than shared, and a replayed turn does not duplicate it.
+See docs/concepts/12 and 13 for the full picture. The properties covered are the
+ones the design rests on: memory accumulates across turns, it is per-seat rather
+than shared, a replayed turn is remembered once but *acted* again, abandoning a
+game reclaims its threads, and a finished game can be reconstructed from the
+checkpointer after the fact.
 """
 
 import pytest
@@ -235,3 +237,58 @@ async def _decision_count(orch, seat_id: str) -> int:
     )
     row = await cursor.fetchone()
     return row[0]
+
+
+@pytest.mark.asyncio
+async def test_timeline_reconstructs_the_game_from_checkpoints(tmp_path):
+    """The post-game report is read back out of the checkpointer, not recorded
+    during play -- see docs/concepts/13. Checks the facts that come from the
+    checkpoint history (node order and counts) and the ones that come from the
+    log (narrative, turn counts), since the two are deliberately separate."""
+    from app.game import timeline
+
+    orch = await make_orchestrator(tmp_path, ["ai"] * 7)
+    orch.start()
+    await orch._task
+
+    report = await timeline.build_timeline(orch.graph, orch.seat_mind, orch.session_id)
+
+    assert report["available"] is True
+    assert report["winner"] == orch.state.winner
+    assert report["total_steps"] > 10
+    assert report["caveat"]
+
+    # The conditional self-edges show up as repeat executions of one node.
+    counts = {row["node"]: row["count"] for row in report["node_counts"]}
+    assert counts["assign_roles"] == 1
+    assert counts.get("day_discussion", 0) > 1, "the self-edge should have looped"
+
+    # Execution starts where the graph says it does, and the lobby is a real
+    # checkpoint the graph waited at rather than an absence.
+    assert report["steps"][0]["next_node"] == "assign_roles"
+    assert report["steps"][0]["phase"] == "lobby"
+
+    # Narrative comes from the log, so it matches it exactly.
+    assert len(report["events"]) == len(orch.state.log)
+
+    # Per-seat turn counts come from the log; memory depth from the mind thread.
+    assert len(report["seats"]) == 7
+    actor = max(report["seats"], key=lambda s: s["turns"])
+    assert actor["turns"] > 0
+    assert actor["memory_messages"] > 0
+
+
+@pytest.mark.asyncio
+async def test_timeline_of_a_discarded_game_reports_unavailable(tmp_path):
+    """Abandoning a game reclaims its checkpoint threads on purpose, so there is
+    genuinely no history left -- that's a normal answer, not an error."""
+    from app.game import timeline
+
+    orch = await make_orchestrator(tmp_path, ["ai"] * 7)
+    orch.start()
+    await orch._task
+    await orch.discard_checkpoints()
+
+    report = await timeline.build_timeline(orch.graph, orch.seat_mind, orch.session_id)
+    assert report["available"] is False
+    assert report["steps"] == []

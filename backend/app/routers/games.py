@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Request
 
 from app import persistence
-from app.game import registry
+from app.game import registry, timeline
 from app.game.orchestrator import GameOrchestrator
 from app.models import AgentConfig, GameState, Player
 
@@ -79,6 +79,24 @@ async def get_state(session_id: str) -> dict:
 async def get_decisions(session_id: str, request: Request) -> list[dict]:
     conn = request.app.state.db_conn
     return await persistence.get_decisions(conn, session_id)
+
+
+@router.get("/{session_id}/timeline")
+async def get_timeline(session_id: str, request: Request) -> dict:
+    """The post-game technical report, reconstructed from the checkpointer via
+    LangGraph time travel (see game/timeline.py).
+
+    Deliberately independent of the registry: it reads checkpoint threads by
+    id, so it works for any game whose checkpoints still exist -- including one
+    the server has since forgotten about, or one from a previous process. The
+    exception is an *abandoned* game, whose threads stop_game reclaims on
+    purpose; that returns `available: false` rather than an error, since "there
+    is no history to show" is a normal answer here, not a failure."""
+    return await timeline.build_timeline(
+        request.app.state.graph,
+        getattr(request.app.state, "seat_mind", None),
+        session_id,
+    )
 
 
 @router.post("/{session_id}/pause")

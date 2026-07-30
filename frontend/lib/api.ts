@@ -1,4 +1,4 @@
-import type { AgentConfig, GameState, GraphStructure } from "./types";
+import type { AgentConfig, GameState, GraphStructure, Timeline } from "./types";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -64,5 +64,14 @@ export async function beginGame(sessionId: string): Promise<void> {
 export async function fetchGraphStructure(): Promise<GraphStructure> {
   const res = await fetch(`${API_BASE}/graph/structure`);
   if (!res.ok) throw new Error(`Failed to fetch graph structure (${res.status})`);
+  return res.json();
+}
+
+/** The post-game technical report. Reconstructed on demand from the
+ * checkpointer (LangGraph time travel), so it costs nothing while a game is
+ * being played and is available for any game whose checkpoints still exist. */
+export async function fetchTimeline(sessionId: string): Promise<Timeline> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/timeline`);
+  if (!res.ok) throw new Error(`Failed to fetch timeline (${res.status})`);
   return res.json();
 }

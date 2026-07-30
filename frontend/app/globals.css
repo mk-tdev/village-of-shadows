@@ -961,3 +961,169 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Post-game technical summary (GameSummary.tsx) ---
+   Reads the LangGraph checkpoint history after a game ends. Shares the
+   .metrics-table / .debug-section-title styles with the debug panel so the two
+   read as one engineering view rather than two separate designs. */
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.summary-stat {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.summary-stat-label {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.summary-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.summary-caveat {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  background: rgba(232, 163, 61, 0.06);
+  border-left: 2px solid var(--amber-dim);
+  border-radius: 0 8px 8px 0;
+  padding: 9px 12px;
+  margin: 0;
+}
+.summary-prose {
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink-dim);
+  margin: 0 0 10px;
+}
+.summary-prose code,
+.summary-table-wrap code {
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+.summary-phases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.summary-phases li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 4px 11px;
+  font-size: 12px;
+}
+.summary-phase-step {
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.summary-phase-label {
+  color: var(--amber);
+  font-weight: 500;
+}
+.summary-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.summary-bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 26px;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+}
+.summary-bar-label {
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.summary-bar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  height: 9px;
+  overflow: hidden;
+}
+.summary-bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber-dim), var(--amber));
+  border-radius: 4px;
+}
+.summary-bar-count {
+  text-align: right;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* Wide tables scroll inside their own box rather than widening the page. */
+.summary-table-wrap {
+  overflow-x: auto;
+}
+.summary-dead {
+  opacity: 0.55;
+}
+.summary-dead-tag {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--blood);
+  margin-left: 6px;
+}
+.btn-ghost {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--ink-dim);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-ghost:hover {
+  border-color: var(--card-border-strong);
+  color: var(--ink);
+}
+
+/* The summary is one full-width column, unlike the debug panel's two -- its
+   tables and step list need the horizontal room. */
+.summary-body {
+  padding: 0 18px 18px;
+}
+.overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.overlay-actions .btn-ghost {
+  margin-top: 0;
+}

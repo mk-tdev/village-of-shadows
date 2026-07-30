@@ -10,6 +10,7 @@ import { Feed } from "./Feed";
 import { Controls } from "./Controls";
 import { GodViewToggle } from "./GodViewToggle";
 import { DebugPanel } from "./DebugPanel";
+import { GameSummary } from "./GameSummary";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 
 export function GameView({ sessionId }: { sessionId: string }) {
@@ -19,6 +20,10 @@ export function GameView({ sessionId }: { sessionId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [beginning, setBeginning] = useState(false);
+  // The game-over overlay covers the board, so reading the technical
+  // summary means dismissing it first rather than opening a second layer
+  // on top of it.
+  const [showSummary, setShowSummary] = useState(false);
 
   const isNight = !game || game.phase === "night" || game.phase === "lobby";
   // The "X is thinking" feed indicator only makes sense for an AI seat --
@@ -176,7 +181,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
         </div>
       )}
 
-      {game.winner && (
+      {game.winner && !showSummary && (
         <div className="overlay">
           <div className="overlay-card">
             <h2>{game.winner === "villagers" ? "Villagers win" : "Werewolves win"}</h2>
@@ -185,11 +190,32 @@ export function GameView({ sessionId }: { sessionId: string }) {
                 ? "Every werewolf has been rooted out. The village is safe — for now."
                 : "The werewolves now equal or outnumber the villagers. The night has claimed the village."}
             </p>
-            <Link className="btn" href="/">
-              Play again
-            </Link>
+            <div className="overlay-actions">
+              <Link className="btn" href="/">
+                Play again
+              </Link>
+              <button className="btn-ghost" type="button" onClick={() => setShowSummary(true)}>
+                ⌗ Technical summary
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Only after a game ends: everything here is read back out of the
+          checkpointer rather than streamed live, so there is nothing to show
+          mid-game (see backend/app/game/timeline.py). */}
+      {game.winner && (
+        <section className="debug-panel">
+          <div className="debug-panel-header">
+            <h2 className="debug-panel-title">
+              <span>⌗</span> Post-game technical summary
+            </h2>
+          </div>
+          <div className="summary-body">
+            <GameSummary sessionId={sessionId} />
+          </div>
+        </section>
       )}
 
       <DebugPanel currentNode={currentNode} metrics={metrics} activity={activity} />

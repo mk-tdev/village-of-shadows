@@ -59,3 +59,9 @@ specific to multi-agent orchestration rather than general web-app plumbing.
     only what changed since that seat last acted, and the memory-corrupting
     replay bug that appears the moment agent state lives outside the main
     graph's rollback.
+13. [Time travel and the post-game report](13-time-travel-and-the-post-game-report.md) —
+    reconstructing a finished game's whole execution history from the
+    checkpoints that already had to exist, what that reveals for free
+    (self-edges counted, cost localised by timestamp), and why a checkpoint
+    here is *not* a clean point-in-time snapshot when nodes mutate shared
+    state in place.

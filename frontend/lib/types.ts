@@ -94,6 +94,62 @@ export interface GraphStructure {
   seat_mind?: { nodes: GraphNode[]; edges: GraphEdge[] } | null;
 }
 
+/** Post-game technical report, reconstructed from the LangGraph checkpointer
+ * by time travel rather than recorded during play — see
+ * backend/app/game/timeline.py. */
+export interface TimelineStep {
+  step: number;
+  next_node: string | null;
+  phase: string | null;
+  round: number | null;
+  alive: number | null;
+  log_count: number | null;
+  at: string | null;
+  elapsed_ms: number | null;
+  checkpoint_id: string | null;
+  source: string | null;
+}
+
+export interface TimelineEvent {
+  seq: number;
+  round: number;
+  phase: string;
+  type: string;
+  private: boolean;
+  text: string;
+}
+
+export interface TimelineSeat {
+  seat_id: string;
+  name: string;
+  role: string | null;
+  alive: boolean;
+  controller: Controller;
+  provider: Provider | null;
+  model_name: string | null;
+  memory_messages: number;
+  memory_checkpoints: number;
+  turns: number;
+}
+
+export interface Timeline {
+  session_id: string;
+  available: boolean;
+  caveat?: string;
+  winner?: "villagers" | "werewolves" | null;
+  rounds?: number | null;
+  phase?: string | null;
+  total_steps?: number;
+  started_at?: string | null;
+  ended_at?: string | null;
+  duration_ms?: number | null;
+  node_counts?: { node: string; count: number }[];
+  phases?: { label: string; phase: string | null; round: number | null; from_step: number }[];
+  steps: TimelineStep[];
+  events: TimelineEvent[];
+  seats: TimelineSeat[];
+}
+
 /** Published after each AI seat's turn, carrying how many messages that
  * seat's persistent conversation now holds. */
 export interface MemoryEvent {
