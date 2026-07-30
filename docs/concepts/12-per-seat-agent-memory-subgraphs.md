@@ -68,7 +68,7 @@ return {
     }
 }
 ```
-([seat_mind.py:177-189](../../backend/app/game/seat_mind.py#L177-L189))
+([seat_mind.py:229-235](../../backend/app/game/seat_mind.py#L229-L235))
 
 The mind is compiled **once** at startup, sharing the very same
 `AsyncSqliteSaver` the main game graph already uses for interrupt/resume:
@@ -202,7 +202,7 @@ if orch.seat_mind is not None:
         if player.controller == "ai":
             await remember(orch, player.seat_id, text)
 ```
-([nodes.py:514-521](../../backend/app/game/nodes.py#L514-L521))
+([nodes.py:534-541](../../backend/app/game/nodes.py#L534-L541))
 
 `remember` appends straight into a seat's conversation with `aupdate_state` and
 **no model invocation**
@@ -253,7 +253,7 @@ stamp = state.get("turn_stamp")
 if stamp is not None and stamp == state.get("last_turn_stamp"):
     return {"replayed": True}
 ```
-([seat_mind.py:112-114](../../backend/app/game/seat_mind.py#L112-L114))
+([seat_mind.py:124-126](../../backend/app/game/seat_mind.py#L124-L126))
 
 A replayed turn takes the other branch out of `ingest`
 ([seat_mind.py:148-149](../../backend/app/game/seat_mind.py#L148-L149)) instead
@@ -382,7 +382,7 @@ orch.publish("memory", {
     "replayed": bool(state.get("replayed")),
 })
 ```
-([seat_mind.py:231-236](../../backend/app/game/seat_mind.py#L231-L236))
+([seat_mind.py:278-283](../../backend/app/game/seat_mind.py#L278-L283))
 
 Published after every turn and shown as a `Mem` column beside the token
 metrics. The count is read off the checkpointed state the turn already

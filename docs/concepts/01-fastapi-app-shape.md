@@ -63,7 +63,7 @@ app.include_router(stream.router)
 app.include_router(input.router)
 app.include_router(graph.router)
 ```
-([main.py:45-48](../../backend/app/main.py#L45-L48))
+([main.py:46-49](../../backend/app/main.py#L46-L49))
 
 Each router (`games.py`, `stream.py`, `input.py`, `graph.py`) owns one slice
 of the API surface and is mounted under a shared prefix
@@ -78,7 +78,7 @@ create, state) independently readable despite touching the same
 ```python
 app.mount("/mcp", mcp.streamable_http_app())
 ```
-([main.py:49](../../backend/app/main.py#L49))
+([main.py:50](../../backend/app/main.py#L50))
 
 The MCP tool server (see
 [05-mcp-tool-server-identity.md](05-mcp-tool-server-identity.md)) is a

@@ -111,7 +111,7 @@ await run_seat_turn(
     commit_tool="submit_night_action", fallback={"pool": pool},
 )
 ```
-([nodes.py:242-277](../../backend/app/game/nodes.py#L242-L277))
+([nodes.py:262-297](../../backend/app/game/nodes.py#L262-L297))
 
 This used to be a call to `run_agent_turn`, which built a fresh two-message
 conversation and threw it away when the turn ended. It now goes through this
@@ -181,7 +181,7 @@ itself is otherwise unchanged: same tool-calling mechanism, same
 `MAX_TOOL_ITERATIONS` ceiling, same MCP round-trips.
 
 The leading system message is `_persona(wolf, game)`
-([nodes.py:530-547](../../backend/app/game/nodes.py#L530-L547)) — this seat's
+([nodes.py:550-567](../../backend/app/game/nodes.py#L550-L567)) — this seat's
 personality, its secret role, and (only because it's a werewolf) its
 teammate's name. It sits at the head of `history` from the seat's first turn
 onward rather than being rebuilt here. Everything *else* the wolf was told

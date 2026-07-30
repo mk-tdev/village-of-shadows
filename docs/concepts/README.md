@@ -10,6 +10,25 @@ Read them in order — later ones assume the earlier ones. If you only have
 time for a few, read 02, 03, 05, 09, and 12; those are the concepts most
 specific to multi-agent orchestration rather than general web-app plumbing.
 
+Those `file:line` citations are checked, not trusted:
+
+```bash
+python docs/concepts/check_citations.py
+```
+
+verifies each one still contains the code the doc quotes beside it, so a
+citation that drifted when the code moved fails loudly instead of quietly
+pointing a reader at the wrong function.
+
+**A note on how to read these.** Roughly half of each doc is the mechanism and
+half is what went wrong building it — the naive version, the symptom, the root
+cause, the fix. That's deliberate: the pitfalls are where the actual learning
+is, because most of them are not specific to Werewolf or to LangGraph. "State
+you mutate in place isn't a point-in-time snapshot" (13), "an idempotency guard
+has to be applied per effect, not per operation" (12), and "a single shared
+consumer queue silently loses events once there can be two consumers" (09) are
+all general lessons that happened to surface here.
+
 1. [FastAPI app shape](01-fastapi-app-shape.md) — routers, lifespan, one
    shared process, dependency injection via `app.state`.
 2. [LangGraph as the game's state machine](02-langgraph-state-machine.md) —

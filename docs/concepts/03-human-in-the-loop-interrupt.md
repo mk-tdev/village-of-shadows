@@ -24,7 +24,7 @@ if wolf.controller == "human":
     )
     await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
 ```
-([nodes.py:257-261](../../backend/app/game/nodes.py#L257-L261))
+([nodes.py:277-281](../../backend/app/game/nodes.py#L277-L281))
 
 `interrupt(payload)` does something that looks like a blocking call but
 isn't: it raises a special LangGraph exception that unwinds execution all
@@ -47,7 +47,7 @@ async def _run(self, input_: Any) -> None:
                 return
         ...
 ```
-([orchestrator.py:136-149](../../backend/app/game/orchestrator.py#L136-L149))
+([orchestrator.py:162-177](../../backend/app/game/orchestrator.py#L162-L177))
 
 `GameOrchestrator._run` drives the graph with `graph.astream(...)` inside a
 background `asyncio.Task` (see `start()`,
@@ -127,7 +127,7 @@ covered yet — what happens when a turn genuinely fails, not just suspends:
 except Exception as exc:  # surfaced to the SSE stream rather than swallowed
     self.publish("error", {"message": _describe_exception(exc)})
 ```
-([orchestrator.py:152-153](../../backend/app/game/orchestrator.py#L152-L153))
+([orchestrator.py:178-179](../../backend/app/game/orchestrator.py#L178-L179))
 
 The first version of this line was just `self.publish("error", {"message":
 str(exc)})` — reasonable-looking, and wrong in a way that only shows up

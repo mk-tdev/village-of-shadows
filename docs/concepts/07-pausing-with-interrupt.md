@@ -97,7 +97,7 @@ async def pause_game(session_id: str) -> dict:
     orch.request_pause()
     return {"ok": True}
 ```
-([games.py:84-95](../../backend/app/routers/games.py#L84-L95))
+([games.py:102-113](../../backend/app/routers/games.py#L102-L113))
 
 `POST /pause` doesn't stop anything immediately — it just sets a plain
 boolean on the orchestrator. Whatever seat's turn is currently mid-flight
@@ -166,7 +166,7 @@ if isinstance(event, dict) and "__interrupt__" in event:
     self.state.awaiting = AwaitingInput(**payload)
     ...
 ```
-([orchestrator.py:139-147](../../backend/app/game/orchestrator.py#L139-L147))
+([orchestrator.py:165-173](../../backend/app/game/orchestrator.py#L165-L173))
 
 `GameOrchestrator._run` distinguishes a pause-interrupt from a
 human-turn-interrupt purely by the `"kind"` field in the payload — a pause
@@ -241,7 +241,7 @@ shift and steal an answer meant for an earlier call.
 always *after* any human `interrupt()` call earlier in that same node body
 (e.g. night_wolves' human branch) -- never before it."""
 ```
-([nodes.py:148-150](../../backend/app/game/nodes.py#L148-L150))
+([nodes.py:148-151](../../backend/app/game/nodes.py#L148-L151))
 
 This was caught by careful reasoning about LangGraph's position-based
 resume matching *before* writing the code — and then confirmed with a

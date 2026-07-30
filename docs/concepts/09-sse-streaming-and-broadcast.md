@@ -138,7 +138,7 @@ eventually reconnect and re-fetch it:
 ```python
 orch.publish("roles_assigned", {"players": [p.model_dump() for p in game.players]})
 ```
-([nodes.py:219](../../backend/app/game/nodes.py#L219))
+([nodes.py:220](../../backend/app/game/nodes.py#L220))
 
 ```typescript
 source.addEventListener("roles_assigned", (e) => {

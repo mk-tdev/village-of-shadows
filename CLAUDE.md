@@ -30,11 +30,21 @@ Concretely, before considering a feature/bugfix task done:
    not just quietly correct the code. That's often the most useful part of
    the doc for someone learning from it.
 4. **Any file the docs cite got edited**, even for an unrelated reason → its
-   line numbers may have drifted. Run `grep -n "path/to/file.py:" docs/concepts/*.md`
-   (or the `.ts`/`.tsx` equivalent) for every changed file and fix any
-   citation that no longer points at the right lines. Don't assume only the
-   "obviously relevant" doc cites that file — several docs often cite the
-   same file for different reasons.
+   line numbers may have drifted. Inserting a few lines anywhere shifts every
+   citation below it, in *every* doc that cites that file — not just the
+   "obviously relevant" one. Don't eyeball this; run the checker:
+
+   ```bash
+   python docs/concepts/check_citations.py
+   ```
+
+   It verifies each citation still contains the code the doc quotes next to
+   it, not merely that the line range exists. **Checking only that a range is
+   in bounds is not enough** — a stale citation stays in bounds and quietly
+   points at the wrong function, which is worse than no citation, because a
+   reader trusts it. This project shipped exactly that drift twice before the
+   checker existed. Exit code is non-zero if anything is stale, so treat a
+   failure as a blocker on "done".
 
 **Scope note:** this guide covers *agentic-AI-engineering concepts*, not
 every UI/product change. A new page, a styling pass, or a form field doesn't

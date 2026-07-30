@@ -67,7 +67,7 @@ async with create_session({"transport": "streamable_http", "url": settings.mcp_u
     await session.call_tool("bind_seat", {"token": token})
     ...
 ```
-([agent_turn.py:119-121](../../backend/app/game/agent_turn.py#L119-L121))
+([agent_turn.py:124-126](../../backend/app/game/agent_turn.py#L124-L126))
 
 The orchestrator opens the MCP session and immediately calls `bind_seat`
 itself, handing the token it just minted. Only *after* this does it load the
@@ -90,7 +90,7 @@ all_tools = await load_mcp_tools(session)
 model_tools = [t for t in all_tools if t.name in MODEL_VISIBLE_TOOLS]
 bound_model = chat_model.bind_tools(model_tools)
 ```
-([agent_turn.py:126-128](../../backend/app/game/agent_turn.py#L126-L128))
+([agent_turn.py:131-133](../../backend/app/game/agent_turn.py#L131-L133))
 
 `load_mcp_tools` (from `langchain-mcp-adapters`) would happily return
 *every* tool the server defines, `bind_seat` included — filtering by
@@ -99,7 +99,7 @@ actually keeps `bind_seat` out of the model's hands. Notice this isn't
 security through obscurity ("the model probably won't guess the tool
 name") — even if a model somehow emitted a `bind_seat` tool call, it isn't
 in `tools_by_name` (built from the same filtered list,
-[agent_turn.py:129](../../backend/app/game/agent_turn.py#L129)), so there's
+[agent_turn.py:134](../../backend/app/game/agent_turn.py#L134)), so there's
 no code path that would execute it.
 
 ## A routing pitfall this exact setup hit: the double mount
