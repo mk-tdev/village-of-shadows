@@ -114,7 +114,10 @@ export function GameView({ sessionId }: { sessionId: string }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div className="badge">
             {isNight ? <MoonIcon /> : <SunIcon />}
-            <span>{isNight ? "Night" : "Day"}</span>
+            {/* "Night" would be a lie before the graph has run anything --
+                assign_roles hasn't dealt roles and start_night hasn't set the
+                phase yet. */}
+            <span>{game.phase === "lobby" ? "Not started" : isNight ? "Night" : "Day"}</span>
           </div>
           <div className="badge">
             <EyeIcon />
@@ -152,34 +155,42 @@ export function GameView({ sessionId }: { sessionId: string }) {
             />
           ))}
         </div>
-        <div className="feed-wrap">
+        {/* At lobby the feed is empty, and its fixed 500px would push Start
+            below the fold on a shorter laptop screen -- which would be worse
+            than the modal this replaced. Collapse it until there's something
+            to show. */}
+        <div className={`feed-wrap${game.phase === "lobby" ? " feed-wrap-lobby" : ""}`}>
           <Feed entries={game.log} godView={godView} active={activeAiTurn} />
           <div className="controls">
-            <Controls
-              awaiting={game.awaiting}
-              paused={game.paused}
-              onSubmit={handleSubmit}
-              onContinue={handleContinue}
-              submitting={submitting}
-            />
+            {/* Start lives here rather than in a modal overlay. A centred
+                dialog covers the board, so pressing Start meant looking at a
+                dialog at the exact moment the first turns resolved -- and with
+                mock seats those land instantly, so the opening moves were
+                genuinely missed. Sitting in the controls panel, directly under
+                the feed and where every other player action already happens,
+                it starts the game with the board already in view. */}
+            {game.phase === "lobby" ? (
+              <>
+                <div className="controls-hint">
+                  Seats are configured and the event stream is already live. The graph hasn’t run
+                  a single node yet — start it and you’ll see every step from the first one.
+                </div>
+                <button className="btn" onClick={handleBegin} disabled={beginning}>
+                  {beginning ? "Starting..." : "▶ Start Game"}
+                </button>
+              </>
+            ) : (
+              <Controls
+                awaiting={game.awaiting}
+                paused={game.paused}
+                onSubmit={handleSubmit}
+                onContinue={handleContinue}
+                submitting={submitting}
+              />
+            )}
           </div>
         </div>
       </div>
-
-      {game.phase === "lobby" && (
-        <div className="overlay">
-          <div className="overlay-card">
-            <h2>Ready when you are</h2>
-            <p>
-              Seats are configured and everyone’s connected. The game won’t advance a single
-              step until you start it — click below to assign roles and begin Night 1.
-            </p>
-            <button className="btn" onClick={handleBegin} disabled={beginning}>
-              {beginning ? "Starting..." : "▶ Start Game"}
-            </button>
-          </div>
-        </div>
-      )}
 
       {game.winner && !showSummary && (
         <div className="overlay">

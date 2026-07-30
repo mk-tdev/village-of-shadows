@@ -105,9 +105,10 @@ related but distinct reason than the graph highlight: they're the *only*
 place a connected browser learns those values after its one-time initial
 `"state"` snapshot, since nothing else updates them on the frontend. See
 [10-frontend-observability.md](10-frontend-observability.md) for the real
-bug this caused — a lobby "Start Game" overlay that never closed once the
-game actually started, because `game.phase` was frozen at `"lobby"` from
-the snapshot with no live event ever correcting it.
+bug this caused — the lobby's Start Game prompt (a modal overlay at the time;
+it's since moved inline, see [11](11-application-walkthrough.md)) never went
+away once the game actually started, because `game.phase` was frozen at
+`"lobby"` from the snapshot with no live event ever correcting it.
 
 ## A third staleness bug: roles never reach an already-connected browser
 
@@ -127,7 +128,7 @@ supposed to reveal every seat's role and role icon the instant it's
 toggled on. Instead, every seat showed no role at all until the page was
 manually refreshed — a refresh re-fetches a `"state"` snapshot taken
 *after* `assign_roles` had already run, so it "fixed itself" the same
-misleading way the lobby-overlay bug in the previous section did before
+misleading way the stuck lobby prompt in the previous section did before
 its own fix.
 
 The fix follows the same shape again — publish the data a node just

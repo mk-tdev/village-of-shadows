@@ -105,9 +105,10 @@ export function useGameStream(sessionId: string): GameStreamState {
       // applying it here, `game.phase` would stay frozen at whatever the
       // initial "state" snapshot showed (now "lobby", see 07's begin_game
       // section) for the rest of the connection, since no other event
-      // updates it. That left the "Ready when you are" lobby overlay stuck
-      // open forever once the game actually started, even though the
-      // backend had moved on.
+      // updates it. That left the lobby's Start Game prompt showing forever
+      // once the game actually started, even though the backend had moved on
+      // (it was a modal overlay then; it's inline in the controls panel now,
+      // but it still keys off phase === "lobby", so this still matters).
       const next: GameState = {
         ...current,
         players,
@@ -133,8 +134,9 @@ export function useGameStream(sessionId: string): GameStreamState {
       // phase/round otherwise only ever come from the one-time initial
       // "state" snapshot -- nothing else updates them, so without this a
       // browser that connected while the game was still in "lobby" (see
-      // GameView.tsx's "Ready when you are" overlay) would never learn the
-      // game had actually started.
+      // GameView.tsx, which swaps the Start Game prompt for the real controls
+      // on exactly that value) would never learn the game had actually
+      // started.
       const current = gameRef.current;
       if (current && data.phase !== undefined && (current.phase !== data.phase || current.round !== data.round)) {
         const next: GameState = { ...current, phase: data.phase, round: data.round ?? current.round };

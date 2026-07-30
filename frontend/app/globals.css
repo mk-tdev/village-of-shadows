@@ -1127,3 +1127,11 @@ select:focus {
 .overlay-actions .btn-ghost {
   margin-top: 0;
 }
+
+/* Before the graph has run, the feed has nothing in it. Keeping its full
+   500px would push the inline Start button below the fold on a shorter
+   screen, so collapse it until there's a game to narrate. */
+.feed-wrap-lobby .feed {
+  height: auto;
+  min-height: 140px;
+}

@@ -51,10 +51,20 @@ replaced the automatic start.
 `GET /games/{id}/stream`. The route calls `orch.subscribe()`, gets its own
 queue, and immediately yields a `"state"` event with the current
 `GameState` — phase `"lobby"`, no roles assigned, nothing in the log yet,
-because nothing has run. `GameView.tsx` renders a "Ready when you are"
-overlay in exactly this state
-([GameView.tsx](../../frontend/components/GameView.tsx)) with a
-**Start Game** button.
+because nothing has run. `GameView.tsx` renders the board in exactly this
+state ([GameView.tsx](../../frontend/components/GameView.tsx)) — seats listed
+but role-less, an empty feed, and a **Start Game** button in the controls
+panel.
+
+That button used to be a centred "Ready when you are" modal, and moving it
+inline fixed a real complaint: a modal covers the board, so pressing Start
+meant staring at a dialog at the exact moment the first turns resolved — and
+with mock seats those land in milliseconds, so the opening moves were
+genuinely missed. Two details make the inline version work: the empty feed
+collapses from its fixed 500px while `phase === "lobby"` (otherwise Start
+lands below the fold on a shorter laptop screen, which is worse than the
+modal was), and the phase badge reads "Not started" rather than "Night",
+since `start_night` hasn't run yet.
 
 **3a. Clicking Start Game is what actually kicks off the graph.**
 ```python

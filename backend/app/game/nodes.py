@@ -53,11 +53,12 @@ def _sync(config: RunnableConfig, game: GameState):
     connect-after-auto-start design (the snapshot usually already showed a
     phase past "lobby" by the time anyone was watching), but a real bug now
     that a browser connects *before* the human clicks "Start Game" (see
-    07-pausing-with-interrupt.md's `begin_game`): the "Ready when you are"
-    overlay checks `game.phase === "lobby"` and had nothing that would ever
-    tell it the phase moved on, so it never closed. Piggy-backing on the
-    "node" event (already fires on every node transition) means phase/round
-    go stale for at most one node's worth of lag, not forever.
+    07-pausing-with-interrupt.md's `begin_game`): the frontend swaps its
+    Start Game prompt for the real controls on `game.phase === "lobby"`, and
+    had nothing that would ever tell it the phase moved on, so the prompt
+    never went away. Piggy-backing on the "node" event (already fires on every
+    node transition) means phase/round go stale for at most one node's worth of
+    lag, not forever.
     """
     session_id = config["configurable"]["session_id"]
     orch = registry.get(session_id)
