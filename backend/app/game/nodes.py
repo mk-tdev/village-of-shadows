@@ -235,7 +235,26 @@ async def start_night(state: dict, config: RunnableConfig) -> dict:
     game.wolf_index = 0
     game.night_proposals = []
     game.night_saved = None
-    await _log_system(orch, f"Night {game.round} falls over the village.")
+    # On the first night only, say what order the night runs in. Without it the
+    # night looks like it skips around the table at random -- it doesn't, but
+    # the reason isn't visible: night turns are dispatched by *role* (see
+    # night_wolves/night_doctor/night_seer below, which look their seat up by
+    # role and ignore seat position), while roles were dealt randomly in
+    # assign_roles. So the 5th seat acting first is normal, and only makes
+    # sense once you know the wolves go first. Repeating this every night would
+    # just be noise, hence round 1 only.
+    #
+    # Deliberately states the fixed ritual order rather than who is actually
+    # alive to take each turn: this entry is public (see _log_system), so
+    # "the doctor is gone" would leak a role to every seat.
+    if game.round == 1:
+        await _log_system(
+            orch,
+            f"Night {game.round} falls over the village. The werewolves wake first, then the "
+            "doctor, then the seer — night turns follow role, not seating order.",
+        )
+    else:
+        await _log_system(orch, f"Night {game.round} falls over the village.")
     _maybe_pause(orch, game)
     return {"game": game}
 

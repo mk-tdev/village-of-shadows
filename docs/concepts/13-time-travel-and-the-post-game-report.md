@@ -85,8 +85,8 @@ Measured directly:
 ```
 step next             phase        log  last log entry
    0 assign_roles     lobby          0  (none)
-   1 start_night      night          2  Night 1 falls over the village.
-   2 night_wolves     night          2  Night 1 falls over the village.
+   1 start_night      night          2  Night 1 falls over the village. The werewolves…
+   2 night_wolves     night          2  Night 1 falls over the village. The werewolves…
    3 night_wolves     night          3  proposes attacking Tomas.
 ```
 
