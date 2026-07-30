@@ -9,12 +9,11 @@ const TOP = 24;
 const COL_X = 82;
 const VIEW_W = 380;
 
-/** The mind graph is linear — START -> ingest -> deliberate -> END — plus one
- * conditional shortcut from `ingest` straight to END when a turn is a replay
- * (see seat_mind.py's `_ingest`). Ordering by that known sequence keeps the
- * diagram readable; anything the backend adds later falls to the end rather
- * than breaking the panel. */
-const ORDER = ["__start__", "ingest", "deliberate", "__end__"];
+/** `ingest` branches: a normal turn goes to `deliberate`, a turn being replayed
+ * after a pause goes to `reapply` instead (see seat_mind.py). Ordering by this
+ * known sequence keeps the diagram readable; anything the backend adds later
+ * falls to the end rather than breaking the panel. */
+const ORDER = ["__start__", "ingest", "deliberate", "reapply", "__end__"];
 
 /** Short notes on what each node is for. The node names alone ("ingest",
  * "deliberate") don't convey much to someone reading the panel to understand
@@ -22,6 +21,7 @@ const ORDER = ["__start__", "ingest", "deliberate", "__end__"];
 const NOTES: Record<string, string> = {
   ingest: "seeds persona once, adds this turn's briefing",
   deliberate: "model + MCP tool loop, continuing memory",
+  reapply: "replayed turn: re-acts, doesn't re-remember",
 };
 
 /** Deliberately *not* rendered through `GraphFlow`. That component carries a

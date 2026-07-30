@@ -900,6 +900,9 @@ select:focus {
 .activity-decision .activity-icon {
   color: #e5c07b;
 }
+.activity-memory .activity-icon {
+  color: #c9a0dc;
+}
 
 /* --- How-to-play page --- */
 .howto-heading {

@@ -49,9 +49,25 @@ async def stop_game(conn: aiosqlite.Connection, session_id: str) -> None:
 
 
 async def record_log_entry(conn: aiosqlite.Connection, session_id: str, entry: LogEntry) -> None:
+    """Idempotent on `(game_id, seq)`.
+
+    A node re-runs from the top when the graph resumes after a pause (see
+    03-human-in-the-loop-interrupt.md), and while `GameState` is rolled back so
+    the in-memory log recomputes cleanly, rows already written here are not --
+    so a plain INSERT left duplicate rows behind every time a pause landed
+    mid-turn. `seq` is assigned from the rolled-back log's length, so a replay
+    reproduces the same value, which makes it a natural dedup key. Guarded with
+    NOT EXISTS rather than a UNIQUE constraint so existing databases (created
+    by `CREATE TABLE IF NOT EXISTS`) get the fix without a migration.
+
+    The frontend already deduped these on `seq` when they arrived over SSE;
+    this closes the same hole on the persistence side."""
     await conn.execute(
         """INSERT INTO log_entries (game_id, seq, round, phase, type, seat_id, text, thought, private)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+           WHERE NOT EXISTS (
+               SELECT 1 FROM log_entries WHERE game_id = ? AND seq = ?
+           )""",
         (
             session_id,
             entry.seq,
@@ -62,6 +78,8 @@ async def record_log_entry(conn: aiosqlite.Connection, session_id: str, entry: L
             entry.text,
             entry.thought,
             entry.private,
+            session_id,
+            entry.seq,
         ),
     )
     await conn.commit()

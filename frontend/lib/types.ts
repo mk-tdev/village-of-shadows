@@ -145,6 +145,6 @@ export interface McpEvent {
  * -- see agent_turn.py's orch.publish("mcp", ...) calls. */
 export interface ActivityEntry {
   id: number;
-  kind: "node" | "turn" | "mcp" | "decision";
+  kind: "node" | "turn" | "mcp" | "decision" | "memory";
   text: string;
 }

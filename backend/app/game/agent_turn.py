@@ -54,9 +54,14 @@ async def run_turn_with_history(
     history: list[Any],
     commit_tool_name: str,
     fallback: dict[str, Any],
-) -> tuple[dict[str, Any], list[Any]]:
+) -> tuple[dict[str, Any], list[Any], dict[str, Any]]:
     """Runs one turn as a *continuation* of `history` rather than from a
-    blank slate, and returns `(committed_result, messages_to_append)`.
+    blank slate, and returns
+    `(committed_result, messages_to_append, committed_args)`.
+
+    `committed_args` is what the agent actually decided — the arguments it
+    passed to the commit tool. The caller keeps them so the same decision can
+    be re-applied if the graph replays this turn (see `apply_commit`).
 
     The caller owns the conversation; this function only reads it and reports
     back what happened, so the same tool-calling machinery serves both a
@@ -99,7 +104,7 @@ async def _run_model_turn(
     history: list[Any],
     commit_tool_name: str,
     fallback: dict[str, Any],
-) -> tuple[dict[str, Any], list[Any]]:
+) -> tuple[dict[str, Any], list[Any], dict[str, Any]]:
     from langchain_mcp_adapters.sessions import create_session
     from langchain_mcp_adapters.tools import load_mcp_tools
 
@@ -147,6 +152,7 @@ async def _run_model_turn(
                     continue
 
                 committed_result = None
+                committed_args: dict[str, Any] = {}
                 for tc in ai_msg.tool_calls:
                     tool = tools_by_name.get(tc["name"])
                     if tool is None:
@@ -161,9 +167,12 @@ async def _run_model_turn(
                     tool_calls_log.append({"tool": tc["name"], "args": tc["args"], "result": result})
                     if tc["name"] == commit_tool_name and result is not None:
                         committed_result = result
+                        # Kept so a replayed turn can re-apply this exact
+                        # decision without consulting the model again.
+                        committed_args = dict(tc["args"] or {})
 
                 if committed_result is not None:
-                    return committed_result, appended
+                    return committed_result, appended, committed_args
         finally:
             identity.release(session)
             latency_ms = int((time.monotonic() - start) * 1000)
@@ -177,9 +186,9 @@ async def _run_model_turn(
                 output_tokens=output_tokens or None,
             )
 
-    result = await _apply_fallback(orch, player, commit_tool_name, fallback)
+    result, args = await _apply_fallback(orch, player, commit_tool_name, fallback)
     appended.append(AIMessage(content=f"(no tool committed; fell back to) {json.dumps(result)}"))
-    return result, appended
+    return result, appended, args
 
 
 def _describe_prompt(history: list[Any]) -> str:
@@ -245,7 +254,7 @@ async def _run_mock_turn(
     history: list[Any],
     commit_tool_name: str,
     fallback: dict[str, Any],
-) -> tuple[dict[str, Any], list[Any]]:
+) -> tuple[dict[str, Any], list[Any], dict[str, Any]]:
     """Offline stand-in for a real model: picks a random legal option and
     routes it through the exact same `actions.py` call a real tool
     invocation would make, so the rest of the pipeline (validation,
@@ -260,7 +269,7 @@ async def _run_mock_turn(
     memory mechanism in `seat_mind.py` is genuinely exercised by the offline
     test suite rather than only on paths that cost money."""
     start = time.monotonic()
-    result = await _apply_fallback(orch, player, commit_tool_name, fallback)
+    result, args = await _apply_fallback(orch, player, commit_tool_name, fallback)
     latency_ms = int((time.monotonic() - start) * 1000)
     raw_response = json.dumps(result)
     prompt = _describe_prompt(history)
@@ -268,12 +277,12 @@ async def _run_mock_turn(
         orch, player, phase=phase,
         prompt=prompt,
         raw_response=raw_response,
-        tool_calls=[{"tool": commit_tool_name, "args": result, "result": result}],
+        tool_calls=[{"tool": commit_tool_name, "args": args, "result": result}],
         latency_ms=latency_ms,
         input_tokens=_estimate_tokens(prompt),
         output_tokens=_estimate_tokens(raw_response),
     )
-    return result, [AIMessage(content=f"(mock) called {commit_tool_name} with {raw_response}")]
+    return result, [AIMessage(content=f"(mock) called {commit_tool_name} with {raw_response}")], args
 
 
 async def _record_decision(
@@ -320,19 +329,42 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-async def _apply_fallback(
-    orch: "GameOrchestrator", player: "Player", commit_tool_name: str, fallback: dict[str, Any]
+async def apply_commit(
+    orch: "GameOrchestrator", player: "Player", commit_tool_name: str, args: dict[str, Any]
 ) -> dict[str, Any]:
-    target = fallback.get("target") or _random_target(fallback.get("pool", []))
-    thought = fallback.get("thought", "considers the options in silence.")
+    """Perform a turn's committed action from explicit arguments.
+
+    Split out so a decision can be applied *twice from the same arguments* —
+    once when the agent makes it, and again if the graph replays that node
+    after a pause. `seat_mind.py`'s `_reapply` is the second caller; see the
+    replay pitfall in 12-per-seat-agent-memory-subgraphs.md for why re-applying
+    is necessary rather than redundant."""
+    target = args.get("target")
+    thought = args.get("thought", "")
     if commit_tool_name == "submit_night_action":
         return await actions.apply_night_action(orch, player.seat_id, target, thought)
     if commit_tool_name == "submit_statement":
-        text = fallback.get("text", "stays quiet, watching the others.")
+        text = args.get("text", "stays quiet, watching the others.")
         return await actions.apply_statement(orch, player.seat_id, text, thought)
     if commit_tool_name == "submit_vote":
         return await actions.apply_vote(orch, player.seat_id, target, thought)
     raise ValueError(f"Unknown commit tool: {commit_tool_name}")
+
+
+async def _apply_fallback(
+    orch: "GameOrchestrator", player: "Player", commit_tool_name: str, fallback: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Returns `(result, args_used)` — the arguments matter to the caller, not
+    just the outcome, because a replayed turn has to reproduce this exact
+    decision without re-deriving it (the random pick below would choose
+    differently the second time)."""
+    args: dict[str, Any] = {
+        "target": fallback.get("target") or _random_target(fallback.get("pool", [])),
+        "thought": fallback.get("thought", "considers the options in silence."),
+    }
+    if commit_tool_name == "submit_statement":
+        args["text"] = fallback.get("text", "stays quiet, watching the others.")
+    return await apply_commit(orch, player, commit_tool_name, args), args
 
 
 def _random_target(pool: list[str]) -> str | None:

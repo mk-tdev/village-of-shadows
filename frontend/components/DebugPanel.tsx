@@ -11,6 +11,7 @@ const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
   turn: "▶",
   mcp: "⇄",
   decision: "✓",
+  memory: "🧠",
 };
 
 /** Engineering debug panel, embedded directly in the page (not a sliding

@@ -113,12 +113,19 @@ async def stop_game(session_id: str, request: Request) -> dict:
     pause, this doesn't wait for a natural checkpoint (see
     GameOrchestrator.stop). The session is unregistered right after, so
     every other route (state, stream, input, pause) 404s for it from this
-    point on, same as a session_id that never existed."""
+    point on, same as a session_id that never existed.
+
+    Abandoning also reclaims the game's checkpoint threads -- its own plus one
+    per seat's mind. Nothing will ever resume an abandoned game, and the
+    played-out record of it stays in the games/log_entries tables regardless,
+    so keeping eight threads of resumable state per discarded game buys
+    nothing."""
     try:
         orch = registry.get(session_id)
     except KeyError:
         raise HTTPException(404, "No such game.")
     orch.stop()
     await persistence.stop_game(request.app.state.db_conn, session_id)
+    await orch.discard_checkpoints()
     registry.unregister(session_id)
     return {"ok": True}

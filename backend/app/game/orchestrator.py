@@ -133,6 +133,32 @@ class GameOrchestrator:
         if self._task is not None and not self._task.done():
             self._task.cancel()
 
+    async def discard_checkpoints(self) -> None:
+        """Delete this game's checkpoint threads -- the main graph's, plus one
+        per seat's mind (see game/seat_mind.py).
+
+        A single game leaves eight threads behind, not one, so without this an
+        abandoned game's state accumulates in village.db forever. Called only
+        on an explicit *stop* (an abandon), never on a natural finish: a
+        completed game's per-seat conversations are the most interesting thing
+        to go back and read, and check_win deliberately writes the outcome into
+        each of them for exactly that reason.
+
+        Best-effort -- a failure to reclaim storage should never be the thing
+        that stops a user abandoning a game."""
+        threads = [self.session_id] + [
+            f"{self.session_id}:{p.seat_id}" for p in self.state.players
+        ]
+        for compiled in (self.graph, self.seat_mind):
+            checkpointer = getattr(compiled, "checkpointer", None)
+            if checkpointer is None or not hasattr(checkpointer, "adelete_thread"):
+                continue
+            for thread_id in threads:
+                try:
+                    await checkpointer.adelete_thread(thread_id)
+                except Exception:  # noqa: BLE001 - storage reclamation is optional
+                    pass
+
     async def _run(self, input_: Any) -> None:
         try:
             async for event in self.graph.astream(input_, self.config):

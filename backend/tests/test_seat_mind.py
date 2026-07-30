@@ -13,6 +13,7 @@ per-seat rather than shared, and a replayed turn does not duplicate it.
 import pytest
 
 from app.game.seat_mind import mind_config, remember, run_seat_turn
+from app.models import GameState
 from tests.helpers import make_orchestrator
 
 
@@ -123,6 +124,83 @@ async def test_replayed_turn_does_not_duplicate_memory(tmp_path):
         fallback={"pool": [p.name for p in orch.state.players if p.seat_id != seat.seat_id]},
     )
     assert len(await _history(orch, seat.seat_id)) > len(after_replay)
+
+
+@pytest.mark.asyncio
+async def test_replayed_turn_reapplies_the_action_to_rolled_back_state(tmp_path):
+    """The other half of the replay guard, and a bug it originally caused.
+
+    Skipping the *memory* write on a replay is right; skipping the *game
+    action* is not. GameState is rolled back to the pre-node checkpoint when a
+    pause interrupts, so the effect of the first attempt is gone — and the
+    first version of this guard returned the cached result without re-applying
+    it, which silently dropped the paused seat's vote."""
+    orch = await make_orchestrator(tmp_path, ["ai"] * 7)
+    await _assign_roles_only(orch)
+    seat = orch.state.players[0]
+    pool = [p.name for p in orch.state.players if p.seat_id != seat.seat_id]
+
+    first = await run_seat_turn(
+        orch, seat, phase="day-vote", briefing="Cast your vote.",
+        turn_stamp="1:day-vote:0", commit_tool="submit_vote", fallback={"pool": pool},
+    )
+    assert orch.state.vote_tally, "the first attempt should have registered a vote"
+    tally_before = dict(orch.state.vote_tally)
+    history_before = await _history(orch, seat.seat_id)
+
+    # Exactly what resume does: hand the node a fresh GameState deserialized
+    # from the checkpoint taken *before* the node ran, so the vote is absent.
+    orch.state = GameState(**{**orch.state.model_dump(), "vote_tally": {}})
+    assert orch.state.vote_tally == {}
+
+    replay = await run_seat_turn(
+        orch, seat, phase="day-vote", briefing="Cast your vote.",
+        turn_stamp="1:day-vote:0", commit_tool="submit_vote", fallback={"pool": pool},
+    )
+
+    assert orch.state.vote_tally == tally_before, "replayed turn did not re-apply the vote"
+    assert replay == first, "replay should reproduce the original decision, not a fresh one"
+    # ...and still without remembering the turn a second time.
+    assert len(await _history(orch, seat.seat_id)) == len(history_before)
+
+
+@pytest.mark.asyncio
+async def test_discarding_a_game_reclaims_every_seats_checkpoint_thread(tmp_path):
+    """One game owns eight checkpoint threads (its own plus one per seat), so
+    abandoning games without reclaiming them grows village.db forever."""
+    orch = await make_orchestrator(tmp_path, ["ai"] * 7)
+    orch.start()
+    await orch._task
+
+    cursor = await orch.conn.execute("SELECT COUNT(DISTINCT thread_id) FROM checkpoints")
+    before = (await cursor.fetchone())[0]
+    assert before > 1, "expected the game graph plus per-seat mind threads"
+
+    await orch.discard_checkpoints()
+
+    cursor = await orch.conn.execute("SELECT COUNT(DISTINCT thread_id) FROM checkpoints")
+    assert (await cursor.fetchone())[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_log_rows_are_idempotent_on_seq(tmp_path):
+    """A replayed node re-appends log entries with the same seq. The in-memory
+    log is rolled back so that recomputes cleanly, but rows already written are
+    not — hence the dedup in persistence.record_log_entry."""
+    from app import persistence
+    from app.models import LogEntry
+
+    orch = await make_orchestrator(tmp_path, ["ai"] * 7)
+    entry = LogEntry(seq=0, round=1, phase="night", type="system", text="Night falls.")
+
+    await persistence.record_log_entry(orch.conn, orch.session_id, entry)
+    await persistence.record_log_entry(orch.conn, orch.session_id, entry)
+
+    cursor = await orch.conn.execute(
+        "SELECT COUNT(*) FROM log_entries WHERE game_id = ? AND seq = ?",
+        (orch.session_id, 0),
+    )
+    assert (await cursor.fetchone())[0] == 1
 
 
 @pytest.mark.asyncio

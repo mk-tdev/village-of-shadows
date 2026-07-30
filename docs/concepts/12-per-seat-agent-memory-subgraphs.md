@@ -255,11 +255,61 @@ if stamp is not None and stamp == state.get("last_turn_stamp"):
 ```
 ([seat_mind.py:112-114](../../backend/app/game/seat_mind.py#L112-L114))
 
-A replayed turn short-circuits straight to `END` and hands back the decision it
-made the first time, instead of living the turn twice. That's what the
-conditional edge out of `ingest` is for
-([seat_mind.py:165-174](../../backend/app/game/seat_mind.py#L165-L174)), and
-`test_seat_mind.py` covers it directly.
+A replayed turn takes the other branch out of `ingest`
+([seat_mind.py:148-149](../../backend/app/game/seat_mind.py#L148-L149)) instead
+of living the turn twice.
+
+### The half-fix that made it worse, and the actual fix
+
+The first version of that branch routed a replay straight to `END` and returned
+the cached `result`. That protected memory and introduced a *second*, worse bug:
+**the game action was never re-applied.**
+
+The two rollbacks are asymmetric in both directions, and only one direction was
+being handled. Memory must not be written twice — but `GameState` **was** rolled
+back, so the vote or statement applied on the first attempt is genuinely gone
+and has to land again. Measured, by pausing at the end of a real `voting` node:
+
+```
+UNPAUSED  round 1: 7 votes  ['Mara','Tomas','Elin','Bram','Sable','Corvin','Petra']
+PAUSED    round 1: 5 votes  ['Tomas','Elin','Bram','Corvin','Petra']   <- Mara's vote gone
+```
+
+Silently. No error, no warning — a seat simply didn't vote, because the guard
+told the node "already handled" and the node discards the return value anyway.
+
+The fix is a third node, `_reapply`
+([seat_mind.py:152-181](../../backend/app/game/seat_mind.py#L152-L181)), which
+re-performs the action from the arguments the agent committed the first time,
+with no model call:
+
+```python
+args = state.get("commit_args")
+...
+result = await apply_commit(orch, player, state["commit_tool"], args)
+```
+
+Re-applying from stored arguments rather than re-asking the model matters twice
+over: it costs no API call, and it keeps the game consistent with what the agent
+*remembers* deciding. Note that the cached `result` alone was not enough to do
+this — `apply_statement` returns a bare `{"ok": True}` with the spoken text
+nowhere in it — which is why `commit_args` is threaded back out of
+`run_turn_with_history` alongside it.
+
+**The generalised lesson, sharper than the first one:** when state lives in two
+scopes with different rollback behaviour, an idempotency guard has to be applied
+*per effect*, not per turn. "Has this already happened?" had two different
+correct answers here — yes for the memory write, no for the game action — and a
+single boolean covering the whole turn was guaranteed to get one of them wrong.
+
+Two smaller consequences of the same rollback asymmetry, both now handled:
+`record_log_entry` dedupes on `(game_id, seq)`
+([persistence.py:51-84](../../backend/app/persistence.py#L51-L84)) because rows
+written before a pause aren't rolled back either, and `discard_checkpoints`
+([orchestrator.py:136-162](../../backend/app/game/orchestrator.py#L136-L162))
+reclaims a game's eight checkpoint threads when it's abandoned — on an explicit
+*stop* only, never a natural finish, since a completed game's per-seat
+conversations are the most interesting thing to go back and read.
 
 **The general lesson:** the moment you keep agent state in a scope that your
 orchestrator's checkpoint/rollback doesn't cover, "the node just re-runs
@@ -268,10 +318,12 @@ state — a second checkpoint thread, an external write, a queued message — ne
 its own idempotency key, and that key has to be derived from state that *is*
 rolled back, or it won't match on the replay.
 
-(There's a smaller, pre-existing version of this same issue that this change
-doesn't address: log rows and SSE events emitted before a pause are also not
-rolled back, so a pause mid-turn can duplicate them. Same root cause, different
-blast radius.)
+(One residue of the same root cause is left deliberately: duplicate `"log"`
+**SSE events** on a replay. The frontend already discards those by `seq` on
+arrival ([10](10-frontend-observability.md)), so suppressing them server-side
+would add a second mechanism to solve a problem the receiver has already
+solved. The *rows* were worth deduping because nothing downstream was
+protecting them.)
 
 ## What the split with `agent_turn.py` buys
 

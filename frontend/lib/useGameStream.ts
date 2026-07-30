@@ -181,6 +181,15 @@ export function useGameStream(sessionId: string): GameStreamState {
     // has no metrics row yet.
     source.addEventListener("memory", (e) => {
       const data: MemoryEvent = JSON.parse((e as MessageEvent).data);
+      // Only worth a feed line when a turn was actually replayed -- otherwise
+      // this would just restate the "decision" entry that already fired. A
+      // replay means a pause interrupted this node and the graph re-ran it, so
+      // the seat re-applied its decision without re-remembering it (see
+      // seat_mind.py's _reapply); that's exactly the sort of thing the panel
+      // exists to make visible.
+      if (data.replayed) {
+        pushActivity("memory", `${data.name} replayed a turn — memory left at ${data.messages}`);
+      }
       setMetrics((prev) => {
         const existing = prev[data.seat_id];
         return {

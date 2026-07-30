@@ -65,7 +65,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 from app.game import registry
-from app.game.agent_turn import run_turn_with_history
+from app.game.actions import ActionError
+from app.game.agent_turn import apply_commit, run_turn_with_history
 
 
 class MindState(TypedDict, total=False):
@@ -83,6 +84,11 @@ class MindState(TypedDict, total=False):
     commit_tool: str
     fallback: dict[str, Any]
     result: dict[str, Any] | None
+    # The arguments this seat committed on its last turn. Kept because a
+    # replayed turn must re-apply that same decision to a rolled-back
+    # GameState -- `result` alone isn't enough (apply_statement returns a bare
+    # {"ok": True}, with the spoken text nowhere in it).
+    commit_args: dict[str, Any] | None
     last_turn_stamp: str | None
     replayed: bool
 
@@ -106,8 +112,14 @@ def _ingest(state: MindState, config: RunnableConfig) -> dict[str, Any]:
     append a duplicate exchange and permanently corrupt that agent's history
     of its own play. Stamping each turn with `(round, phase, seat's turn
     index)` -- all values that *are* rolled back, so they come back identical
-    on a replay -- lets the mind recognise "I have already lived this turn"
-    and hand back the decision it made the first time instead of reliving it.
+    on a replay -- lets the mind recognise "I have already lived this turn."
+
+    A replayed turn routes to `_reapply` rather than straight to END, because
+    those two rollbacks are asymmetric in *both* directions: the memory must
+    not be written twice, but the game action must be applied again, since the
+    version applied on the first attempt went away with the rolled-back
+    GameState. Skipping it entirely is what silently dropped a paused seat's
+    vote before this node existed.
     """
     stamp = state.get("turn_stamp")
     if stamp is not None and stamp == state.get("last_turn_stamp"):
@@ -134,7 +146,40 @@ def _ingest(state: MindState, config: RunnableConfig) -> dict[str, Any]:
 
 
 def _route_after_ingest(state: MindState) -> str:
-    return END if state.get("replayed") else "deliberate"
+    return "reapply" if state.get("replayed") else "deliberate"
+
+
+async def _reapply(state: MindState, config: RunnableConfig) -> dict[str, Any]:
+    """Re-perform a replayed turn's action, without consulting the model.
+
+    The agent already lived this turn and already remembers it, so there is
+    nothing to think about -- but the effect of its decision was rolled back
+    with `GameState` when the pause interrupted the node, so it has to land
+    again. Re-applying from the stored `commit_args` reproduces the *same*
+    decision rather than asking for a fresh one, which matters twice over: it
+    costs no API call, and it keeps the game consistent with what the agent
+    remembers doing.
+
+    Only the game action repeats. `messages` is untouched, so memory still
+    records this turn exactly once."""
+    args = state.get("commit_args")
+    if not args:
+        # Nothing recorded to re-apply (a turn that never committed). Hand back
+        # whatever the first attempt produced and leave the game alone.
+        return {}
+
+    session_id = config["configurable"]["session_id"]
+    seat_id = config["configurable"]["seat_id"]
+    orch = registry.get(session_id)
+    player = orch.state.find_seat(seat_id)
+    try:
+        result = await apply_commit(orch, player, state["commit_tool"], args)
+    except ActionError:
+        # The rolled-back state may no longer permit the original choice (a
+        # target that is no longer alive, say). Better to leave the turn
+        # un-acted than to crash the whole game out of the SSE stream.
+        return {}
+    return {"result": result}
 
 
 async def _deliberate(state: MindState, config: RunnableConfig) -> dict[str, Any]:
@@ -152,14 +197,14 @@ async def _deliberate(state: MindState, config: RunnableConfig) -> dict[str, Any
     orch = registry.get(session_id)
     player = orch.state.find_seat(seat_id)
 
-    result, appended = await run_turn_with_history(
+    result, appended, commit_args = await run_turn_with_history(
         orch, player,
         phase=state.get("phase", orch.state.phase),
         history=list(state.get("messages") or []),
         commit_tool_name=state["commit_tool"],
         fallback=state.get("fallback") or {},
     )
-    return {"result": result, "messages": appended}
+    return {"result": result, "messages": appended, "commit_args": commit_args}
 
 
 def build_seat_mind(checkpointer):
@@ -168,8 +213,10 @@ def build_seat_mind(checkpointer):
     builder = StateGraph(MindState)
     builder.add_node("ingest", _ingest)
     builder.add_node("deliberate", _deliberate)
+    builder.add_node("reapply", _reapply)
     builder.add_edge(START, "ingest")
-    builder.add_conditional_edges("ingest", _route_after_ingest, [END, "deliberate"])
+    builder.add_conditional_edges("ingest", _route_after_ingest, ["reapply", "deliberate"])
+    builder.add_edge("reapply", END)
     builder.add_edge("deliberate", END)
     return builder.compile(checkpointer=checkpointer)
 
