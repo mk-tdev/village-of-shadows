@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 # Starts the backend (FastAPI/uvicorn, port 8000) and frontend (Next.js, port
-# 3000) as background processes, logging to logs/ and recording PIDs to .run/
+# 4001) as background processes, logging to logs/ and recording PIDs to .run/
 # so stop.sh can find and kill exactly these processes later.
+#
+# The frontend port is pinned rather than left to Next's own default (3000)
+# because the backend only accepts CORS requests from origins listed in
+# CORS_ORIGINS (backend/.env, see app/config.py) -- a frontend on any other
+# port loads fine but every API call it makes is blocked by the browser, which
+# looks like a broken backend rather than a config mismatch. Override with
+# FRONTEND_PORT=... only if you add the matching origin there too.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 BACKEND_PORT="${BACKEND_PORT:-8000}"
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+FRONTEND_PORT="${FRONTEND_PORT:-4001}"
 
 mkdir -p logs .run
 

@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     db_path: str = "./village.db"
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # start.sh runs the frontend on 4001; 3000 stays listed so a plain
+    # `next dev` on its own default still works against this backend.
+    cors_origins: list[str] = ["http://localhost:4001", "http://localhost:3000"]
 
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None

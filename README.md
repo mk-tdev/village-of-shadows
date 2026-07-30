@@ -8,26 +8,48 @@ replaces.
 
 ## Running it
 
-**Backend**
+One-time setup:
 
 ```bash
-cd backend
-uv sync
-cp .env.example .env   # fill in API keys if you have them -- optional, see below
-uv run uvicorn app.main:app --reload
+cd backend && uv sync && cp .env.example .env && cd ../frontend && pnpm install && cp .env.local.example .env.local
 ```
 
-**Frontend** (separate terminal)
+(Fill in API keys in `backend/.env` if you have them — optional, see below.)
+
+Then, from the repo root:
 
 ```bash
-cd frontend
-pnpm install
-cp .env.local.example .env.local
-pnpm dev
+./start.sh
 ```
 
-Then open `http://localhost:3000`, pick which seat you want to play, and hit
-**Start Game**.
+That runs the backend on **:8000** and the frontend on **:4001**, logging to
+`logs/` and recording PIDs to `.run/`. Open `http://localhost:4001`, pick which
+seat you want to play, and hit **Start Game**.
+
+To stop everything:
+
+```bash
+./stop.sh
+```
+
+`stop.sh` kills by recorded PID tree, then sweeps by port and by process
+pattern — `uvicorn --reload` and `pnpm dev` each fork children that survive a
+plain kill of the top-level process, which otherwise leaves the ports held.
+
+<details>
+<summary>Running the two servers manually instead</summary>
+
+```bash
+cd backend && uv run uvicorn app.main:app --reload   # :8000
+cd frontend && pnpm dev                              # :3000
+```
+
+Both `:4001` and `:3000` are in `CORS_ORIGINS` (`backend/.env`), so either port
+works. If you serve the frontend from any *other* port, add that origin there
+too — otherwise the page loads but every API call is blocked by the browser,
+which looks like a broken backend rather than a CORS mismatch.
+
+</details>
 
 ## Playing without any API key
 
