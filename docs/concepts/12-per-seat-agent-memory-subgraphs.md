@@ -113,9 +113,15 @@ who's alive, roles, votes, deaths, win conditions, phase transitions,
 persistence, SSE. Nothing about that changed. What's new is a second
 responsibility — deciding what each mind is allowed to learn.
 
-A mind never touches `GameState`. It only ever sees a briefing the
-orchestrator hands it, and that briefing is built through `build_agent_view`
-([04](04-partial-observability-agent-view.md)):
+Nothing a mind is *told* comes from `GameState` directly. It only ever sees a
+briefing the orchestrator hands it, and that briefing is built through
+`build_agent_view` ([04](04-partial-observability-agent-view.md)):
+
+(To be precise about the boundary, since it's easy to overstate: a mind's
+*execution* does reach `GameState` — `_deliberate` looks its player up on
+`orch.state`, and a committed tool call mutates it through `actions.py`. What
+the boundary guarantees is narrower and is the part that matters: no game
+information reaches a model's context except through `build_agent_view`.)
 
 ```python
 view = build_agent_view(game, seat.seat_id)
