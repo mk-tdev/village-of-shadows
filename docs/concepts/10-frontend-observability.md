@@ -3,6 +3,7 @@
 **Files:** [`frontend/lib/useGameStream.ts`](../../frontend/lib/useGameStream.ts),
 [`frontend/components/DebugPanel.tsx`](../../frontend/components/DebugPanel.tsx),
 [`frontend/components/GraphFlow.tsx`](../../frontend/components/GraphFlow.tsx),
+[`frontend/components/CouncilTable3D.tsx`](../../frontend/components/CouncilTable3D.tsx),
 [`backend/app/routers/graph.py`](../../backend/app/routers/graph.py)
 
 ## `useGameStream`: a reducer over SSE events, not a REST poll
@@ -77,6 +78,32 @@ which reveals it even when God Mode is off
 different visibility rules distinct: God Mode may reveal every role for
 observability, while a seer investigation reveals only knowledge the human
 legitimately earned during play.
+
+## The 3D chamber is another projection of state
+
+The council table in [`CouncilTable3D.tsx`](../../frontend/components/CouncilTable3D.tsx)
+does not own game logic. `GameView` projects the same streamed `GameState`
+used by the ordinary player cards into a smaller scene model: living status
+controls each candle, the current turn controls the glowing seat, the phase
+changes the light and fog, and the existing role-visibility rule decides
+whether a role artifact is present. In particular, turning God Mode off does
+not make the 3D layer a back door for secret roles; it receives only the
+human player's own role, public death reveals, and roles legitimately learned
+by a human seer.
+
+The scene is loaded with a client-only dynamic import, so Three.js and the
+renderer are not part of the initial setup/game bundle. It also detects WebGL
+support and honors reduced-motion preferences. The chamber can be collapsed;
+doing so unmounts its canvas instead of hiding an active render loop, returning
+the GPU work as well as the screen space. Player names are drawn into small
+local canvas textures above their portraits, so edited names stay legible in
+the 3D scene without another font or network dependency. Drifting embers, an
+animated ritual light, active-seat rings, and candle light make the chamber
+feel alive, but all animation observes the same reduced-motion preference.
+If either the code chunk, textures, or WebGL presentation is unavailable, the
+normal cards, feed, controls, and orchestration observability remain the
+authoritative interface; the 3D chamber is an atmospheric visualization,
+never a dependency of play.
 
 ## The debug panel: making the orchestration itself visible
 

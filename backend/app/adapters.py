@@ -34,7 +34,7 @@ def get_chat_model(config: AgentConfig):
         from langchain_anthropic import ChatAnthropic
 
         return ChatAnthropic(
-            model=config.model_name or "claude-sonnet-4-6",
+            model=config.model_name or "claude-sonnet-5",
             anthropic_api_key=settings.anthropic_api_key,
         )
 
@@ -42,15 +42,19 @@ def get_chat_model(config: AgentConfig):
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
-            model=config.model_name or "gpt-4.1",
+            model=config.model_name or "gpt-5.6-terra",
             openai_api_key=settings.openai_api_key,
+            # GPT-5.6 reasoning + function tools are supported together on
+            # Responses, not Chat Completions. Keeping this on the adapter
+            # means setup preflight and live turns always use the same API.
+            use_responses_api=True,
         )
 
     if config.provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         return ChatGoogleGenerativeAI(
-            model=config.model_name or "gemini-2.5-flash",
+            model=config.model_name or "gemini-3.5-flash",
             google_api_key=settings.google_api_key,
         )
 
@@ -58,7 +62,7 @@ def get_chat_model(config: AgentConfig):
         from langchain_ollama import ChatOllama
 
         return ChatOllama(
-            model=config.model_name or "llama3.1",
+            model=config.model_name or "qwen3:8b",
             base_url=config.endpoint or "http://localhost:11434",
         )
 

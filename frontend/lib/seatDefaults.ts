@@ -12,50 +12,41 @@ export const DEFAULT_PERSONALITIES = [
   "curious",
 ];
 
-/**
- * Model suggestions per provider -- a convenience list, not a closed set
- * (plan §8: "any model the account/endpoint supports" stays valid via
- * free-text in the Combobox). Claude IDs and pricing/thinking-support tiers
- * are verified against Anthropic's own current model catalog. OpenAI and
- * Gemini don't have an equivalent live source wired into this session, so
- * treat those two lists as best-effort -- double check current IDs/pricing
- * against each provider's own docs before relying on them.
- */
+/** Curated suggestions: every listed family is documented by its provider as
+ * supporting both reasoning/thinking and tool calling. The combobox also
+ * accepts custom IDs because provider and local catalogs evolve; the setup
+ * preflight proves the exact entered ID can answer and call a tool before it
+ * creates a game. */
 export const PROVIDER_MODEL_SUGGESTIONS: Record<Provider, SelectOption[]> = {
   mock: [{ value: "mock-v1", label: "mock-v1", sublabel: "offline / no key needed" }],
 
   claude: [
-    { value: "claude-opus-5", label: "Claude Opus 5", sublabel: "flagship · thinking · $5/$25 per MTok" },
-    { value: "claude-sonnet-5", label: "Claude Sonnet 5", sublabel: "balanced · thinking · $3/$15 per MTok" },
-    { value: "claude-haiku-4-5", label: "Claude Haiku 4.5", sublabel: "cheapest · fastest · $1/$5 per MTok" },
-    { value: "claude-opus-4-8", label: "Claude Opus 4.8", sublabel: "prev-gen flagship · thinking · $5/$25" },
-    { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", sublabel: "prev-gen balanced · thinking · $3/$15" },
-    { value: "claude-fable-5", label: "Claude Fable 5", sublabel: "most capable · thinking always on · $10/$50" },
+    { value: "claude-fable-5", label: "Claude Fable 5", sublabel: "adaptive thinking · tools" },
+    { value: "claude-opus-5", label: "Claude Opus 5", sublabel: "adaptive thinking · tools" },
+    { value: "claude-sonnet-5", label: "Claude Sonnet 5", sublabel: "adaptive thinking · tools" },
+    { value: "claude-haiku-4-5", label: "Claude Haiku 4.5", sublabel: "extended thinking · tools" },
   ],
 
-  // Best-effort — verify against platform.openai.com/docs before shipping.
   openai: [
-    { value: "gpt-5.1", label: "GPT-5.1", sublabel: "flagship (verify current ID)" },
-    { value: "gpt-5.1-mini", label: "GPT-5.1 Mini", sublabel: "cheaper (verify current ID)" },
-    { value: "gpt-5.1-nano", label: "GPT-5.1 Nano", sublabel: "cheapest (verify current ID)" },
-    { value: "o4-mini", label: "o4-mini", sublabel: "reasoning / thinking model" },
-    { value: "o3", label: "o3", sublabel: "reasoning / thinking, higher cost" },
+    { value: "gpt-5.6-sol", label: "GPT-5.6 Sol", sublabel: "reasoning · function calling" },
+    { value: "gpt-5.6-terra", label: "GPT-5.6 Terra", sublabel: "reasoning · function calling" },
+    { value: "gpt-5.6-luna", label: "GPT-5.6 Luna", sublabel: "reasoning · function calling" },
+    { value: "gpt-5.4-mini", label: "GPT-5.4 Mini", sublabel: "reasoning · function calling" },
+    { value: "gpt-5.4-nano", label: "GPT-5.4 Nano", sublabel: "reasoning · function calling" },
   ],
 
-  // Best-effort — verify against ai.google.dev/gemini-api/docs/models before shipping.
   gemini: [
-    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", sublabel: "flagship · thinking built-in" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", sublabel: "balanced · thinking built-in" },
-    { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", sublabel: "cheapest / fastest" },
+    { value: "gemini-3.6-flash", label: "Gemini 3.6 Flash", sublabel: "thinking · function calling" },
+    { value: "gemini-3.5-flash", label: "Gemini 3.5 Flash", sublabel: "thinking · function calling" },
+    { value: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite", sublabel: "thinking · function calling" },
   ],
 
   ollama: [
-    { value: "gemma4:latest", label: "gemma4:latest", sublabel: "tool-calling · your local pull" },
-    { value: "llama3.1", label: "llama3.1", sublabel: "general purpose" },
-    { value: "qwen2.5:14b", label: "qwen2.5:14b", sublabel: "general purpose, larger" },
-    { value: "qwen2.5:7b", label: "qwen2.5:7b", sublabel: "cheaper / smaller" },
-    { value: "deepseek-r1:7b", label: "deepseek-r1:7b", sublabel: "reasoning / thinking model" },
-    { value: "phi3", label: "phi3", sublabel: "small, fast" },
+    { value: "gpt-oss:20b", label: "gpt-oss:20b", sublabel: "thinking · tools" },
+    { value: "gpt-oss:120b", label: "gpt-oss:120b", sublabel: "thinking · tools" },
+    { value: "qwen3:4b", label: "qwen3:4b", sublabel: "thinking · tools" },
+    { value: "qwen3:8b", label: "qwen3:8b", sublabel: "thinking · tools" },
+    { value: "qwen3:14b", label: "qwen3:14b", sublabel: "thinking · tools" },
   ],
 
   // Ollama Cloud (ollama.com's hosted models) -- not a local server, needs
@@ -65,16 +56,12 @@ export const PROVIDER_MODEL_SUGGESTIONS: Record<Provider, SelectOption[]> = {
   // POST /api/chat (a "-cloud" suffix is only a valid alias for a handful
   // of models, like gpt-oss, that also exist as local pulls -- most cloud
   // models are just their plain name, and guessing wrong 410s instead of
-  // giving a useful error). Still not a closed set -- ollama.com's catalog
-  // changes over time, so re-verify against your own account's /api/tags
-  // if a model here stops resolving.
+  // giving a useful error). The list is only a set of suggestions because
+  // ollama.com's catalog changes over time; custom IDs remain editable, and
+  // the readiness check blocks retired or inaccessible entries before play.
   ollama_cloud: [
-    { value: "gpt-oss:20b", label: "gpt-oss:20b", sublabel: "small / fast, tool-calling" },
-    { value: "gpt-oss:120b", label: "gpt-oss:120b", sublabel: "larger, tool-calling" },
-    { value: "minimax-m2.7", label: "minimax-m2.7", sublabel: "general purpose" },
-    { value: "kimi-k2.6", label: "kimi-k2.6", sublabel: "large" },
-    { value: "deepseek-v4-flash", label: "deepseek-v4-flash", sublabel: "cheaper / faster" },
-    { value: "glm-5.1", label: "glm-5.1", sublabel: "large" },
+    { value: "gpt-oss:20b", label: "gpt-oss:20b", sublabel: "thinking · tools" },
+    { value: "gpt-oss:120b", label: "gpt-oss:120b", sublabel: "thinking · tools" },
   ],
 };
 

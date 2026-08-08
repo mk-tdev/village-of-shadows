@@ -1,114 +1,262 @@
-# Village of Shadows
+<div align="center">
 
-A 7-seat multi-agent Werewolf game — FastAPI + LangGraph orchestrator, a real
-MCP tool server, SQLite persistence, and a Next.js frontend driven over SSE.
-Full design rationale lives in [village-of-shadows-plan.md](village-of-shadows-plan.md);
-`werewolf_game.html` is the original single-file client-side prototype this
-replaces.
+# 🌘 Village of Shadows
 
-## Running it
+### Six autonomous AI agents. One human player. Nobody knows whom to trust.
 
-One-time setup:
+[![LangGraph](https://img.shields.io/badge/LangGraph-orchestration-7c3aed?style=flat-square)](https://github.com/langchain-ai/langgraph)
+[![MCP](https://img.shields.io/badge/MCP-agent%20tools-0f766e?style=flat-square)](https://modelcontextprotocol.io/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?style=flat-square)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
+[![Tests](https://img.shields.io/badge/backend%20tests-27%20passing-2e7d32?style=flat-square)](#testing)
 
-```bash
-cd backend && uv sync && cp .env.example .env && cd ../frontend && pnpm install && cp .env.local.example .env.local
+<img src="assets/youtube-thumbnail-1280x720.jpg" alt="Village of Shadows — six AI agents versus one human" width="100%" />
+
+</div>
+
+**Village of Shadows** is a seven-player game of Werewolf where six independent AI agents play alongside one human. Every agent has its own model, personality, secret role, private knowledge, and persistent conversation history.
+
+LangGraph controls the rules of the world—turn order, night actions, discussion, voting, resolution, pauses, and human interrupts—but it does not write the story. The agents decide whom to trust, accuse, protect, investigate, deceive, or eliminate.
+
+> This is an agentic-AI learning project built to explore something beyond another chatbot or fixed research workflow: multiple autonomous agents, incomplete information, competing objectives, persistent memory, validated tools, and a human genuinely participating inside the orchestration.
+
+## ✨ What makes it different
+
+| Capability | What happens in the game |
+|---|---|
+| **Six independent agents** | Each AI seat can use a different provider, model, and personality. |
+| **A real human participant** | LangGraph suspends execution until the human speaks, votes, or completes a night action. |
+| **Partial observability** | Agents receive only the public discussion and private information their role is allowed to know. |
+| **Persistent per-seat memory** | Each agent remembers its own previous turns without sharing a hidden global conversation. |
+| **MCP tool actions** | Agents act through validated game tools instead of returning loosely structured text. |
+| **Unscripted social behavior** | Werewolves can lie, seers can conceal evidence, doctors can make mistakes, and villagers can confidently accuse one another. |
+| **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
+| **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth. |
+| **Live 3D council chamber** | State-driven portraits, nameplates, candles, role artifacts, active-player lighting, ritual effects, and day/night atmosphere. |
+
+## 🕯️ Meet the village
+
+<p align="center">
+  <img src="frontend/public/portraits/mara.webp" alt="Mara" width="12%" />
+  <img src="frontend/public/portraits/tomas.webp" alt="Tomas" width="12%" />
+  <img src="frontend/public/portraits/elin.webp" alt="Elin" width="12%" />
+  <img src="frontend/public/portraits/bram.webp" alt="Bram" width="12%" />
+  <img src="frontend/public/portraits/sable.webp" alt="Sable" width="12%" />
+  <img src="frontend/public/portraits/corvin.webp" alt="Corvin" width="12%" />
+  <img src="frontend/public/portraits/petra.webp" alt="Petra" width="12%" />
+</p>
+
+The portraits belong to stable seats, while names, personalities, controllers, providers, and models remain configurable. The 3D chamber projects live game state without becoming a dependency of play: it is lazy-loaded, collapsible, WebGL-safe, and respects reduced-motion preferences.
+
+## 🎭 The hidden roles
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="frontend/public/roles/werewolf.webp" alt="Werewolf artifact" width="115" /><br /><b>🐺 Werewolf ×2</b><br /><sub>Coordinate an attack and survive the vote.</sub></td>
+    <td align="center" width="25%"><img src="frontend/public/roles/seer.webp" alt="Seer artifact" width="115" /><br /><b>👁️ Seer ×1</b><br /><sub>Investigate one player every night.</sub></td>
+    <td align="center" width="25%"><img src="frontend/public/roles/doctor.webp" alt="Doctor artifact" width="115" /><br /><b>🛡️ Doctor ×1</b><br /><sub>Protect one player from the attack.</sub></td>
+    <td align="center" width="25%"><img src="frontend/public/roles/villager.webp" alt="Villager artifact" width="115" /><br /><b>🏘️ Villager ×3</b><br /><sub>Reason from discussion and vote.</sub></td>
+  </tr>
+</table>
+
+## 🧠 Architecture
+
+```mermaid
+flowchart LR
+    Human[Human player] --> UI[Next.js game UI]
+    UI -->|REST actions| API[FastAPI]
+    API --> Graph[LangGraph game orchestrator]
+    Graph --> Minds[Persistent per-seat agent subgraph]
+    Minds --> Models[Claude / OpenAI / Gemini / Ollama]
+    Minds -->|bound tools| MCP[MCP tool server]
+    MCP --> Rules[Identity + game-rule validation]
+    Rules --> Graph
+    Graph <--> Store[(SQLite logs + checkpoints)]
+    API -->|SSE state and activity| UI
 ```
 
-(Fill in API keys in `backend/.env` if you have them — optional, see below.)
+The graph provides orchestration, state boundaries, replay safety, and interrupts. The agents provide decisions and behavior. Their interaction produces a game that was not scripted in advance.
 
-Then, from the repo root:
+### One AI turn, end to end
+
+1. LangGraph selects the next living seat and constructs that seat's permitted view.
+2. The seat's persistent mind receives only what changed since its previous turn.
+3. Its configured model reasons over its persona, memory, role, and visible evidence.
+4. The model calls MCP tools to inspect context or commit its action.
+5. The server binds tool identity to the connection and validates the action against current game state.
+6. SQLite persists the outcome, the graph advances, and SSE streams the change to the browser.
+
+For the full engineering walkthrough, start with the [Concept Guide](docs/concepts/README.md).
+
+## 🤖 Models and providers
+
+The setup screen supports:
+
+- **Claude**
+- **OpenAI**
+- **Gemini**
+- **Ollama** running locally
+- **Ollama Cloud**
+- **Mock**, requiring no API key
+
+Model fields are editable comboboxes. The app offers a curated list of reasoning/thinking models with tool-calling support, but you may enter any custom model ID supported by your account or Ollama endpoint. Before creating a session, the backend sends each unique configuration a real readiness message and requires the model to call `confirm_game_model`. Invalid IDs, missing API keys, inaccessible models, endpoints that are offline, and text-only models fail on the setup screen instead of crashing a game midway.
+
+See the in-app **How to Play** page for the model list, or inspect [`frontend/lib/seatDefaults.ts`](frontend/lib/seatDefaults.ts).
+
+## 🚀 Quick start
+
+### Requirements
+
+- Python 3.12+
+- [`uv`](https://docs.astral.sh/uv/)
+- Node.js and [`pnpm`](https://pnpm.io/)
+
+### 1. Install and configure
+
+```bash
+cd backend
+uv sync
+cp .env.example .env
+
+cd ../frontend
+pnpm install
+cp .env.local.example .env.local
+cd ..
+```
+
+API keys are optional because every AI seat defaults to the offline `mock` provider. To use hosted models, add the relevant values to `backend/.env`:
+
+```dotenv
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+GOOGLE_API_KEY=
+OLLAMA_API_KEY=
+```
+
+### 2. Start both applications
 
 ```bash
 ./start.sh
 ```
 
-That runs the backend on **:8000** and the frontend on **:4001**, logging to
-`logs/` and recording PIDs to `.run/`. Open `http://localhost:4001`, pick which
-seat you want to play, and hit **Start Game**.
+Open **http://localhost:4001**.
 
-To stop everything:
+1. Choose your human seat.
+2. Give the AI seats models and personalities.
+3. Click **Test Models & Start Game**.
+4. Review the per-seat readiness results.
+5. On the connected game page, click **Start Game** to begin from the first LangGraph node.
+
+Stop both applications with:
 
 ```bash
 ./stop.sh
 ```
 
-`stop.sh` kills by recorded PID tree, then sweeps by port and by process
-pattern — `uvicorn --reload` and `pnpm dev` each fork children that survive a
-plain kill of the top-level process, which otherwise leaves the ports held.
-
 <details>
-<summary>Running the two servers manually instead</summary>
+<summary><b>Run the backend and frontend separately</b></summary>
 
 ```bash
-cd backend && uv run uvicorn app.main:app --reload   # :8000
-cd frontend && pnpm dev                              # :3000
+# Terminal 1 — http://127.0.0.1:8000
+cd backend
+uv run uvicorn app.main:app --reload
+
+# Terminal 2 — http://localhost:3000
+cd frontend
+pnpm dev
 ```
 
-Both `:4001` and `:3000` are in `CORS_ORIGINS` (`backend/.env`), so either port
-works. If you serve the frontend from any *other* port, add that origin there
-too — otherwise the page loads but every API call is blocked by the browser,
-which looks like a broken backend rather than a CORS mismatch.
+Ports `4001` and `3000` are included in the backend's default CORS origins. Add any other frontend origin to `CORS_ORIGINS`.
 
 </details>
 
-## Playing without any API key
+## 🧪 Playing without API keys
 
-Every AI seat defaults to `provider: "mock"` in the control panel. The mock
-provider skips calling a real model entirely and picks a random legal action
-instead — but it still runs through the exact same MCP tool call and SQLite
-persistence path a real model would, so the whole system (orchestrator,
-interrupts, tool validation, logging) is exercisable with zero setup. Swap a
-seat to `claude` / `openai` / `gemini` / `ollama` and give it a real
-`model_name` once you have the matching API key in `backend/.env`. The model
-field is a free-text combobox with suggestions per provider, covering
-flagship/cheap/thinking-capable tiers — Claude's suggestions are verified
-against Anthropic's current model catalog; OpenAI's and Gemini's are
-best-effort and worth double-checking against each provider's own docs
-before relying on them (`frontend/lib/seatDefaults.ts`).
+`mock-v1` makes simple legal choices without contacting an LLM, but it still exercises the graph, human interrupts, MCP action path, validation, persistence, SSE updates, memory bookkeeping, pause/replay handling, and win conditions. It is the quickest way to explore the complete system for free.
 
-## Debug panel
+## 🔭 God Mode and engineering observability
 
-The "Debug" pill in the bottom-right of the live game view opens a panel with
-two things meant to showcase the agentic-engineering internals, not just the
-game itself:
+The game page makes the agent system visible while it runs:
 
-- **LangGraph orchestration flow** — the actual compiled graph, introspected
-  live via `GET /graph/structure` (`graph.get_graph()`, not a hand-drawn
-  diagram), with the currently-executing node highlighted in real time from
-  a `node` SSE event emitted on every node entry (see `game/nodes.py`'s
-  `_sync` and `routers/graph.py`).
-- **Per-agent token & context usage** — a live table of input/output tokens,
-  call count, and latency per seat, accumulated from `decision` SSE events
-  (`game/agent_turn.py`). Real providers report actual `usage_metadata` from
-  the model response; the `mock` provider estimates tokens from text length
-  (~4 chars/token) since there's no real API call to measure — those rows
-  are marked "est."
+- The actual compiled **LangGraph orchestration graph**, introspected rather than hand-drawn.
+- The active node and active per-seat mind node.
+- A chronological feed of turns, MCP sessions, tool calls, memory updates, and decisions.
+- Per-agent provider, model, latency, calls, tokens, and remembered-message count.
+- Private thoughts and secret actions when God Mode is enabled.
+- A post-game report reconstructed from LangGraph checkpoint history.
 
-## Tests
+God Mode changes only presentation. It does not change what any AI agent or human player is legitimately allowed to know.
+
+## 📁 Project map
+
+```text
+backend/app/
+├── adapters.py              # Provider-neutral LangChain model construction
+├── model_preflight.py       # Real message + required tool-call readiness gate
+├── game/                    # LangGraph nodes, orchestration, memory, views
+├── mcp_server.py            # MCP tools and connection-bound seat identity
+├── persistence.py           # SQLite game records and decisions
+└── routers/                 # REST, SSE, game lifecycle, graph inspection
+
+frontend/
+├── app/                     # Next.js setup, game, and How to Play pages
+├── components/              # 3D chamber, player UI, feed, controls, debug views
+├── lib/                     # API client, SSE reducer, models, portrait mapping
+└── public/                  # Character portraits and role artifacts
+
+docs/concepts/               # 13-part agentic engineering guide
+```
+
+## ✅ Testing
 
 ```bash
 cd backend
 uv run pytest
+
+cd ../frontend
+pnpm lint
+pnpm build
+
+cd ..
+python3 docs/concepts/check_citations.py
 ```
 
-Covers: partial-observability leakage (`test_views.py`), a full night → day
-→ vote → win game loop via the mock provider including the human
-interrupt/resume path (`test_graph_smoke.py`), and a real MCP protocol
-round-trip — session bind, tool listing, a gameplay tool call — independent
-of any LLM (`test_mcp_integration.py`).
+The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, replay safety, pause/continue, human interrupt/resume, full mock games, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
 
-## Known gaps in this pass
+## 📚 Learn from the implementation
 
-- **Werewolf negotiation** is a first-pass: independent proposals resolved
-  by majority, same as the original prototype — not yet the real multi-turn
-  back-and-forth described in plan §5. The `negotiate_message` MCP tool
-  exists and is wired for it, just not yet called by the graph.
-- **openai / gemini / ollama** adapters are implemented per plan §7 but
-  untested end-to-end (no keys/local models available while building this).
-  Only `claude` and `mock` have been exercised against a real model call.
-- **`agent_decisions` viewer**: the `GET /games/{id}/decisions` endpoint
-  works: no dedicated frontend page for it yet.
-- LangGraph logs a `Deserializing unregistered type app.models.GameState`
-  deprecation warning on checkpoint resume. Harmless today; worth
-  registering the type (or moving to a slimmer checkpoint-only schema)
-  before relying on `LANGGRAPH_STRICT_MSGPACK`.
+The [Concept Guide](docs/concepts/README.md) explains the design and the failures that shaped it:
+
+1. FastAPI application shape
+2. LangGraph as a game state machine
+3. Human-in-the-loop interrupts
+4. Partial observability and private information
+5. MCP identity and validated tools
+6. Model-agnostic adapters and tool calling
+7. Starting, pausing, continuing, and stopping safely
+8. Persistence versus checkpointing
+9. Server-Sent Events and broadcast semantics
+10. Frontend observability and the 3D state projection
+11. A complete turn walkthrough
+12. Persistent per-seat agent memory
+13. LangGraph time travel and the post-game report
+
+Additional references:
+
+- [Original implementation plan](village-of-shadows-plan.md)
+- [Deployment and user-supplied-key plan](docs/deployment-plan.md)
+- [`werewolf_game.html`](werewolf_game.html), the original single-file prototype
+
+## ⚠️ Current limitations
+
+- Werewolf night coordination currently resolves independent proposals by tally rather than a multi-turn private negotiation.
+- The decisions API is available, but there is no dedicated standalone decisions-history page.
+- Hosted-model availability and aliases vary by account and change over time; the readiness gate is intentionally the final source of truth.
+
+---
+
+<div align="center">
+
+### Sometimes the best way to understand agents is to give them identities, incomplete information, competing objectives—and then sit down at the table with them.
+
+</div>

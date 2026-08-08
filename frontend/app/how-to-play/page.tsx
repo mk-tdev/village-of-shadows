@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { DoctorIcon, EyeIcon, VillagerIcon, WolfIcon } from "@/components/icons";
+import { PROVIDER_MODEL_SUGGESTIONS } from "@/lib/seatDefaults";
+import type { Provider } from "@/lib/types";
 
 const ROLES = [
   {
@@ -35,6 +37,13 @@ const ROLES = [
       "No night action. Your only power is the day vote — listen to the discussion, watch for " +
       "inconsistencies, and vote to eliminate whoever you think is a werewolf.",
   },
+];
+
+const HOSTED_MODEL_PROVIDERS: { provider: Provider; label: string; apiKey: string }[] = [
+  { provider: "gemini", label: "Gemini", apiKey: "GOOGLE_API_KEY" },
+  { provider: "openai", label: "OpenAI", apiKey: "OPENAI_API_KEY" },
+  { provider: "claude", label: "Claude", apiKey: "ANTHROPIC_API_KEY" },
+  { provider: "ollama_cloud", label: "Ollama Cloud", apiKey: "OLLAMA_API_KEY" },
 ];
 
 export default function HowToPlayPage() {
@@ -143,6 +152,33 @@ export default function HowToPlayPage() {
             at once, alongside mock seats, all playing the same game together.
           </li>
         </ul>
+      </div>
+
+      <div className="setup-card" style={{ marginBottom: 20 }}>
+        <h2 className="howto-heading">Available hosted AI models</h2>
+        <p className="howto-p">
+          These are the reasoning and tool-calling models suggested by the setup screen. You can still type a
+          different model ID in the editable model field. Before a game is created, every selected model receives
+          a real readiness message and must successfully call the test tool.
+        </p>
+        <div className="model-catalog-grid">
+          {HOSTED_MODEL_PROVIDERS.map(({ provider, label, apiKey }) => (
+            <section className="model-catalog-card" key={provider}>
+              <div className="model-catalog-heading">
+                <h3>{label}</h3>
+                <code>{apiKey}</code>
+              </div>
+              <ul className="model-catalog-list">
+                {PROVIDER_MODEL_SUGGESTIONS[provider].map((model) => (
+                  <li key={model.value}>
+                    <code>{model.value}</code>
+                    {model.sublabel && <span>{model.sublabel}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       </div>
 
       <div className="setup-card">
