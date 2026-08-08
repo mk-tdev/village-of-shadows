@@ -1,18 +1,9 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import type { Role } from "@/lib/types";
-import { portraitAnimationDelay, portraitForSeat } from "@/lib/portraits";
-import { DoctorIcon, EyeIcon, VillagerIcon, WolfIcon } from "./icons";
+import { portraitAnimationDelay, portraitForSeat, roleArtifactFor } from "@/lib/portraits";
 
 type PortraitVariant = "card" | "feed" | "setup";
-type IconComponent = (props: { className?: string }) => ReturnType<typeof WolfIcon>;
-
-const ROLE_ICON: Record<Role, IconComponent> = {
-  werewolf: WolfIcon,
-  seer: EyeIcon,
-  doctor: DoctorIcon,
-  villager: VillagerIcon,
-};
 
 export function CharacterPortrait({
   seatId,
@@ -30,7 +21,6 @@ export function CharacterPortrait({
   variant?: PortraitVariant;
 }) {
   const portrait = portraitForSeat(seatId);
-  const RoleIcon = role ? ROLE_ICON[role] : null;
   const style = {
     "--portrait-delay": portraitAnimationDelay(seatId),
   } as CSSProperties;
@@ -56,9 +46,15 @@ export function CharacterPortrait({
         <span className="portrait-shadow" />
         <span className="portrait-light" />
       </div>
-      {RoleIcon && variant === "card" && (
+      {role && variant === "card" && (
         <span className={`portrait-role portrait-role-${role}`}>
-          <RoleIcon className="portrait-role-icon" />
+          <Image
+            className="portrait-role-artifact"
+            src={roleArtifactFor(role)}
+            alt=""
+            fill
+            sizes="30px"
+          />
         </span>
       )}
       {active && <span className="portrait-pulse" />}

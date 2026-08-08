@@ -1,3 +1,5 @@
+import type { Role } from "./types";
+
 const PORTRAIT_BY_SEAT: Record<string, string> = {
   seat_0: "/portraits/mara.webp",
   seat_1: "/portraits/tomas.webp",
@@ -8,10 +10,21 @@ const PORTRAIT_BY_SEAT: Record<string, string> = {
   seat_6: "/portraits/petra.webp",
 };
 
+const ROLE_ARTIFACT_BY_ROLE: Record<Role, string> = {
+  werewolf: "/roles/werewolf.webp",
+  seer: "/roles/seer.webp",
+  doctor: "/roles/doctor.webp",
+  villager: "/roles/villager.webp",
+};
+
 /** Portrait identity belongs to the seat, not its editable display name.
  * A player can rename Mara without accidentally inheriting another face. */
 export function portraitForSeat(seatId: string): string | null {
   return PORTRAIT_BY_SEAT[seatId] ?? null;
+}
+
+export function roleArtifactFor(role: Role): string {
+  return ROLE_ARTIFACT_BY_ROLE[role];
 }
 
 export function portraitAnimationDelay(seatId: string): string {
