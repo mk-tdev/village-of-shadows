@@ -91,6 +91,14 @@ async def apply_night_action(
             raise ActionError(f"{target_name} is not a valid seer target.")
         target = state.find_by_name(target_name)
         state.seer_knowledge.setdefault(seat_id, {})[target.name] = target.role
+        # The initial SSE state snapshot is the only wholesale state payload
+        # the browser receives. Publish this post-snapshot mutation as its own
+        # structured delta so a human seer can see the result immediately
+        # without enabling God Mode or refreshing the page.
+        orch.publish(
+            "seer_result",
+            {"seat_id": seat_id, "target": target.name, "role": target.role},
+        )
         await _append_log(
             orch, type_="seer", seat_id=seat_id, name=player.name,
             text=f"investigates {target_name} — discovers they are a {target.role}.",

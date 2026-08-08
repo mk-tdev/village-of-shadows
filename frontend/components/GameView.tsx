@@ -55,6 +55,12 @@ export function GameView({ sessionId }: { sessionId: string }) {
     );
   }
 
+  const humanPlayer = game.players.find((player) => player.controller === "human");
+  const humanSeerKnowledge =
+    humanPlayer?.role === "seer"
+      ? (game.seer_knowledge[humanPlayer.seat_id] ?? {})
+      : {};
+
   const handleSubmit = async (value: Record<string, unknown>) => {
     if (!game.awaiting) return;
     setSubmitting(true);
@@ -153,6 +159,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
               player={p}
               active={active?.seat_id === p.seat_id}
               godView={godView}
+              knownRole={humanSeerKnowledge[p.name]}
             />
           ))}
         </div>

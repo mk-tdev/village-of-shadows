@@ -63,7 +63,7 @@ export interface GameState {
   round: number;
   phase: string;
   log: LogEntry[];
-  seer_knowledge: Record<string, Record<string, string>>;
+  seer_knowledge: Record<string, Record<string, Role>>;
   winner: "villagers" | "werewolves" | null;
   awaiting: AwaitingInput | null;
   paused: boolean;
@@ -72,6 +72,12 @@ export interface GameState {
 export interface TurnEvent {
   seat_id: string | null;
   name: string | null;
+}
+
+export interface SeerResultEvent {
+  seat_id: string;
+  target: string;
+  role: Role;
 }
 
 export interface GraphNode {

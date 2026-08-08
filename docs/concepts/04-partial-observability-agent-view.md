@@ -68,6 +68,16 @@ skips this function. Concretely:
 - A doctor or plain villager gets neither extra field — nothing beyond the
   shared basics.
 
+The browser has a parallel, but separate, partial-observability boundary.
+When the human plays the seer, each successful investigation is streamed as
+a structured `"seer_result"` event and displayed on that target's player
+card even with God Mode disabled. The UI selects only the human seat's entry
+from `seer_knowledge`; it does not turn on the global all-roles view. Agent
+prompt filtering and human UI filtering consume the same authoritative
+knowledge, but each has its own delivery path and must be tested separately
+(see [09](09-sse-streaming-and-broadcast.md) and
+[10](10-frontend-observability.md)).
+
 ## Where this gets called
 
 There are two callers, and the difference between them is worth

@@ -165,6 +165,42 @@ new staleness bug was actually hit, rather than broadcasting the full
 `GameState` on every node transition — cheaper per-event, at the cost of
 being the kind of bug that only surfaces one missed field at a time.
 
+## A fourth staleness bug: the human seer's result existed only on the server
+
+Seer investigations exposed the same snapshot-versus-delta problem in a
+more subtle form. `apply_night_action` correctly added the discovered role
+to `GameState.seer_knowledge`, and its private log entry even described the
+result, but an already-connected browser received neither a new state
+snapshot nor a structured update for that nested map. With God Mode off,
+the human seer therefore had no way to see the identity they had just
+investigated. Refreshing happened to make it appear because reconnecting
+sent a newer `"state"` snapshot.
+
+The action now publishes a narrow `"seer_result"` delta at the moment the
+knowledge is recorded:
+
+```python
+orch.publish(
+    "seer_result",
+    {"seat_id": seat_id, "target": target.name, "role": target.role},
+)
+```
+([actions.py](../../backend/app/game/actions.py))
+
+The frontend folds that event into only the named seer's nested knowledge
+map. `GameView` then gives player cards knowledge from the human seat only,
+and `PlayerCard` treats that investigated role as visible even when God Mode
+is disabled. This separation matters: the event updates the browser's live
+state, while the rendering rule decides which part of that state belongs in
+the ordinary player view. God Mode remains an observability feature, not a
+requirement for receiving legitimate role-specific information.
+
+This is also why a private prose log is not a sufficient state protocol.
+The UI should not parse a sentence such as “discovers they are a werewolf”
+to reconstruct game state; a stable event with explicit `seat_id`, `target`,
+and `role` fields keeps transport, state reduction, and presentation
+independent.
+
 ## Publishing events from inside a graph node
 
 Graph nodes never write to the HTTP response directly — they call

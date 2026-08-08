@@ -14,17 +14,22 @@ export function PlayerCard({
   player,
   active,
   godView,
+  knownRole,
 }: {
   player: Player;
   active: boolean;
   godView: boolean;
+  knownRole?: Role;
 }) {
-  const roleKnown = player.controller === "human" || !player.alive || godView;
-  const RoleIcon = roleKnown && player.role ? ROLE_ICON[player.role] : null;
+  const visibleRole =
+    player.controller === "human" || !player.alive || godView
+      ? player.role
+      : knownRole;
+  const RoleIcon = visibleRole ? ROLE_ICON[visibleRole] : null;
 
   return (
     <div className={`player-card ${active ? "active" : ""} ${!player.alive ? "dead" : ""}`}>
-      <div className={`avatar ${RoleIcon ? `avatar-${player.role}` : ""}`}>
+      <div className={`avatar ${RoleIcon ? `avatar-${visibleRole}` : ""}`}>
         {RoleIcon ? <RoleIcon className="avatar-icon" /> : player.name[0]}
         {active && <div className="pulse-ring" />}
       </div>
@@ -39,8 +44,8 @@ export function PlayerCard({
           ) : (
             <span>{player.controller === "human" ? "you" : player.personality}</span>
           )}
-          {roleKnown && player.role && (
-            <span className={`role-chip role-${player.role}`}>{player.role}</span>
+          {visibleRole && (
+            <span className={`role-chip role-${visibleRole}`}>{visibleRole}</span>
           )}
         </div>
       </div>

@@ -65,6 +65,19 @@ Two things worth noticing in the `"log"` handler specifically:
   the log line, rather than waiting for a full state re-fetch — the log
   entry itself carries `seat_id`, so the reducer can act on it immediately.
 
+The same reducer rule applies to private knowledge that changes after the
+initial snapshot. A `"seer_result"` event carries the investigating seat,
+target name, and discovered role; its listener immutably merges that value
+into the correct nested `seer_knowledge` map
+([useGameStream.ts](../../frontend/lib/useGameStream.ts)). `GameView` reads
+only the human seer's map and passes each investigated role to `PlayerCard`,
+which reveals it even when God Mode is off
+([GameView.tsx](../../frontend/components/GameView.tsx),
+[PlayerCard.tsx](../../frontend/components/PlayerCard.tsx)). This keeps two
+different visibility rules distinct: God Mode may reveal every role for
+observability, while a seer investigation reveals only knowledge the human
+legitimately earned during play.
+
 ## The debug panel: making the orchestration itself visible
 
 ```tsx
@@ -147,7 +160,7 @@ source.addEventListener("decision", (e) => {
   });
 });
 ```
-([useGameStream.ts:176-194](../../frontend/lib/useGameStream.ts#L176-L194))
+([useGameStream.ts:199-217](../../frontend/lib/useGameStream.ts#L199-L217))
 
 Every `"decision"` event (published from `_record_decision` in
 `agent_turn.py` — see

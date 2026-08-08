@@ -13,6 +13,7 @@ import type {
   MindNodeEvent,
   Player,
   SeatMetrics,
+  SeerResultEvent,
   TurnEvent,
 } from "./types";
 
@@ -88,6 +89,28 @@ export function useGameStream(sessionId: string): GameStreamState {
       const current = gameRef.current;
       if (!current) return;
       const next: GameState = { ...current, players: data.players };
+      gameRef.current = next;
+      setGame(next);
+    });
+
+    // Seer knowledge changes after the one-time "state" snapshot. Keep the
+    // nested per-seat map intact while folding the new private discovery into
+    // local state, so the human seer's player cards can reveal only the roles
+    // they have actually investigated.
+    source.addEventListener("seer_result", (e) => {
+      const data: SeerResultEvent = JSON.parse((e as MessageEvent).data);
+      const current = gameRef.current;
+      if (!current) return;
+      const next: GameState = {
+        ...current,
+        seer_knowledge: {
+          ...current.seer_knowledge,
+          [data.seat_id]: {
+            ...(current.seer_knowledge[data.seat_id] ?? {}),
+            [data.target]: data.role,
+          },
+        },
+      };
       gameRef.current = next;
       setGame(next);
     });
