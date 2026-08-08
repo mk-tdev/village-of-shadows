@@ -5,9 +5,21 @@ from fastapi import APIRouter, HTTPException, Request
 from app import persistence
 from app.game import registry, timeline
 from app.game.orchestrator import GameOrchestrator
+from app.model_preflight import ModelPreflightResponse, preflight_models
 from app.models import AgentConfig, GameState, Player
 
 router = APIRouter(prefix="/games", tags=["games"])
+
+
+@router.post("/preflight", response_model=ModelPreflightResponse)
+async def preflight_game_models(configs: list[AgentConfig]) -> ModelPreflightResponse:
+    """Prove every AI configuration can answer and call a bound tool.
+
+    This route is intentionally read-only: no game, database row, or graph is
+    created until the setup page receives an all-clear and calls POST /games.
+    """
+
+    return await preflight_models(configs)
 
 
 @router.post("")

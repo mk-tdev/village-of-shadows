@@ -1,7 +1,8 @@
 # 6. Model-agnostic adapters and the tool-calling loop
 
 **Files:** [`backend/app/adapters.py`](../../backend/app/adapters.py),
-[`backend/app/game/agent_turn.py`](../../backend/app/game/agent_turn.py)
+[`backend/app/game/agent_turn.py`](../../backend/app/game/agent_turn.py),
+[`backend/app/model_preflight.py`](../../backend/app/model_preflight.py)
 
 ## One interface, six providers
 
@@ -11,16 +12,20 @@ def get_chat_model(config: AgentConfig):
         return None
     if config.provider == "claude":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=config.model_name or "claude-sonnet-4-6", anthropic_api_key=settings.anthropic_api_key)
+        return ChatAnthropic(model=config.model_name or "claude-sonnet-5", anthropic_api_key=settings.anthropic_api_key)
     if config.provider == "openai":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=config.model_name or "gpt-4.1", openai_api_key=settings.openai_api_key)
+        return ChatOpenAI(
+            model=config.model_name or "gpt-5.6-terra",
+            openai_api_key=settings.openai_api_key,
+            use_responses_api=True,
+        )
     if config.provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(model=config.model_name or "gemini-2.5-flash", google_api_key=settings.google_api_key)
+        return ChatGoogleGenerativeAI(model=config.model_name or "gemini-3.5-flash", google_api_key=settings.google_api_key)
     if config.provider == "ollama":
         from langchain_ollama import ChatOllama
-        return ChatOllama(model=config.model_name or "llama3.1", base_url=config.endpoint or "http://localhost:11434")
+        return ChatOllama(model=config.model_name or "qwen3:8b", base_url=config.endpoint or "http://localhost:11434")
     if config.provider == "ollama_cloud":
         from langchain_ollama import ChatOllama
         headers = {"Authorization": f"Bearer {settings.ollama_api_key}"} if settings.ollama_api_key else {}
@@ -44,6 +49,14 @@ zero special-casing anywhere except this one function. Adding a new
 provider means adding one `if` branch here — nothing else in the codebase
 changes; `ollama_cloud` is a real example of exactly that, added after
 `ollama` itself.
+
+The OpenAI branch explicitly selects the Responses API. This is not an
+optional optimisation for the current GPT-5.6 catalog: those models reject
+reasoning plus function tools on Chat Completions. The preflight reproduced
+that provider error before this flag was added, while Gemini and Ollama
+passed the same tool-call probe. Keeping the choice inside the adapter makes
+both preflight and live turns use the required endpoint without introducing
+OpenAI-specific logic into either caller.
 
 Imports are done lazily (`from langchain_anthropic import ...` *inside* the
 branch, not at module top) so that a game using only `claude` and `mock`
@@ -77,8 +90,7 @@ underlying `ollama.Client`/`ollama.AsyncClient`. Same underlying reason as
 the paragraph above, just a different mechanism for this one library.
 
 **A second real bug this surfaced: guessed model names silently 410.**
-Ollama Cloud's actual catalog (`gpt-oss:120b`, `minimax-m2.7`, `kimi-k2.6`,
-...) uses plain model names for almost everything — a `-cloud` suffix is
+Ollama Cloud's actual catalog uses plain model names for almost everything — a `-cloud` suffix is
 only a valid alias for a handful of models, like `gpt-oss`, that also exist
 as local pulls, where the suffix disambiguates "run the cloud one"
 from "run whatever I have pulled locally under this same name." Guessing
@@ -94,6 +106,35 @@ response. There's no way to derive Ollama Cloud's current catalog from
 first principles — it's an external, changing service — so re-verify
 against your own account's `/api/tags` if a listed model ever stops
 resolving.
+
+## Fail at setup, not during the third round
+
+A model ID can be syntactically plausible and still be unusable for this
+game: it may have been retired, be unavailable to this account, point at a
+local model that was never pulled, or answer text without supporting tool
+calls. Constructing a LangChain adapter proves none of those things. Before
+the setup page creates a game, `POST /games/preflight` sends every unique AI
+configuration a small real message with a bound `confirm_game_model` tool.
+It passes only when the returned `AIMessage.tool_calls` contains that exact
+tool and its expected argument.
+
+The frontend model control remains an editable combobox: provider-verified
+IDs are suggestions, not a permanently closed catalog. This matters for new
+hosted releases and locally named Ollama pulls. Safety comes from proving the
+exact entered ID at setup, not from assuming a hard-coded list can never age.
+
+[`model_preflight.py`](../../backend/app/model_preflight.py) deliberately
+uses `get_chat_model` and `.bind_tools()` just like a live turn, so the check
+covers the complete provider path: credentials, endpoint, model access,
+message generation, and function calling. Duplicate seats using the same
+provider/model/endpoint share one request, but receive separate results in
+the UI. The mock provider passes without network access, and human seats are
+not checked because they never instantiate a model.
+
+The route is read-only. A failed check creates no database row, orchestrator,
+or graph thread; the player stays on setup with the provider's error beside
+the affected seat. This moves a previously destructive late failure to the
+only place it is cheap to fix.
 
 ## Why "let the model call a tool" beats "ask for JSON and parse it"
 

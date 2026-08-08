@@ -14,6 +14,21 @@ export interface AgentConfig {
   endpoint?: string | null;
 }
 
+export interface ModelPreflightResult {
+  seat_id: string;
+  display_name: string;
+  provider: Provider;
+  model_name: string;
+  ok: boolean;
+  message: string;
+  latency_ms: number;
+}
+
+export interface ModelPreflightResponse {
+  ok: boolean;
+  results: ModelPreflightResult[];
+}
+
 export interface Player {
   seat_id: string;
   name: string;

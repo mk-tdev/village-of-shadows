@@ -1,4 +1,4 @@
-import type { AgentConfig, GameState, GraphStructure, Timeline } from "./types";
+import type { AgentConfig, GameState, GraphStructure, ModelPreflightResponse, Timeline } from "./types";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -12,6 +12,19 @@ export async function createGame(configs: AgentConfig[]): Promise<{ session_id: 
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
     throw new Error(detail?.detail ?? `Failed to create game (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function preflightModels(configs: AgentConfig[]): Promise<ModelPreflightResponse> {
+  const res = await fetch(`${API_BASE}/games/preflight`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(configs),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Failed to check models (${res.status})`);
   }
   return res.json();
 }

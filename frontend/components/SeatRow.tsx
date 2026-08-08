@@ -80,7 +80,7 @@ export function SeatRow({
                 value={seat.model_name ?? ""}
                 options={PROVIDER_MODEL_SUGGESTIONS[seat.provider ?? "mock"]}
                 onChange={(value) => onChange({ ...seat, model_name: value })}
-                placeholder="Model name"
+                placeholder="Model name or custom ID"
               />
               {seat.provider === "ollama" && (
                 <input

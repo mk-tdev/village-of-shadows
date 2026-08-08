@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { beginGame, continueGame, pauseGame, stopGame, submitInput } from "@/lib/api";
@@ -13,6 +14,14 @@ import { DebugPanel } from "./DebugPanel";
 import { GameSummary } from "./GameSummary";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 
+const CouncilTable3D = dynamic(
+  () => import("./CouncilTable3D").then((module) => module.CouncilTable3D),
+  {
+    ssr: false,
+    loading: () => <div className="council-3d-loading">Opening the council chamber…</div>,
+  }
+);
+
 export function GameView({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const { game, active, connected, errorMessage, currentNode, mindNode, mindNodeCounts, metrics, activity } =
@@ -21,6 +30,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [beginning, setBeginning] = useState(false);
+  const [councilOpen, setCouncilOpen] = useState(true);
   // The game-over overlay covers the board, so reading the technical
   // summary means dismissing it first rather than opening a second layer
   // on top of it.
@@ -60,6 +70,15 @@ export function GameView({ sessionId }: { sessionId: string }) {
     humanPlayer?.role === "seer"
       ? (game.seer_knowledge[humanPlayer.seat_id] ?? {})
       : {};
+  const councilPlayers = game.players.map((player) => ({
+    seatId: player.seat_id,
+    name: player.name,
+    alive: player.alive,
+    role:
+      player.controller === "human" || !player.alive || godView
+        ? (player.role ?? null)
+        : (humanSeerKnowledge[player.name] ?? null),
+  }));
 
   const handleSubmit = async (value: Record<string, unknown>) => {
     if (!game.awaiting) return;
@@ -150,6 +169,36 @@ export function GameView({ sessionId }: { sessionId: string }) {
           </button>
         </div>
       </header>
+
+      <section className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live 3D council table">
+        <div className="council-3d-caption">
+          <div>
+            <span>THE COUNCIL CHAMBER</span>
+            <small>
+              {active?.name ? `${active.name} holds the floor` : game.phase === "lobby" ? "Awaiting the first night" : "The village is listening"}
+            </small>
+          </div>
+          <button
+            className="council-collapse-btn"
+            type="button"
+            aria-expanded={councilOpen}
+            aria-controls="council-3d-stage"
+            onClick={() => setCouncilOpen((open) => !open)}
+          >
+            <span aria-hidden="true">{councilOpen ? "▴" : "▾"}</span>
+            {councilOpen ? "Collapse" : "Open chamber"}
+          </button>
+        </div>
+        <div className="council-3d-stage" id="council-3d-stage" aria-hidden={!councilOpen}>
+          {councilOpen && (
+            <CouncilTable3D
+              players={councilPlayers}
+              activeSeatId={active?.seat_id ?? null}
+              isNight={isNight}
+            />
+          )}
+        </div>
+      </section>
 
       <div className="board">
         <div className="players">

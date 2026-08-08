@@ -23,12 +23,12 @@ The obvious answer — the instant `POST /games` creates it — turned out to
 be wrong in practice:
 
 ```python
-orch = GameOrchestrator(session_id, state, conn, graph)
+orch = GameOrchestrator(session_id, state, conn, graph, request.app.state.seat_mind)
 registry.register(orch)
 # Deliberately not orch.start() here -- see GameOrchestrator.started's
 # docstring.
 ```
-([routers/games.py:40-46](../../backend/app/routers/games.py#L40-L46))
+([routers/games.py:52-58](../../backend/app/routers/games.py#L52-L58))
 
 `create_game` builds and registers the orchestrator, but never calls
 `orch.start()`. If it did — which is what this project's first version
@@ -60,7 +60,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:51-66](../../backend/app/routers/games.py#L51-L66))
+([routers/games.py:63-78](../../backend/app/routers/games.py#L63-L78))
 
 `GameState.phase` starts at `"lobby"` and stays there until `begin_game`
 actually calls `orch.start()`. The frontend's game page already opens its
@@ -97,7 +97,7 @@ async def pause_game(session_id: str) -> dict:
     orch.request_pause()
     return {"ok": True}
 ```
-([games.py:102-113](../../backend/app/routers/games.py#L102-L113))
+([games.py:114-125](../../backend/app/routers/games.py#L114-L125))
 
 `POST /pause` doesn't stop anything immediately — it just sets a plain
 boolean on the orchestrator. Whatever seat's turn is currently mid-flight
@@ -313,4 +313,3 @@ calls `registry.unregister(session_id)` after `orch.stop()` — unlike pause,
 there's no notion of a stopped game still existing to be resumed later, so
 every other route (`/state`, `/stream`, `/input`, `/pause`) should 404 for
 it from that instant on, identical to a `session_id` that never existed.
-

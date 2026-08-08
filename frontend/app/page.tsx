@@ -3,19 +3,21 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createGame } from "@/lib/api";
+import { createGame, preflightModels } from "@/lib/api";
 import { defaultSeats, PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
 import { SeatRow } from "@/components/SeatRow";
 import { Select } from "@/components/Select";
 import { Combobox } from "@/components/Combobox";
-import type { AgentConfig, Provider } from "@/lib/types";
+import type { AgentConfig, ModelPreflightResult, Provider } from "@/lib/types";
 
 export default function SetupPage() {
   const router = useRouter();
   const [humanIndex, setHumanIndex] = useState(0);
   const [seats, setSeats] = useState<AgentConfig[]>(() => defaultSeats(0));
   const [starting, setStarting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preflightResults, setPreflightResults] = useState<ModelPreflightResult[]>([]);
   // The master picker's own selection -- kept separate from any one seat's
   // provider/model so it still has a sensible value to apply even after
   // per-seat edits have made the seats disagree with each other, and so a
@@ -32,6 +34,8 @@ export default function SetupPage() {
   const canStart = !duplicateNames && seats.every((s) => s.display_name.trim().length > 0);
 
   function updateHumanIndex(index: number) {
+    setPreflightResults([]);
+    setError(null);
     setHumanIndex(index);
     setSeats((prev) =>
       prev.map((s, i) => ({
@@ -44,10 +48,14 @@ export default function SetupPage() {
   }
 
   function updateSeat(index: number, next: AgentConfig) {
+    setPreflightResults([]);
+    setError(null);
     setSeats((prev) => prev.map((s, i) => (i === index ? next : s)));
   }
 
   function applyMasterToAllAiSeats(provider: Provider, modelName: string) {
+    setPreflightResults([]);
+    setError(null);
     setSeats((prev) =>
       prev.map((s, i) =>
         i === humanIndex
@@ -78,11 +86,21 @@ export default function SetupPage() {
   async function handleStart() {
     setError(null);
     setStarting(true);
+    setChecking(true);
     try {
+      const preflight = await preflightModels(seats);
+      setPreflightResults(preflight.results);
+      setChecking(false);
+      if (!preflight.ok) {
+        setError("One or more AI seats failed the readiness check. Fix them before starting.");
+        setStarting(false);
+        return;
+      }
       const { session_id } = await createGame(seats);
       router.push(`/game/${session_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start game");
+      setChecking(false);
       setStarting(false);
     }
   }
@@ -129,7 +147,7 @@ export default function SetupPage() {
               value={masterModel}
               options={PROVIDER_MODEL_SUGGESTIONS[masterProvider]}
               onChange={handleMasterModelChange}
-              placeholder="Model name"
+              placeholder="Model name or custom ID"
             />
           </div>
         </div>
@@ -154,13 +172,28 @@ export default function SetupPage() {
           </p>
         )}
 
+        {preflightResults.length > 0 && (
+          <div className="preflight-panel" aria-live="polite">
+            <div className="preflight-title">AI model readiness</div>
+            {preflightResults.map((result) => (
+              <div className={`preflight-row ${result.ok ? "ok" : "failed"}`} key={result.seat_id}>
+                <span className="preflight-status" aria-hidden="true">{result.ok ? "✓" : "×"}</span>
+                <span>
+                  <strong>{result.display_name}</strong> · {result.model_name}
+                  <small>{result.message}{result.latency_ms > 0 ? ` · ${result.latency_ms} ms` : ""}</small>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <button
           className="btn"
           style={{ marginTop: 18 }}
           disabled={!canStart || starting}
           onClick={handleStart}
         >
-          {starting ? "Starting..." : "Start Game"}
+          {checking ? "Checking every AI model..." : starting ? "Creating village..." : "Test Models & Start Game"}
         </button>
       </div>
     </div>
