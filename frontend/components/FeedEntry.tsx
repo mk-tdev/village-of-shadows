@@ -1,4 +1,10 @@
 import type { LogEntry } from "@/lib/types";
+import { CharacterPortrait } from "./CharacterPortrait";
+
+function SpeakerPortrait({ entry }: { entry: LogEntry }) {
+  if (!entry.seat_id || !entry.name) return null;
+  return <CharacterPortrait seatId={entry.seat_id} name={entry.name} variant="feed" />;
+}
 
 export function FeedEntry({ entry, godView }: { entry: LogEntry; godView: boolean }) {
   if (entry.type === "system") {
@@ -13,7 +19,7 @@ export function FeedEntry({ entry, godView }: { entry: LogEntry; godView: boolea
   if (entry.type === "statement") {
     return (
       <div className="entry entry-statement">
-        <div className="entry-avatar">{entry.name?.[0]}</div>
+        <SpeakerPortrait entry={entry} />
         <div className="entry-body">
           <div className="entry-name">{entry.name}</div>
           {entry.thought && godView && <div className="entry-thought">{entry.thought}</div>}
@@ -25,7 +31,7 @@ export function FeedEntry({ entry, godView }: { entry: LogEntry; godView: boolea
   if (entry.type === "vote") {
     return (
       <div className="entry entry-statement">
-        <div className="entry-avatar">{entry.name?.[0]}</div>
+        <SpeakerPortrait entry={entry} />
         <div className="entry-body">
           <div className="entry-name">Vote</div>
           {entry.thought && godView && <div className="entry-thought">{entry.thought}</div>}
@@ -40,7 +46,7 @@ export function FeedEntry({ entry, godView }: { entry: LogEntry; godView: boolea
     if (entry.private && !godView) return null;
     return (
       <div className="entry entry-statement private">
-        <div className="entry-avatar">{entry.name?.[0]}</div>
+        <SpeakerPortrait entry={entry} />
         <div className="entry-body">
           <div className="entry-name">
             {entry.name} <span className="private-tag">{entry.type}</span>

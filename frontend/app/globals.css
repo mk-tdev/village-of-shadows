@@ -9,14 +9,14 @@
   --ink-faint: #7d7288;
   --amber: #e8a33d;
   --amber-dim: #8a6a35;
-  --blood: #c0495a;
+  --blood: #d04455;
   --sage: #7fa87f;
-  --night1: #100e1a;
-  --night2: #1c1830;
-  --day1: #2e2313;
-  --day2: #3d2c17;
-  --card: rgba(255, 255, 255, 0.045);
-  --card-border: rgba(232, 163, 61, 0.22);
+  --night1: #050508;
+  --night2: #15101f;
+  --day1: #171008;
+  --day2: #32210f;
+  --card: rgba(18, 14, 24, 0.82);
+  --card-border: rgba(232, 163, 61, 0.24);
   --card-border-strong: rgba(232, 163, 61, 0.5);
 }
 
@@ -31,20 +31,60 @@ body {
 body {
   font-family: "Inter", sans-serif;
   color: var(--ink);
-  background: radial-gradient(ellipse at top, var(--night2), var(--night1) 70%);
+  background:
+    radial-gradient(circle at 78% 8%, rgba(130, 146, 178, 0.12), transparent 20%),
+    radial-gradient(ellipse at top, var(--night2), var(--night1) 68%);
   background-attachment: fixed;
   min-height: 100vh;
   transition: background 1.2s ease;
   -webkit-font-smoothing: antialiased;
 }
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+body::before {
+  z-index: 0;
+  opacity: 0.52;
+  background:
+    radial-gradient(ellipse at 15% 25%, rgba(116, 126, 150, 0.09), transparent 31%),
+    radial-gradient(ellipse at 82% 67%, rgba(104, 36, 52, 0.08), transparent 28%),
+    repeating-linear-gradient(112deg, transparent 0 120px, rgba(208, 214, 225, 0.018) 121px 123px, transparent 124px 210px);
+  animation: village-fog 24s ease-in-out infinite alternate;
+}
+body::after {
+  z-index: 0;
+  opacity: 0.17;
+  background-image: repeating-radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.08) 0 0.6px, transparent 0.8px 3px);
+  background-size: 5px 5px;
+  mix-blend-mode: soft-light;
+}
 body.phase-day {
-  background: radial-gradient(ellipse at top, var(--day2), var(--day1) 70%);
+  background:
+    radial-gradient(circle at 72% 5%, rgba(213, 143, 51, 0.13), transparent 24%),
+    radial-gradient(ellipse at top, var(--day2), var(--day1) 70%);
+}
+body.phase-day::before {
+  opacity: 0.34;
+}
+@keyframes village-fog {
+  from {
+    transform: translate3d(-1.5%, -0.5%, 0) scale(1.04);
+  }
+  to {
+    transform: translate3d(1.5%, 0.8%, 0) scale(1.08);
+  }
 }
 
 .app {
   max-width: 1080px;
   margin: 0 auto;
   padding: 28px 20px 60px;
+  position: relative;
+  z-index: 1;
 }
 
 h1.village-title {
@@ -53,6 +93,8 @@ h1.village-title {
   font-size: 28px;
   margin: 0;
   letter-spacing: 0.3px;
+  color: #f1e5cf;
+  text-shadow: 0 0 24px rgba(192, 73, 90, 0.24), 0 2px 0 rgba(0, 0, 0, 0.8);
 }
 .subtitle {
   font-size: 13px;
@@ -129,21 +171,40 @@ h1.village-title {
   gap: 9px;
 }
 .player-card {
-  background: var(--card);
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.035), transparent 58%),
+    var(--card);
   border: 1px solid var(--card-border);
   border-radius: 12px;
-  padding: 11px 13px;
+  padding: 8px 11px;
+  min-height: 76px;
   display: flex;
   align-items: center;
   gap: 11px;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+  isolation: isolate;
+}
+.player-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(circle at 12% 50%, rgba(208, 68, 85, 0.16), transparent 48%);
+  transition: opacity 0.35s;
 }
 .player-card.active {
   border-color: var(--card-border-strong);
-  box-shadow: 0 0 0 1px var(--card-border-strong), 0 0 16px rgba(232, 163, 61, 0.15);
+  box-shadow: 0 0 0 1px var(--card-border-strong), 0 0 22px rgba(208, 68, 85, 0.2);
+  transform: translateX(3px);
+}
+.player-card.active::after {
+  opacity: 1;
 }
 .player-card.dead {
-  opacity: 0.45;
+  opacity: 0.52;
 }
 .avatar {
   width: 36px;
@@ -184,6 +245,169 @@ h1.village-title {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03));
   border-color: rgba(255, 255, 255, 0.3);
   color: var(--ink-dim);
+}
+
+/* Generated character art stays role-neutral. Role knowledge is a small
+   overlay, so a random role assignment never conflicts with the persona. */
+.character-portrait {
+  --portrait-size: 58px;
+  width: var(--portrait-size);
+  height: var(--portrait-size);
+  flex: 0 0 var(--portrait-size);
+  position: relative;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.38));
+}
+.portrait-feed {
+  --portrait-size: 31px;
+}
+.portrait-setup {
+  --portrait-size: 64px;
+}
+.portrait-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 17px;
+  border: 1px solid rgba(232, 163, 61, 0.42);
+  background: #0b0910;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.65), inset 0 -12px 20px rgba(0, 0, 0, 0.42);
+  transform: translateZ(0);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.portrait-feed .portrait-frame {
+  border-radius: 10px;
+}
+.portrait-image {
+  object-fit: cover;
+  transform: scale(1.035);
+  animation: portrait-breathe 7.5s ease-in-out infinite;
+  animation-delay: var(--portrait-delay);
+  will-change: transform, filter;
+}
+.portrait-shadow,
+.portrait-light {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.portrait-shadow {
+  background:
+    linear-gradient(to top, rgba(3, 2, 6, 0.58), transparent 48%),
+    radial-gradient(circle at center, transparent 42%, rgba(2, 1, 4, 0.5) 100%);
+}
+.portrait-light {
+  left: -160%;
+  right: auto;
+  width: 90%;
+  opacity: 0.2;
+  transform: skewX(-14deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 211, 139, 0.36), transparent);
+  animation: portrait-lantern 8.8s ease-in-out infinite;
+  animation-delay: var(--portrait-delay);
+}
+.portrait-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-family: "Spectral", serif;
+  color: var(--amber);
+}
+.character-portrait.is-active .portrait-frame {
+  border-color: rgba(232, 163, 61, 0.88);
+  box-shadow: inset 0 0 16px rgba(208, 68, 85, 0.15), 0 0 16px rgba(232, 163, 61, 0.22);
+}
+.character-portrait.is-active .portrait-image {
+  animation: portrait-watch 2.2s ease-in-out infinite;
+}
+.character-portrait.is-dead .portrait-image {
+  filter: grayscale(1) contrast(1.15) brightness(0.42);
+  animation-play-state: paused;
+}
+.character-portrait.is-dead .portrait-shadow {
+  background: linear-gradient(145deg, rgba(5, 3, 7, 0.24), rgba(5, 3, 7, 0.88));
+}
+.portrait-role {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.7);
+  z-index: 3;
+}
+.portrait-role-icon {
+  width: 13px;
+  height: 13px;
+}
+.portrait-role-werewolf {
+  color: #f0a0aa;
+  background: #5a1d29;
+}
+.portrait-role-seer {
+  color: #b8d7f6;
+  background: #233b59;
+}
+.portrait-role-doctor {
+  color: #bde0bd;
+  background: #29442d;
+}
+.portrait-role-villager {
+  color: #d0c8d5;
+  background: #39323f;
+}
+.portrait-pulse {
+  position: absolute;
+  inset: -4px;
+  z-index: -1;
+  border: 1px solid rgba(232, 163, 61, 0.75);
+  border-radius: 20px;
+  animation: portrait-pulse 1.8s ease-out infinite;
+}
+@keyframes portrait-breathe {
+  0%, 100% {
+    transform: scale(1.035) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.075) translate3d(0, -0.7%, 0);
+  }
+}
+@keyframes portrait-watch {
+  0%, 100% {
+    transform: scale(1.075) translate3d(0, 0, 0);
+    filter: saturate(1);
+  }
+  50% {
+    transform: scale(1.105) translate3d(0, -1%, 0);
+    filter: saturate(1.12) contrast(1.05);
+  }
+}
+@keyframes portrait-lantern {
+  0%, 42% {
+    transform: translateX(0) skewX(-14deg);
+    opacity: 0;
+  }
+  55% {
+    opacity: 0.18;
+  }
+  70%, 100% {
+    transform: translateX(330%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+@keyframes portrait-pulse {
+  from {
+    opacity: 0.8;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.18);
+  }
 }
 .pulse-ring {
   position: absolute;
@@ -333,9 +557,15 @@ h1.village-title {
   color: var(--ink-faint);
   font-style: italic;
 }
+.entry-thinking > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
 .dot-flicker {
   display: inline-flex;
   gap: 3px;
+  margin-left: 5px;
 }
 .dot-flicker span {
   width: 4px;
@@ -548,9 +778,6 @@ select:focus {
   background: rgba(232, 163, 61, 0.07);
   box-shadow: 0 0 0 1px var(--card-border-strong);
 }
-.seat-avatar {
-  flex-shrink: 0;
-}
 .seat-row {
   flex: 1;
   min-width: 0;
@@ -558,6 +785,21 @@ select:focus {
   grid-template-columns: 1fr 1fr auto 1fr 1fr;
   gap: 10px;
   align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .portrait-image,
+  .portrait-light,
+  .portrait-pulse,
+  .pulse-ring,
+  .dot-flicker span,
+  .entry {
+    animation: none !important;
+  }
+  .player-card {
+    transition: none;
+  }
 }
 .controller-badge {
   display: inline-block;

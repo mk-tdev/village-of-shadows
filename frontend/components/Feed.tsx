@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { LogEntry, TurnEvent } from "@/lib/types";
 import { FeedEntry } from "./FeedEntry";
+import { CharacterPortrait } from "./CharacterPortrait";
 
 export function Feed({
   entries,
@@ -27,11 +28,21 @@ export function Feed({
       ))}
       {active && (
         <div className="entry entry-thinking">
-          <span>{active.name} is thinking</span>
-          <span className="dot-flicker">
-            <span />
-            <span />
-            <span />
+          {active.seat_id && active.name && (
+            <CharacterPortrait
+              seatId={active.seat_id}
+              name={active.name}
+              variant="feed"
+              active
+            />
+          )}
+          <span>
+            {active.name} is thinking
+            <span className="dot-flicker" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
           </span>
         </div>
       )}

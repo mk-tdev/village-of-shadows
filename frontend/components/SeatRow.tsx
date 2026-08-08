@@ -2,6 +2,7 @@ import type { AgentConfig, Provider } from "@/lib/types";
 import { PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
 import { Select } from "./Select";
 import { Combobox } from "./Combobox";
+import { CharacterPortrait } from "./CharacterPortrait";
 
 export function SeatRow({
   seat,
@@ -14,10 +15,15 @@ export function SeatRow({
 }) {
   return (
     <div className={`seat-row-wrap ${isHuman ? "you" : ""}`}>
-      {/* Same look as an in-game player card before its role is revealed --
-          roles aren't assigned until the graph's assign_roles node runs
-          (nodes.py), so there's no role icon to show yet, only who's who. */}
-      <div className="avatar seat-avatar">{seat.display_name.trim()[0]?.toUpperCase() ?? "?"}</div>
+      {/* Portrait identity is tied to the stable seat id, while names and
+          personalities remain freely editable. Roles are still hidden until
+          the graph's assign_roles node runs. */}
+      <CharacterPortrait
+        seatId={seat.seat_id}
+        name={seat.display_name}
+        variant="setup"
+        active={isHuman}
+      />
 
       <div className="seat-row">
         <div>
