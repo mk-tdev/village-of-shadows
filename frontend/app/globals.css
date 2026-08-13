@@ -285,6 +285,194 @@ h1.village-title {
   position: relative;
   z-index: 1;
 }
+.living-village-renderer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.cinematic-cast {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  perspective: 900px;
+}
+.cinematic-cast::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -2%;
+  height: 22%;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(222, 116, 57, 0.1), rgba(4, 7, 12, 0) 66%);
+  filter: blur(9px);
+}
+.cinematic-person {
+  position: absolute;
+  width: clamp(100px, 12.5%, 146px);
+  height: 78%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: left 0.8s cubic-bezier(0.22, 1, 0.36, 1), bottom 0.8s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s, opacity 0.35s;
+}
+.cinematic-person::after {
+  content: "";
+  position: absolute;
+  left: 19%;
+  right: 19%;
+  bottom: 0;
+  height: 4.5%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.72);
+  filter: blur(5px);
+  transform: scaleX(1.2);
+}
+.cinematic-figure-wrap {
+  position: absolute;
+  inset: 7% 0 0;
+  display: block;
+  transform-origin: 50% 100%;
+  animation: cinematic-breathe 5.6s ease-in-out infinite;
+  animation-delay: calc(var(--portrait-delay, 0s) * 1s);
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.35s;
+}
+.cinematic-figure-wrap img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  object-position: center bottom;
+  user-select: none;
+  filter: drop-shadow(0 12px 9px rgba(0, 0, 0, 0.7));
+}
+.cinematic-name {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px 5px;
+  border: 1px solid rgba(232, 163, 61, 0.38);
+  border-radius: 999px;
+  background: rgba(5, 7, 12, 0.86);
+  color: #f1e5cf;
+  font-family: "Spectral", serif;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+.cinematic-name b {
+  color: #91c7d6;
+  font: 700 7px/1 "Inter", sans-serif;
+  letter-spacing: 0.1em;
+}
+.cinematic-person:hover .cinematic-figure-wrap,
+.cinematic-person:focus-visible .cinematic-figure-wrap,
+.cinematic-person.is-selected .cinematic-figure-wrap {
+  transform: translateY(-3%) scale(1.055);
+  filter: brightness(1.12);
+}
+.cinematic-person:focus-visible {
+  outline: none;
+}
+.cinematic-person:focus-visible .cinematic-name,
+.cinematic-person.is-selected .cinematic-name {
+  border-color: rgba(139, 199, 218, 0.9);
+  box-shadow: 0 0 18px rgba(97, 173, 198, 0.3);
+}
+.cinematic-person.is-speaking .cinematic-figure-wrap {
+  transform: translateY(-6%) scale(1.11);
+  filter: brightness(1.2) drop-shadow(0 0 11px rgba(232, 163, 61, 0.27));
+  animation: cinematic-speaking 2.4s ease-in-out infinite;
+}
+.cinematic-person.is-speaking .cinematic-name {
+  border-color: rgba(255, 198, 102, 0.92);
+  background: rgba(89, 29, 25, 0.92);
+  box-shadow: 0 0 20px rgba(232, 122, 61, 0.34);
+}
+.cinematic-person.is-dimmed {
+  filter: brightness(0.57) saturate(0.68);
+}
+.cinematic-person.is-dead {
+  opacity: 0.34;
+  filter: grayscale(1) sepia(0.12) brightness(0.52);
+}
+.cinematic-person.is-dead .cinematic-figure-wrap {
+  transform: translateY(5%) scale(0.94);
+  animation: none;
+}
+.cinematic-role {
+  position: absolute;
+  z-index: 4;
+  right: 1%;
+  top: 1%;
+  width: 25px;
+  height: 25px;
+  object-fit: cover;
+  border: 1px solid rgba(232, 163, 61, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.68);
+}
+.cinematic-memorial {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: 4%;
+  padding: 3px 6px;
+  border: 1px solid rgba(182, 179, 192, 0.28);
+  background: rgba(8, 8, 12, 0.8);
+  color: rgba(218, 215, 222, 0.72);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.cinematic-cast-map .cinematic-person {
+  width: clamp(75px, 9.5%, 105px);
+  height: 52%;
+}
+.cinematic-cast-map .cinematic-name {
+  font-size: 9px;
+  padding: 3px 7px 4px;
+}
+.cast-vote-line {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.cast-vote-line line {
+  stroke: rgba(208, 68, 85, 0.9);
+  stroke-width: 2;
+  stroke-dasharray: 6 8;
+  filter: drop-shadow(0 0 5px rgba(208, 68, 85, 0.72));
+  animation: accusation-travel 0.9s linear infinite;
+}
+@keyframes cinematic-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-0.9%) scale(1.008); }
+}
+@keyframes cinematic-speaking {
+  0%, 100% { transform: translateY(-6%) scale(1.11) rotate(-0.3deg); }
+  50% { transform: translateY(-7.2%) scale(1.118) rotate(0.3deg); }
+}
+@keyframes accusation-travel { to { stroke-dashoffset: -28; } }
 .council-3d-loading,
 .council-3d-fallback {
   display: grid;
@@ -312,6 +500,21 @@ h1.village-title {
   }
   .council-collapse-btn {
     padding: 6px 8px;
+  }
+  .cinematic-person {
+    width: 22%;
+    height: 65%;
+  }
+  .cinematic-person:nth-of-type(even) {
+    bottom: -2% !important;
+  }
+  .cinematic-name {
+    font-size: 8px;
+    padding: 3px 6px 4px;
+  }
+  .cinematic-name b,
+  .cinematic-role {
+    display: none;
   }
 }
 @media (max-width: 760px) {

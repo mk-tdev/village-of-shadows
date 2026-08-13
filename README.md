@@ -33,7 +33,7 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
 | **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth. |
 | **Closed-loop Learning Debrief** | Predict before play, then connect human interrupts, information boundaries, tool validation, memory growth, and divergent decisions to agentic-AI concepts. |
-| **Living cinematic village** | A film-like 3D cast inhabits a moonlit village, with automatic camera direction, speaker staging, voting trails, memorials, and phase-aware atmosphere. |
+| **Living cinematic village** | A full-body, identity-matched cast inhabits a moonlit 3D village, with automatic camera direction, speaker staging, voting trails, memorials, and phase-aware atmosphere. |
 
 ## 🕯️ Meet the village
 

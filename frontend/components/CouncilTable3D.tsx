@@ -1,9 +1,9 @@
 "use client";
 
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { portraitForSeat, roleArtifactFor } from "@/lib/portraits";
+import { fullCharacterForSeat, roleArtifactFor } from "@/lib/portraits";
 import type { LogType, Role } from "@/lib/types";
 
 export interface CouncilPlayer {
@@ -96,184 +96,6 @@ function Backdrop() {
   );
 }
 
-function Nameplate({ name, active, alive, human }: { name: string; active: boolean; alive: boolean; human: boolean }) {
-  const texture = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 144;
-    const context = canvas.getContext("2d");
-    if (!context) return null;
-
-    context.fillStyle = active ? "rgba(94, 28, 25, 0.96)" : "rgba(7, 8, 13, 0.9)";
-    context.strokeStyle = human ? "rgba(139, 199, 218, 0.95)" : active ? "rgba(255, 205, 118, 0.98)" : "rgba(232, 163, 61, 0.56)";
-    context.lineWidth = 5;
-    context.beginPath();
-    context.roundRect(5, 5, 502, 134, 25);
-    context.fill();
-    context.stroke();
-    context.font = "600 48px Georgia, serif";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillStyle = alive ? "#f4e8d1" : "#777179";
-    context.shadowColor = active ? "rgba(232, 163, 61, 0.8)" : "rgba(0, 0, 0, 0.8)";
-    context.shadowBlur = 12;
-    context.fillText(`${human ? "YOU · " : ""}${name.slice(0, 16)}`, 256, 72, 455);
-
-    const map = new THREE.CanvasTexture(canvas);
-    map.colorSpace = THREE.SRGBColorSpace;
-    map.needsUpdate = true;
-    return map;
-  }, [active, alive, human, name]);
-
-  useEffect(() => () => texture?.dispose(), [texture]);
-  if (!texture) return null;
-
-  return (
-    <sprite position={[0, 2.35, 0.06]} scale={[1.36, 0.38, 1]} renderOrder={12}>
-      <spriteMaterial map={texture} transparent depthTest={false} toneMapped={false} />
-    </sprite>
-  );
-}
-
-function RoleSigil({ role }: { role: Role }) {
-  const texture = useLoader(THREE.TextureLoader, roleArtifactFor(role));
-  const prepared = useMemo(() => {
-    const clone = texture.clone();
-    clone.colorSpace = THREE.SRGBColorSpace;
-    clone.needsUpdate = true;
-    return clone;
-  }, [texture]);
-
-  return (
-    <sprite position={[0.43, 1.22, 0.16]} scale={[0.35, 0.35, 1]} renderOrder={11}>
-      <spriteMaterial map={prepared} transparent depthTest={false} toneMapped={false} />
-    </sprite>
-  );
-}
-
-function Villager({
-  player,
-  index,
-  count,
-  active,
-  selected,
-  mode,
-  phase,
-  reduceMotion,
-  onSelect,
-}: {
-  player: CouncilPlayer;
-  index: number;
-  count: number;
-  active: boolean;
-  selected: boolean;
-  mode: CouncilCameraMode;
-  phase: string;
-  reduceMotion: boolean;
-  onSelect: (seatId: string) => void;
-}) {
-  const portraitUrl = portraitForSeat(player.seatId) ?? "/portraits/mara.webp";
-  const portrait = useLoader(THREE.TextureLoader, portraitUrl);
-  const prepared = useMemo(() => {
-    const clone = portrait.clone();
-    clone.colorSpace = THREE.SRGBColorSpace;
-    clone.needsUpdate = true;
-    return clone;
-  }, [portrait]);
-  const group = useRef<THREE.Group>(null);
-  const shadow = useRef<THREE.Mesh>(null);
-  const basePosition = useMemo(() => seatPosition(index, count, mode), [count, index, mode]);
-
-  useFrame(({ clock, camera }, delta) => {
-    if (!group.current) return;
-    const speakingStep = active && mode === "cinematic" ? 0.56 : 0;
-    const target = basePosition.clone();
-    target.z += speakingStep;
-    group.current.position.lerp(target, reduceMotion ? 1 : 1 - Math.exp(-delta * 4));
-    const breathe = !reduceMotion && player.alive ? Math.sin(clock.elapsedTime * 1.55 + index) * 0.018 : 0;
-    group.current.position.y = breathe;
-    group.current.lookAt(camera.position.x, group.current.position.y + 1.1, camera.position.z);
-    if (shadow.current && !reduceMotion) shadow.current.rotation.z = clock.elapsedTime * 0.12;
-  });
-
-  const cloakColor = player.human ? "#244553" : active ? "#5b2524" : index % 2 ? "#20242d" : "#2e2425";
-
-  return (
-    <group
-      ref={group}
-      position={basePosition}
-      onClick={(event) => {
-        event.stopPropagation();
-        onSelect(player.seatId);
-      }}
-      onPointerEnter={() => { document.body.style.cursor = "pointer"; }}
-      onPointerLeave={() => { document.body.style.cursor = "default"; }}
-    >
-      <mesh position={[0, 0.78, -0.02]} castShadow>
-        <coneGeometry args={[0.48, 1.25, 8]} />
-        <meshStandardMaterial
-          color={player.alive ? cloakColor : "#15151a"}
-          roughness={0.94}
-          metalness={0.02}
-          transparent
-          opacity={player.alive ? 1 : 0.42}
-        />
-      </mesh>
-      <mesh position={[-0.3, 0.88, -0.01]} rotation={[0, 0, -0.35]}>
-        <capsuleGeometry args={[0.085, 0.55, 4, 8]} />
-        <meshStandardMaterial color={player.alive ? cloakColor : "#15151a"} roughness={0.95} />
-      </mesh>
-      <mesh position={[0.3, 0.88, -0.01]} rotation={[0, 0, 0.35]}>
-        <capsuleGeometry args={[0.085, 0.55, 4, 8]} />
-        <meshStandardMaterial color={player.alive ? cloakColor : "#15151a"} roughness={0.95} />
-      </mesh>
-
-      <mesh position={[0, 1.46, 0.035]} scale={active || selected ? 1.06 : 1}>
-        <planeGeometry args={[0.86, 1.02]} />
-        <meshBasicMaterial
-          map={prepared}
-          transparent
-          opacity={player.alive ? 1 : 0.24}
-          toneMapped={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position={[0, 1.46, 0.008]}>
-        <planeGeometry args={[0.94, 1.1]} />
-        <meshStandardMaterial
-          color={player.human ? "#79b9cc" : active ? "#e8a33d" : player.alive ? "#3b2925" : "#16151a"}
-          emissive={active ? "#6d2d1e" : player.human ? "#163c4a" : "#000000"}
-          emissiveIntensity={active ? 1.4 : 0.55}
-          roughness={0.7}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      <Nameplate name={player.name} active={active || selected} alive={player.alive} human={player.human} />
-      {player.role && <RoleSigil role={player.role} />}
-
-      {(active || selected) && player.alive && (
-        <mesh ref={shadow} position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.48, 0.56, 48]} />
-          <meshBasicMaterial color={player.human ? "#85c7d9" : "#e8a33d"} transparent opacity={0.85} />
-        </mesh>
-      )}
-      {!player.alive && (
-        <group>
-          <mesh position={[0, 0.2, 0.05]}>
-            <cylinderGeometry args={[0.18, 0.24, 0.42, 10]} />
-            <meshStandardMaterial color="#39363e" roughness={1} />
-          </mesh>
-          <pointLight position={[0, 0.55, 0.25]} intensity={0.6} distance={1.1} color="#8e83a8" />
-        </group>
-      )}
-      {phase === "night" && player.alive && (
-        <pointLight position={[0, 1.15, 0.35]} color={active ? "#b95345" : "#7480a7"} intensity={active ? 1.3 : 0.3} distance={1.8} />
-      )}
-    </group>
-  );
-}
-
 function Bonfire({ phase, active, reduceMotion }: { phase: string; active: boolean; reduceMotion: boolean }) {
   const fire = useRef<THREE.Group>(null);
   const isNight = phase === "night" || phase === "lobby";
@@ -304,26 +126,6 @@ function Bonfire({ phase, active, reduceMotion }: { phase: string; active: boole
       </group>
       <pointLight position={[0, 0.75, 0.15]} intensity={isNight ? 6.2 : 3.2} distance={6.5} color="#e66d38" />
     </group>
-  );
-}
-
-function AccusationBeam({ from, to }: { from: THREE.Vector3; to: THREE.Vector3 }) {
-  const { midpoint, length, quaternion } = useMemo(() => {
-    const start = from.clone().add(new THREE.Vector3(0, 0.12, 0));
-    const end = to.clone().add(new THREE.Vector3(0, 0.12, 0));
-    const direction = end.clone().sub(start);
-    return {
-      midpoint: start.clone().add(end).multiplyScalar(0.5),
-      length: direction.length(),
-      quaternion: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()),
-    };
-  }, [from, to]);
-
-  return (
-    <mesh position={midpoint} quaternion={quaternion}>
-      <cylinderGeometry args={[0.018, 0.018, length, 8]} />
-      <meshBasicMaterial color="#d04455" transparent opacity={0.82} />
-    </mesh>
   );
 }
 
@@ -358,30 +160,21 @@ function FogVeil({ reduceMotion }: { reduceMotion: boolean }) {
 function Scene({
   players,
   activeSeatId,
-  selectedSeatId,
   phase,
-  event,
   mode,
   reduceMotion,
-  onSelect,
 }: {
   players: CouncilPlayer[];
   activeSeatId: string | null;
-  selectedSeatId: string | null;
   phase: string;
-  event: CouncilEvent | null;
   mode: CouncilCameraMode;
   reduceMotion: boolean;
-  onSelect: (seatId: string) => void;
 }) {
   const isNight = phase === "night" || phase === "lobby";
-  const focusSeatId = selectedSeatId ?? activeSeatId;
-  const voterIndex = event?.seatId ? players.findIndex((player) => player.seatId === event.seatId) : -1;
-  const targetIndex = event?.target ? players.findIndex((player) => player.name === event.target) : -1;
 
   return (
     <>
-      <CameraDirector players={players} focusSeatId={focusSeatId} mode={mode} reduceMotion={reduceMotion} />
+      <CameraDirector players={players} focusSeatId={activeSeatId} mode={mode} reduceMotion={reduceMotion} />
       <fog attach="fog" args={[isNight ? "#080d18" : "#21140c", 8, 18]} />
       <ambientLight intensity={isNight ? 0.32 : 0.66} color={isNight ? "#8096c8" : "#ffd7a0"} />
       <directionalLight position={[-4, 8, 3]} intensity={isNight ? 1.55 : 2.3} color={isNight ? "#aebfe8" : "#ffc47a"} />
@@ -398,28 +191,79 @@ function Scene({
       <Bonfire phase={phase} active={activeSeatId !== null} reduceMotion={reduceMotion} />
       <FogVeil reduceMotion={reduceMotion} />
 
-      {players.map((player, index) => (
-        <Villager
-          key={player.seatId}
-          player={player}
-          index={index}
-          count={players.length}
-          active={activeSeatId === player.seatId}
-          selected={selectedSeatId === player.seatId}
-          mode={mode}
-          phase={phase}
-          reduceMotion={reduceMotion}
-          onSelect={onSelect}
-        />
-      ))}
-
-      {event?.type === "vote" && voterIndex >= 0 && targetIndex >= 0 && (
-        <AccusationBeam
-          from={seatPosition(voterIndex, players.length, mode)}
-          to={seatPosition(targetIndex, players.length, mode)}
-        />
-      )}
     </>
+  );
+}
+
+function castPosition(index: number, count: number, mode: CouncilCameraMode) {
+  if (mode === "cinematic") {
+    return { left: `${10 + (index / Math.max(1, count - 1)) * 80}%`, bottom: "2.5%" };
+  }
+  const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
+  return {
+    left: `${50 + Math.cos(angle) * 34}%`,
+    bottom: `${31 - Math.sin(angle) * 19}%`,
+  };
+}
+
+function CinematicCast({
+  players,
+  activeSeatId,
+  event,
+  mode,
+}: {
+  players: CouncilPlayer[];
+  activeSeatId: string | null;
+  event: CouncilEvent | null;
+  mode: CouncilCameraMode;
+}) {
+  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
+  const focusedSeatId = activeSeatId ?? selectedSeatId;
+  const voterIndex = event?.seatId ? players.findIndex((player) => player.seatId === event.seatId) : -1;
+  const targetIndex = event?.target ? players.findIndex((player) => player.name === event.target) : -1;
+  const voter = voterIndex >= 0 ? castPosition(voterIndex, players.length, mode) : null;
+  const target = targetIndex >= 0 ? castPosition(targetIndex, players.length, mode) : null;
+
+  return (
+    <div className={`cinematic-cast cinematic-cast-${mode}`} aria-label="Village characters">
+      {event?.type === "vote" && voter && target && (
+        <svg className="cast-vote-line" aria-hidden="true">
+          <line x1={voter.left} y1={`calc(100% - ${voter.bottom})`} x2={target.left} y2={`calc(100% - ${target.bottom})`} />
+        </svg>
+      )}
+      {players.map((player, index) => {
+        const active = activeSeatId === player.seatId;
+        const selected = selectedSeatId === player.seatId && !activeSeatId;
+        const dimmed = Boolean(focusedSeatId && focusedSeatId !== player.seatId);
+        const position = castPosition(index, players.length, mode);
+        return (
+          <button
+            key={player.seatId}
+            type="button"
+            className={`cinematic-person${active ? " is-speaking" : ""}${selected ? " is-selected" : ""}${!player.alive ? " is-dead" : ""}${dimmed ? " is-dimmed" : ""}`}
+            style={{ left: position.left, bottom: position.bottom, zIndex: mode === "map" ? 20 + index : 20 + Math.abs(3 - index) }}
+            onClick={() => setSelectedSeatId((current) => current === player.seatId ? null : player.seatId)}
+            aria-label={`${player.name}${active ? ", speaking" : ""}${!player.alive ? ", eliminated" : ""}`}
+          >
+            <span className="cinematic-name">
+              {player.human && <b>YOU</b>}
+              {player.name}
+            </span>
+            <span className="cinematic-figure-wrap">
+              {/* Generated as one coherent full-body portrait rather than a face
+                  pasted onto procedural geometry. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={fullCharacterForSeat(player.seatId) ?? "/characters/full/mara.webp"} alt="" draggable={false} />
+            </span>
+            {player.role && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="cinematic-role" src={roleArtifactFor(player.role)} alt={player.role} />
+            )}
+            {!player.alive && <span className="cinematic-memorial">IN MEMORY</span>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -436,7 +280,6 @@ export function CouncilTable3D({
   event: CouncilEvent | null;
   cameraMode: CouncilCameraMode;
 }) {
-  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
   const [webglSupported] = useState(() => {
     if (typeof document === "undefined") return true;
     const canvas = document.createElement("canvas");
@@ -448,30 +291,27 @@ export function CouncilTable3D({
   );
 
   if (!webglSupported) {
-    return <div className="council-3d-fallback">Cinematic view unavailable. The game remains fully playable below.</div>;
+    return (
+      <div className="living-village-renderer">
+        <CinematicCast players={players} activeSeatId={activeSeatId} event={event} mode={cameraMode} />
+      </div>
+    );
   }
 
   return (
-    <Canvas
-      shadows
-      dpr={[1, 1.45]}
-      frameloop={reduceMotion ? "demand" : "always"}
-      camera={{ position: [0, 3.35, 8.25], fov: 42, near: 0.1, far: 32 }}
-      gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
-      onPointerMissed={() => setSelectedSeatId(null)}
-    >
-      <Suspense fallback={null}>
-        <Scene
-          players={players}
-          activeSeatId={activeSeatId}
-          selectedSeatId={activeSeatId ? null : selectedSeatId}
-          phase={phase}
-          event={event}
-          mode={cameraMode}
-          reduceMotion={reduceMotion}
-          onSelect={(seatId) => setSelectedSeatId((current) => current === seatId ? null : seatId)}
-        />
-      </Suspense>
-    </Canvas>
+    <div className="living-village-renderer">
+      <Canvas
+        shadows
+        dpr={[1, 1.45]}
+        frameloop={reduceMotion ? "demand" : "always"}
+        camera={{ position: [0, 3.35, 8.25], fov: 42, near: 0.1, far: 32 }}
+        gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
+      >
+        <Suspense fallback={null}>
+          <Scene players={players} activeSeatId={activeSeatId} phase={phase} mode={cameraMode} reduceMotion={reduceMotion} />
+        </Suspense>
+      </Canvas>
+      <CinematicCast players={players} activeSeatId={activeSeatId} event={event} mode={cameraMode} />
+    </div>
   );
 }

@@ -10,6 +10,16 @@ const PORTRAIT_BY_SEAT: Record<string, string> = {
   seat_6: "/portraits/petra.webp",
 };
 
+const FULL_CHARACTER_BY_SEAT: Record<string, string> = {
+  seat_0: "/characters/full/mara.webp",
+  seat_1: "/characters/full/tomas.webp",
+  seat_2: "/characters/full/elin.webp",
+  seat_3: "/characters/full/bram.webp",
+  seat_4: "/characters/full/sable.webp",
+  seat_5: "/characters/full/corvin.webp",
+  seat_6: "/characters/full/petra.webp",
+};
+
 const ROLE_ARTIFACT_BY_ROLE: Record<Role, string> = {
   werewolf: "/roles/werewolf.webp",
   seer: "/roles/seer.webp",
@@ -21,6 +31,12 @@ const ROLE_ARTIFACT_BY_ROLE: Record<Role, string> = {
  * A player can rename Mara without accidentally inheriting another face. */
 export function portraitForSeat(seatId: string): string | null {
   return PORTRAIT_BY_SEAT[seatId] ?? null;
+}
+
+/** Full-length, identity-matched character art for the cinematic village.
+ * Kept separate from close portraits so cards remain sharp at small sizes. */
+export function fullCharacterForSeat(seatId: string): string | null {
+  return FULL_CHARACTER_BY_SEAT[seatId] ?? null;
 }
 
 export function roleArtifactFor(role: Role): string {
