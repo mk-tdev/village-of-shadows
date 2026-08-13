@@ -33,7 +33,7 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
 | **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth. |
 | **Closed-loop Learning Debrief** | Predict before play, then connect human interrupts, information boundaries, tool validation, memory growth, and divergent decisions to agentic-AI concepts. |
-| **Live 3D council chamber** | State-driven portraits, nameplates, candles, role artifacts, active-player lighting, ritual effects, and day/night atmosphere. |
+| **Living cinematic village** | A film-like 3D cast inhabits a moonlit village, with automatic camera direction, speaker staging, voting trails, memorials, and phase-aware atmosphere. |
 
 ## 🕯️ Meet the village
 
@@ -47,7 +47,7 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
   <img src="frontend/public/portraits/petra.webp" alt="Petra" width="12%" />
 </p>
 
-The portraits belong to stable seats, while names, personalities, controllers, providers, and models remain configurable. The 3D chamber projects live game state without becoming a dependency of play: it is lazy-loaded, collapsible, WebGL-safe, and respects reduced-motion preferences.
+The portraits belong to stable seats, while names, personalities, controllers, providers, and models remain configurable. During play they become a real-time cast inside the Living Village. **Cinema** mode follows the current speaker; **Map** mode reveals the entire council. Characters step forward to speak, votes draw visible accusation paths, the fallen become memorials, and night changes the fog and light. The scene is lazy-loaded, collapsible, WebGL-safe, and respects reduced-motion preferences; its cinematic background remains visible even when 3D acceleration is unavailable.
 
 ## 🎭 The hidden roles
 
@@ -215,9 +215,9 @@ backend/app/
 
 frontend/
 ├── app/                     # Next.js setup, game, and How to Play pages
-├── components/              # 3D chamber, player UI, feed, controls, debug views
+├── components/              # Cinematic 3D village, player UI, feed, controls, debug views
 ├── lib/                     # API client, SSE reducer, models, portrait mapping
-└── public/                  # Character portraits and role artifacts
+└── public/                  # Character portraits, role artifacts, and scene art
 
 docs/concepts/               # 13-part agentic engineering guide
 ```

@@ -13,6 +13,7 @@ import { GodViewToggle } from "./GodViewToggle";
 import { DebugPanel } from "./DebugPanel";
 import { GameSummary } from "./GameSummary";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
+import type { CouncilCameraMode } from "./CouncilTable3D";
 
 const CouncilTable3D = dynamic(
   () => import("./CouncilTable3D").then((module) => module.CouncilTable3D),
@@ -31,6 +32,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
   const [stopping, setStopping] = useState(false);
   const [beginning, setBeginning] = useState(false);
   const [councilOpen, setCouncilOpen] = useState(true);
+  const [councilCamera, setCouncilCamera] = useState<CouncilCameraMode>("cinematic");
   // The game-over overlay covers the board, so reading the technical
   // summary means dismissing it first rather than opening a second layer
   // on top of it.
@@ -74,11 +76,15 @@ export function GameView({ sessionId }: { sessionId: string }) {
     seatId: player.seat_id,
     name: player.name,
     alive: player.alive,
+    human: player.controller === "human",
     role:
       player.controller === "human" || !player.alive || godView
         ? (player.role ?? null)
         : (humanSeerKnowledge[player.name] ?? null),
   }));
+  const latestSceneEvent = [...game.log]
+    .reverse()
+    .find((entry) => entry.type === "statement" || entry.type === "vote" || entry.type === "death") ?? null;
 
   const handleSubmit = async (value: Record<string, unknown>) => {
     if (!game.awaiting) return;
@@ -170,31 +176,65 @@ export function GameView({ sessionId }: { sessionId: string }) {
         </div>
       </header>
 
-      <section className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live 3D council table">
+      <section className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
         <div className="council-3d-caption">
           <div>
-            <span>THE COUNCIL CHAMBER</span>
+            <span>THE LIVING VILLAGE</span>
             <small>
-              {active?.name ? `${active.name} holds the floor` : game.phase === "lobby" ? "Awaiting the first night" : "The village is listening"}
+              {active?.name
+                ? `${active.name} holds the floor · camera following`
+                : game.phase === "lobby"
+                  ? "The cast waits for nightfall"
+                  : latestSceneEvent?.type === "death"
+                    ? "The village remembers its fallen"
+                    : "The village is listening"}
             </small>
           </div>
-          <button
-            className="council-collapse-btn"
-            type="button"
-            aria-expanded={councilOpen}
-            aria-controls="council-3d-stage"
-            onClick={() => setCouncilOpen((open) => !open)}
-          >
-            <span aria-hidden="true">{councilOpen ? "▴" : "▾"}</span>
-            {councilOpen ? "Collapse" : "Open chamber"}
-          </button>
+          <div className="council-view-controls">
+            {councilOpen && (
+              <div className="council-camera-switch" aria-label="Village camera mode">
+                <button
+                  type="button"
+                  className={councilCamera === "cinematic" ? "is-active" : ""}
+                  aria-pressed={councilCamera === "cinematic"}
+                  onClick={() => setCouncilCamera("cinematic")}
+                >
+                  ◉ Cinema
+                </button>
+                <button
+                  type="button"
+                  className={councilCamera === "map" ? "is-active" : ""}
+                  aria-pressed={councilCamera === "map"}
+                  onClick={() => setCouncilCamera("map")}
+                >
+                  ◇ Map
+                </button>
+              </div>
+            )}
+            <button
+              className="council-collapse-btn"
+              type="button"
+              aria-expanded={councilOpen}
+              aria-controls="council-3d-stage"
+              onClick={() => setCouncilOpen((open) => !open)}
+            >
+              <span aria-hidden="true">{councilOpen ? "▴" : "▾"}</span>
+              {councilOpen ? "Collapse" : "Open village"}
+            </button>
+          </div>
         </div>
         <div className="council-3d-stage" id="council-3d-stage" aria-hidden={!councilOpen}>
           {councilOpen && (
             <CouncilTable3D
               players={councilPlayers}
               activeSeatId={active?.seat_id ?? null}
-              isNight={isNight}
+              phase={game.phase}
+              event={latestSceneEvent ? {
+                type: latestSceneEvent.type,
+                seatId: latestSceneEvent.seat_id ?? null,
+                target: latestSceneEvent.target ?? null,
+              } : null}
+              cameraMode={councilCamera}
             />
           )}
         </div>
