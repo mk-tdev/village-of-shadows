@@ -18,6 +18,7 @@ export default function SetupPage() {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preflightResults, setPreflightResults] = useState<ModelPreflightResult[]>([]);
+  const [prediction, setPrediction] = useState("");
   // The master picker's own selection -- kept separate from any one seat's
   // provider/model so it still has a sensible value to apply even after
   // per-seat edits have made the seats disagree with each other, and so a
@@ -97,6 +98,15 @@ export default function SetupPage() {
         return;
       }
       const { session_id } = await createGame(seats);
+      try {
+        window.localStorage.setItem(
+          `village-learning:${session_id}`,
+          JSON.stringify({ prediction: prediction.trim(), created_at: new Date().toISOString() })
+        );
+      } catch {
+        // The experiment worksheet is a convenience, never a prerequisite
+        // for creating a game (private browsing can disable localStorage).
+      }
       router.push(`/game/${session_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start game");
@@ -160,6 +170,21 @@ export default function SetupPage() {
             onChange={(next) => updateSeat(i, next)}
           />
         ))}
+
+        <section className="learning-prediction" aria-labelledby="learning-prediction-title">
+          <span className="learning-kicker">LEARNING EXPERIMENT · OPTIONAL</span>
+          <h2 id="learning-prediction-title">Predict before you play</h2>
+          <p>
+            Which agent will gain trust, misread the evidence, or change the outcome — and why?
+            Your prediction stays in this browser and returns in the post-game debrief.
+          </p>
+          <textarea
+            value={prediction}
+            onChange={(event) => setPrediction(event.target.value)}
+            placeholder="Example: The cautious model will survive longer, but the aggressive model will drive the first vote."
+            rows={3}
+          />
+        </section>
 
         {duplicateNames && (
           <p className="error-text" style={{ marginTop: 12 }}>

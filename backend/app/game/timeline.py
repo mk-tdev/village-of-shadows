@@ -43,6 +43,7 @@ node.
 from __future__ import annotations
 
 from datetime import datetime
+import json
 from typing import Any
 
 from app.models import GameState
@@ -86,7 +87,7 @@ def _describe_entry(entry: Any) -> str:
     return entry.text or entry.type
 
 
-async def _seat_memory(seat_mind: Any, session_id: str, seat_id: str) -> dict[str, int]:
+async def _seat_memory(seat_mind: Any, session_id: str, seat_id: str) -> dict[str, Any]:
     """Depth of one seat's remembered conversation, and how many checkpoints
     that thread accumulated.
 
@@ -97,20 +98,212 @@ async def _seat_memory(seat_mind: Any, session_id: str, seat_id: str) -> dict[st
     from app.game.seat_mind import mind_config
 
     if seat_mind is None:
-        return {"messages": 0, "checkpoints": 0}
+        return {"messages": 0, "checkpoints": 0, "progression": []}
 
     depth = 0
-    count = 0
+    snapshots: list[Any] = []
     try:
         async for snap in seat_mind.aget_state_history(mind_config(session_id, seat_id)):
-            count += 1
-            depth = max(depth, len((snap.values or {}).get("messages") or []))
+            snapshots.append(snap)
     except Exception:  # noqa: BLE001 - a seat that never acted has no thread
         pass
-    return {"messages": depth, "checkpoints": count}
+
+    # Histories arrive newest-first. Keep only changes in depth so the learner
+    # sees memory grow per turn, rather than a noisy line for every internal
+    # node checkpoint in the seat-mind subgraph.
+    progression: list[dict[str, int]] = []
+    for snap in reversed(snapshots):
+        messages = len((snap.values or {}).get("messages") or [])
+        depth = max(depth, messages)
+        if not progression or progression[-1]["messages"] != messages:
+            progression.append({"stage": len(progression) + 1, "messages": messages})
+
+    return {"messages": depth, "checkpoints": len(snapshots), "progression": progression}
 
 
-async def build_timeline(graph: Any, seat_mind: Any, session_id: str) -> dict:
+def _tool_calls(decision: dict) -> list[dict]:
+    raw = decision.get("tool_calls")
+    if isinstance(raw, list):
+        return raw
+    if not isinstance(raw, str) or not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _tool_status(tool: str, result: Any) -> str:
+    """Classify calls without pretending every read tool is a game action."""
+    if not tool.startswith("submit_"):
+        return "read"
+    if isinstance(result, dict) and result.get("ok") is True:
+        return "accepted"
+    return "rejected"
+
+
+def _action_summary(tool: str, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    if tool == "submit_statement":
+        text = str(args.get("text") or "spoke")
+        return text if len(text) <= 110 else f"{text[:107]}..."
+    if tool in {"submit_vote", "submit_night_action"}:
+        return f"targeted {args.get('target') or 'no target'}"
+    if tool == "write_note":
+        return "updated private notes"
+    return tool.replace("_", " ")
+
+
+def _build_learning_debrief(final: GameState, seats: list[dict], decisions: list[dict]) -> dict:
+    """Turn the technical trace into evidence for a closed learning loop.
+
+    This deliberately reports observable behavior (actions, tool results,
+    memory depth, and information boundaries), not hidden chain-of-thought.
+    """
+    by_id = {player.seat_id: player for player in final.players}
+    public_events = [entry for entry in final.log if not entry.private]
+    private_events = [entry for entry in final.log if entry.private]
+    human = next((player for player in final.players if player.controller == "human"), None)
+    action_types = {"statement", "vote", "werewolf", "doctor", "seer"}
+
+    human_interrupts: list[dict] = []
+    if human is not None:
+        for entry in final.log:
+            if entry.seat_id != human.seat_id or entry.type not in action_types:
+                continue
+            kind = "statement" if entry.type == "statement" else "vote" if entry.type == "vote" else "night_action"
+            human_interrupts.append({
+                "seq": entry.seq,
+                "round": entry.round,
+                "phase": entry.phase,
+                "kind": kind,
+                "action": _describe_entry(entry),
+            })
+
+    calls: list[dict] = []
+    commit_by_stage: dict[tuple[int, str], list[dict]] = {}
+    for decision in decisions:
+        player = by_id.get(decision.get("seat_id"))
+        for call in _tool_calls(decision):
+            tool = str(call.get("tool") or "unknown_tool")
+            status = _tool_status(tool, call.get("result"))
+            row = {
+                "seat_id": decision.get("seat_id"),
+                "name": player.name if player else decision.get("seat_id"),
+                "provider": decision.get("provider"),
+                "model_name": decision.get("model_name"),
+                "round": decision.get("round"),
+                "phase": decision.get("phase"),
+                "tool": tool,
+                "status": status,
+                "summary": _action_summary(tool, call.get("args")),
+            }
+            calls.append(row)
+            if tool.startswith("submit_"):
+                key = (int(decision.get("round") or 0), str(decision.get("phase") or "unknown"))
+                commit_by_stage.setdefault(key, []).append(row)
+
+    comparisons = []
+    for (round_number, phase), rows in commit_by_stage.items():
+        if len(rows) < 2:
+            continue
+        comparisons.append({
+            "round": round_number,
+            "phase": phase,
+            "context": (
+                "These seats acted in the same round and phase. They shared the public conversation, "
+                "while role-specific context and turn order could still differ."
+            ),
+            "decisions": rows,
+        })
+
+    memory = []
+    for seat in seats:
+        if seat["controller"] == "human":
+            continue
+        progression = seat.get("memory_progression") or []
+        first = next((point["messages"] for point in progression if point["messages"] > 0), 0)
+        memory.append({
+            "seat_id": seat["seat_id"],
+            "name": seat["name"],
+            "model_name": seat.get("model_name"),
+            "start_messages": first,
+            "end_messages": seat["memory_messages"],
+            "growth": max(0, seat["memory_messages"] - first),
+            "progression": progression,
+        })
+
+    accepted = sum(call["status"] == "accepted" for call in calls)
+    rejected = sum(call["status"] == "rejected" for call in calls)
+    read_calls = sum(call["status"] == "read" for call in calls)
+    total_growth = sum(item["growth"] for item in memory)
+
+    concept_evidence = [
+        {
+            "concept": "Human in the loop",
+            "evidence": (
+                f"Execution suspended for {len(human_interrupts)} human turn(s); each response re-entered the same rule boundary used by agents."
+            ),
+        },
+        {
+            "concept": "Partial observability",
+            "evidence": (
+                f"The shared transcript contained {len(public_events)} public event(s), while {len(private_events)} event(s) stayed role-private."
+            ),
+        },
+        {
+            "concept": "Validated tool use",
+            "evidence": (
+                f"Models made {len(calls)} recorded tool call(s): {accepted} accepted committed action(s), {read_calls} context/memory read(s), and {rejected} rejected action(s). "
+                f"Human actions also passed through the same validation functions ({len(human_interrupts)} completed)."
+            ),
+        },
+        {
+            "concept": "Persistent independent memory",
+            "evidence": (
+                f"{len(memory)} seat-mind thread(s) accumulated {total_growth} messages beyond their initial remembered context without sharing a global history."
+            ),
+        },
+        {
+            "concept": "Emergent multi-agent behavior",
+            "evidence": (
+                f"The game produced {len(comparisons)} comparable multi-seat decision stage(s) across {final.round} round(s), ending with {final.winner}."
+            ),
+        },
+    ]
+
+    return {
+        "human_interrupts": human_interrupts,
+        "partial_observability": {
+            "public_events": len(public_events),
+            "private_events": len(private_events),
+            "seer_discoveries": sum(len(knowledge) for knowledge in final.seer_knowledge.values()),
+            "explanation": (
+                "Every seat received the public transcript plus only its role-authorized private context. "
+                "God Mode reveals those boundaries after the fact; it never changes what agents were allowed to see."
+            ),
+        },
+        "tool_calls": calls,
+        "tool_totals": {
+            "all": len(calls),
+            "accepted": accepted,
+            "rejected": rejected,
+            "reads": read_calls,
+        },
+        "memories": memory,
+        "comparisons": comparisons,
+        "concept_evidence": concept_evidence,
+        "next_experiments": [
+            "Keep every setting fixed and change one model. Predict which accusation or vote will change.",
+            "Use one model in every AI seat, then vary only personalities to isolate persona effects.",
+            "Replay with God Mode off, record your trust ranking, then compare it with the revealed private trace.",
+            "Compare memory growth and tool choices between a short game and a game that survives more rounds.",
+        ],
+    }
+
+
+async def build_timeline(graph: Any, seat_mind: Any, session_id: str, conn: Any | None = None) -> dict:
     """Walk both checkpoint histories and assemble the post-game report."""
     config = {"configurable": {"thread_id": session_id}}
 
@@ -176,7 +369,7 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str) -> dict:
     if final is not None:
         for player in final.players:
             memory = (
-                {"messages": 0, "checkpoints": 0}
+                {"messages": 0, "checkpoints": 0, "progression": []}
                 if player.controller == "human"
                 else await _seat_memory(seat_mind, session_id, player.seat_id)
             )
@@ -190,6 +383,7 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str) -> dict:
                 "model_name": player.model_name,
                 "memory_messages": memory["messages"],
                 "memory_checkpoints": memory["checkpoints"],
+                "memory_progression": memory["progression"],
                 # From the log, not the checkpoint count -- see _seat_memory.
                 "turns": len([
                     e for e in final.log
@@ -203,6 +397,12 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str) -> dict:
         if not phases or phases[-1]["label"] != label:
             phases.append({"label": label, "phase": step["phase"],
                            "round": step["round"], "from_step": step["step"]})
+
+    decisions: list[dict] = []
+    if conn is not None:
+        from app import persistence
+
+        decisions = await persistence.get_decisions(conn, session_id)
 
     return {
         "session_id": session_id,
@@ -225,4 +425,5 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str) -> dict:
         "steps": steps,
         "events": events,
         "seats": seats,
+        "learning_debrief": _build_learning_debrief(final, seats, decisions) if final else None,
     }

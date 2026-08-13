@@ -32,6 +32,7 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
 | **Unscripted social behavior** | Werewolves can lie, seers can conceal evidence, doctors can make mistakes, and villagers can confidently accuse one another. |
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
 | **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth. |
+| **Closed-loop Learning Debrief** | Predict before play, then connect human interrupts, information boundaries, tool validation, memory growth, and divergent decisions to agentic-AI concepts. |
 | **Live 3D council chamber** | State-driven portraits, nameplates, candles, role artifacts, active-player lighting, ritual effects, and day/night atmosphere. |
 
 ## 🕯️ Meet the village
@@ -146,6 +147,7 @@ Open **http://localhost:4001**.
 3. Click **Test Models & Start Game**.
 4. Review the per-seat readiness results.
 5. On the connected game page, click **Start Game** to begin from the first LangGraph node.
+6. When the game ends, open **Learning Debrief** to compare your prediction with evidence from the run.
 
 Stop both applications with:
 
@@ -187,6 +189,19 @@ The game page makes the agent system visible while it runs:
 
 God Mode changes only presentation. It does not change what any AI agent or human player is legitimately allowed to know.
 
+## 🎓 Closed-loop learning
+
+Village of Shadows now makes its educational outcome explicit instead of leaving the learner to infer it from the spectacle:
+
+1. **Configure** models, personalities, and the human seat.
+2. **Predict** which agent will gain trust, misread evidence, or change the outcome.
+3. **Play** a complete multi-agent scenario from inside the graph.
+4. **Observe** orchestration, private context, tools, memory, and decisions in God Mode.
+5. **Debrief** against durable evidence reconstructed from LangGraph checkpoints, game logs, and model-decision records.
+6. **Compare** by replaying with one changed model or personality.
+
+The post-game Learning Debrief identifies where execution suspended for the human, counts public versus role-private events, lists model tool calls with accepted or rejected validation results, visualizes each seat's memory growth, compares decisions made during the same public round, maps observations to core agentic-AI concepts, and suggests controlled experiments for the next run. It reports stated rationale and observable actions, not hidden chain-of-thought.
+
 ## 📁 Project map
 
 ```text
@@ -221,7 +236,7 @@ cd ..
 python3 docs/concepts/check_citations.py
 ```
 
-The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, replay safety, pause/continue, human interrupt/resume, full mock games, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
+The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, replay safety, pause/continue, human interrupt/resume, full mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
 
 ## 📚 Learn from the implementation
 

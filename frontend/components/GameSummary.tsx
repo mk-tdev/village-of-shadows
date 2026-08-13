@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchTimeline } from "@/lib/api";
-import type { Timeline } from "@/lib/types";
+import type { LearningDebrief, Timeline } from "@/lib/types";
 
 /** Post-game technical report, read out of the LangGraph checkpointer via time
  * travel (see backend/app/game/timeline.py).
@@ -20,6 +20,17 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
   const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAllSteps, setShowAllSteps] = useState(false);
+  const [showAllTools, setShowAllTools] = useState(false);
+  const [prediction] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const raw = window.localStorage.getItem(`village-learning:${sessionId}`);
+      const saved = raw ? JSON.parse(raw) : null;
+      return typeof saved?.prediction === "string" ? saved.prediction : "";
+    } catch {
+      return "";
+    }
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -49,9 +60,24 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
   const slowest = [...timeline.steps]
     .filter((s) => s.elapsed_ms !== null)
     .sort((a, b) => (b.elapsed_ms ?? 0) - (a.elapsed_ms ?? 0))[0];
+  const debrief = timeline.learning_debrief;
 
   return (
     <div className="summary">
+      {debrief && (
+        <LearningDebriefView
+          debrief={debrief}
+          prediction={prediction}
+          showAllTools={showAllTools}
+          onToggleTools={() => setShowAllTools((value) => !value)}
+        />
+      )}
+
+      <div className="summary-divider">
+        <span>TECHNICAL EVIDENCE</span>
+        <p>The checkpoint history and durable event trace behind the learning conclusions.</p>
+      </div>
+
       <div className="summary-stats">
         <Stat label="Outcome" value={timeline.winner ?? "—"} />
         <Stat label="Rounds" value={String(timeline.rounds ?? "—")} />
@@ -183,6 +209,173 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
             </tbody>
           </table>
         </div>
+      </section>
+    </div>
+  );
+}
+
+function LearningDebriefView({
+  debrief,
+  prediction,
+  showAllTools,
+  onToggleTools,
+}: {
+  debrief: LearningDebrief;
+  prediction: string;
+  showAllTools: boolean;
+  onToggleTools: () => void;
+}) {
+  const comparison = debrief.comparisons.find((item) => item.decisions.length > 1);
+
+  return (
+    <div className="learning-debrief">
+      <header className="learning-debrief-hero">
+        <div>
+          <span className="learning-kicker">CLOSED-LOOP LEARNING</span>
+          <h3>What this game demonstrated</h3>
+          <p>
+            The conclusions below come from this game&apos;s checkpoints, tool results,
+            private/public event boundaries, and independent seat memories.
+          </p>
+        </div>
+        <div className="learning-loop" aria-label="Learning loop">
+          {['Configure', 'Predict', 'Play', 'Observe', 'Debrief', 'Compare'].map((step, index) => (
+            <span key={step}><b>{String(index + 1).padStart(2, '0')}</b>{step}</span>
+          ))}
+        </div>
+      </header>
+
+      {prediction && (
+        <section className="prediction-result">
+          <span>Your prediction</span>
+          <blockquote>{prediction}</blockquote>
+          <p>Compare it with the evidence below. What surprised you, and what would you change in the next run?</p>
+        </section>
+      )}
+
+      <section>
+        <p className="debug-section-title">Concept → evidence from this run</p>
+        <div className="learning-concept-grid">
+          {debrief.concept_evidence.map((item) => (
+            <article key={item.concept}>
+              <h4>{item.concept}</h4>
+              <p>{item.evidence}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="learning-evidence-grid">
+        <article>
+          <p className="debug-section-title">Where the human entered the graph</p>
+          {debrief.human_interrupts.length ? (
+            <ol className="evidence-list">
+              {debrief.human_interrupts.slice(0, 8).map((item) => (
+                <li key={item.seq}>
+                  <span>Round {item.round} · {item.phase}</span>
+                  <strong>{item.action}</strong>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="summary-prose">The human died before receiving a playable turn, so no human interrupt completed in this run.</p>
+          )}
+        </article>
+
+        <article>
+          <p className="debug-section-title">Information boundaries</p>
+          <div className="observability-split">
+            <Stat label="Public events" value={String(debrief.partial_observability.public_events)} />
+            <Stat label="Private events" value={String(debrief.partial_observability.private_events)} />
+            <Stat label="Seer discoveries" value={String(debrief.partial_observability.seer_discoveries)} />
+          </div>
+          <p className="summary-prose">{debrief.partial_observability.explanation}</p>
+        </article>
+      </section>
+
+      <section>
+        <p className="debug-section-title">Tools called — and what validation accepted</p>
+        <div className="tool-totals">
+          <span><b>{debrief.tool_totals.all}</b> calls</span>
+          <span className="accepted"><b>{debrief.tool_totals.accepted}</b> accepted actions</span>
+          <span><b>{debrief.tool_totals.reads}</b> reads</span>
+          <span className={debrief.tool_totals.rejected ? "rejected" : ""}><b>{debrief.tool_totals.rejected}</b> rejected</span>
+        </div>
+        {debrief.tool_calls.length ? (
+          <div className="summary-table-wrap">
+            <table className="metrics-table">
+            <thead><tr><th>Agent</th><th>Round / phase</th><th>Tool</th><th>Result</th><th>Decision</th></tr></thead>
+            <tbody>
+              {(showAllTools ? debrief.tool_calls : debrief.tool_calls.slice(0, 14)).map((call, index) => (
+                <tr key={`${call.seat_id}-${call.round}-${call.tool}-${index}`}>
+                  <td>{call.name}<small className="learning-model">{call.model_name ?? call.provider ?? '—'}</small></td>
+                  <td>{call.round} · {call.phase}</td>
+                  <td><code>{call.tool}</code></td>
+                  <td><span className={`tool-status ${call.status}`}>{call.status}</span></td>
+                  <td>{call.summary}</td>
+                </tr>
+              ))}
+            </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="summary-prose">
+            This run used no persisted model tool calls. Human actions still passed through the
+            same rule-validation functions, but they are represented in the interrupt evidence above.
+          </p>
+        )}
+        {debrief.tool_calls.length > 14 && (
+          <button className="btn-ghost" type="button" onClick={onToggleTools}>
+            {showAllTools ? "Show fewer tool calls" : `Show all ${debrief.tool_calls.length} tool calls`}
+          </button>
+        )}
+      </section>
+
+      <section>
+        <p className="debug-section-title">How independent memories evolved</p>
+        <div className="memory-growth-list">
+          {debrief.memories.map((memory) => {
+            const max = Math.max(...debrief.memories.map((item) => item.end_messages), 1);
+            return (
+              <div className="memory-growth-row" key={memory.seat_id}>
+                <span><strong>{memory.name}</strong><small>{memory.model_name ?? 'model'}</small></span>
+                <span className="memory-growth-track"><i style={{ width: `${(memory.end_messages / max) * 100}%` }} /></span>
+                <b>{memory.start_messages} → {memory.end_messages}</b>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {comparison ? (
+        <section>
+          <p className="debug-section-title">Same public round, different decisions</p>
+          <p className="summary-prose">{comparison.context}</p>
+          <div className="comparison-strip">
+            {comparison.decisions.map((decision, index) => (
+              <article key={`${decision.seat_id}-${decision.tool}-${index}`}>
+                <span>{decision.name} · {decision.model_name ?? decision.provider}</span>
+                <strong>{decision.summary}</strong>
+                <small><code>{decision.tool}</code></small>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section>
+          <p className="debug-section-title">Same public round, different decisions</p>
+          <p className="summary-prose">
+            This run did not preserve a stage with two comparable model decisions. Replay with at
+            least two AI seats and keep their models different to create a useful comparison.
+          </p>
+        </section>
+      )}
+
+      <section className="next-experiments">
+        <p className="debug-section-title">Try next</p>
+        <ol>
+          {debrief.next_experiments.map((experiment) => <li key={experiment}>{experiment}</li>)}
+        </ol>
       </section>
     </div>
   );

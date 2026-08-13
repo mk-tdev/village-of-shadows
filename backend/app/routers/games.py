@@ -108,6 +108,7 @@ async def get_timeline(session_id: str, request: Request) -> dict:
         request.app.state.graph,
         getattr(request.app.state, "seat_mind", None),
         session_id,
+        request.app.state.db_conn,
     )
 
 

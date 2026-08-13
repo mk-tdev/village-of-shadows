@@ -150,7 +150,60 @@ export interface TimelineSeat {
   model_name: string | null;
   memory_messages: number;
   memory_checkpoints: number;
+  memory_progression: { stage: number; messages: number }[];
   turns: number;
+}
+
+export interface LearningToolCall {
+  seat_id: string;
+  name: string;
+  provider: Provider | null;
+  model_name: string | null;
+  round: number;
+  phase: string;
+  tool: string;
+  status: "accepted" | "rejected" | "read";
+  summary: string;
+}
+
+export interface LearningDebrief {
+  human_interrupts: {
+    seq: number;
+    round: number;
+    phase: string;
+    kind: string;
+    action: string;
+  }[];
+  partial_observability: {
+    public_events: number;
+    private_events: number;
+    seer_discoveries: number;
+    explanation: string;
+  };
+  tool_calls: LearningToolCall[];
+  tool_totals: {
+    all: number;
+    accepted: number;
+    rejected: number;
+    reads: number;
+  };
+  memories: {
+    seat_id: string;
+    name: string;
+    model_name: string | null;
+    start_messages: number;
+    end_messages: number;
+    growth: number;
+    progression: { stage: number; messages: number }[];
+  }[];
+  comparisons: {
+    round: number;
+    phase: string;
+    context: string;
+    decisions: LearningToolCall[];
+  }[];
+  concept_evidence: { concept: string; evidence: string }[];
+  next_experiments: string[];
 }
 
 export interface Timeline {
@@ -169,6 +222,7 @@ export interface Timeline {
   steps: TimelineStep[];
   events: TimelineEvent[];
   seats: TimelineSeat[];
+  learning_debrief?: LearningDebrief | null;
 }
 
 /** Published as each node of a seat's mind subgraph executes, so the debug

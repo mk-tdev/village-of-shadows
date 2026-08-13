@@ -263,7 +263,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
                 Play again
               </Link>
               <button className="btn-ghost" type="button" onClick={() => setShowSummary(true)}>
-                ⌗ Technical summary
+                ◈ Learning debrief
               </button>
             </div>
           </div>
@@ -277,7 +277,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
         <section className="debug-panel">
           <div className="debug-panel-header">
             <h2 className="debug-panel-title">
-              <span>⌗</span> Post-game technical summary
+              <span>◈</span> Learning debrief &amp; technical trace
             </h2>
           </div>
           <div className="summary-body">

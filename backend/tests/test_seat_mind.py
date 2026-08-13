@@ -251,7 +251,7 @@ async def test_timeline_reconstructs_the_game_from_checkpoints(tmp_path):
     orch.start()
     await orch._task
 
-    report = await timeline.build_timeline(orch.graph, orch.seat_mind, orch.session_id)
+    report = await timeline.build_timeline(orch.graph, orch.seat_mind, orch.session_id, orch.conn)
 
     assert report["available"] is True
     assert report["winner"] == orch.state.winner
@@ -276,6 +276,18 @@ async def test_timeline_reconstructs_the_game_from_checkpoints(tmp_path):
     actor = max(report["seats"], key=lambda s: s["turns"])
     assert actor["turns"] > 0
     assert actor["memory_messages"] > 0
+
+    # The learner-facing debrief is derived from the same durable evidence:
+    # model decisions/tool results, public/private logs, and seat checkpoints.
+    debrief = report["learning_debrief"]
+    assert debrief["tool_totals"]["accepted"] > 0
+    assert debrief["tool_totals"]["rejected"] == 0
+    assert debrief["partial_observability"]["public_events"] > 0
+    assert debrief["partial_observability"]["private_events"] > 0
+    assert len(debrief["memories"]) == 7
+    assert any(memory["growth"] > 0 for memory in debrief["memories"])
+    assert len(debrief["concept_evidence"]) >= 5
+    assert len(debrief["next_experiments"]) >= 3
 
 
 @pytest.mark.asyncio
