@@ -347,6 +347,33 @@ function LearningDebriefView({
         </div>
       </section>
 
+      <section>
+        <p className="debug-section-title">How private beliefs evolved</p>
+        <p className="summary-prose">
+          Notes are an immutable ledger: revisions and retired theories remain visible instead of
+          being overwritten, with the round and evidence event that prompted each change.
+        </p>
+        {debrief.note_evolution.length ? (
+          <ol className="private-notes-list debrief-note-list">
+            {debrief.note_evolution.slice(-20).reverse().map((note) => (
+              <li key={note.event_key} className={`private-note-card is-${note.status}`}>
+                <div className="private-note-meta">
+                  <span className={`private-note-kind kind-${note.kind}`}>{note.kind}</span>
+                  <strong>{note.name ?? note.seat_id}</strong>
+                  {note.subject ? <span>about {note.subject}</span> : null}
+                  <span>v{note.revision}</span>
+                  <span>{note.source_seq === null ? "opening belief" : `from event #${note.source_seq}`}</span>
+                </div>
+                <p>{note.content}</p>
+                <span className="private-note-operation">{note.operation}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="summary-prose">No model committed a private notebook update in this run.</p>
+        )}
+      </section>
+
       {comparison ? (
         <section>
           <p className="debug-section-title">Same public round, different decisions</p>

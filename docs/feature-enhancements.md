@@ -11,7 +11,9 @@ Status legend:
 - **In progress** — actively being implemented.
 - **Complete** — shipped and verified.
 
-All features below currently have status **Proposed**.
+Features remain **Proposed** unless their section says otherwise. Completed
+features stay here as an implementation record and as dependencies for the
+enhancements that follow.
 
 ## FE-01: Real werewolf negotiation
 
@@ -143,16 +145,19 @@ Initial acceptance criteria:
 
 ## FE-07: Agent-authored private notes
 
+**Status: Complete — implemented and verified on `codex/fe-07-agent-private-notes`.**
+
 Give agents structured tools for maintaining private working memory beyond the
 raw conversation history.
 
-Possible tools:
+Implemented MCP tools:
 
-- `record_suspicion`
-- `remember_clue`
-- `update_theory`
-- `mark_statement_as_lie`
-- `record_alliance`
+- `record_private_note` classifies a new `suspicion`, `clue`, `theory`, `lie`,
+  or `alliance` and can cite a visible transcript event.
+- `revise_private_note` appends a new version of an active note.
+- `retire_private_note` closes a disproved theory without deleting history.
+- `get_my_notes` returns the latest active notebook contents.
+- `get_my_note_history` returns only the calling seat's immutable revisions.
 
 Initial acceptance criteria:
 
@@ -161,6 +166,18 @@ Initial acceptance criteria:
 - Agents can revise or retire a theory without deleting history.
 - Notes survive pause, resume, and replay correctly.
 - God Mode can inspect note evolution.
+
+Implementation notes:
+
+- SQLite stores an immutable `agent_note_events` ledger with deterministic
+  event keys, so pause/resume replays cannot duplicate side effects.
+- A source may be a public log event or the calling seat's own private event;
+  another seat's private evidence is rejected by the validation layer.
+- SSE sends an observer snapshot on connection and individual updates during
+  play. The UI reveals them only in God Mode.
+- The Learning Debrief preserves the same note evolution after the game.
+- Tests cover lifecycle history, ownership isolation, invisible-source
+  rejection, idempotent replay, and the real MCP protocol path.
 
 ## FE-08: Additional roles
 

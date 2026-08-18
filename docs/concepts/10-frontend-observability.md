@@ -118,7 +118,7 @@ never a dependency of play.
  * part of the project meant to showcase the agentic-engineering internals,
  * not just play the game. */
 ```
-([DebugPanel.tsx:15-23](../../frontend/components/DebugPanel.tsx#L15-L23))
+([DebugPanel.tsx:24-32](../../frontend/components/DebugPanel.tsx#L24-L32))
 
 This panel exists for a different audience than the rest of the UI: not
 "someone playing Werewolf," but "someone who wants to see how the
@@ -187,7 +187,7 @@ source.addEventListener("decision", (e) => {
   });
 });
 ```
-([useGameStream.ts:199-217](../../frontend/lib/useGameStream.ts#L199-L217))
+([useGameStream.ts:222-240](../../frontend/lib/useGameStream.ts#L222-L240))
 
 Every `"decision"` event (published from `_record_decision` in
 `agent_turn.py` — see
@@ -242,7 +242,7 @@ source.addEventListener("mcp", (e) => {
   );
 });
 ```
-([useGameStream.ts:66-70](../../frontend/lib/useGameStream.ts#L66-L70), [166-174](../../frontend/lib/useGameStream.ts#L166-L174))
+([useGameStream.ts:72-76](../../frontend/lib/useGameStream.ts#L72-L76), [212-220](../../frontend/lib/useGameStream.ts#L212-L220))
 
 Each existing listener (`"turn"`, `"node"`, `"decision"`) got one extra line
 calling `pushActivity(...)` alongside whatever it already did — the feed is

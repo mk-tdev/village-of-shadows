@@ -564,4 +564,10 @@ def _persona(player, game: GameState) -> str:
         ctx += " Each night you secretly learn one player's true role."
     elif player.role == "doctor":
         ctx += " Each night you may secretly protect one player (including yourself) from being killed."
+    ctx += (
+        " Maintain a concise private notebook when evidence changes. Use record_private_note for a new "
+        "suspicion, clue, theory, lie, or alliance; cite the visible event seq when possible. Use "
+        "revise_private_note when your belief changes and retire_private_note when evidence disproves it, "
+        "so your earlier reasoning remains auditable. Never put secret-role facts into public speech."
+    )
     return ctx

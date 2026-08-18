@@ -29,6 +29,10 @@ MODEL_VISIBLE_TOOLS = {
     "get_my_private_context",
     "get_vote_history",
     "get_my_notes",
+    "get_my_note_history",
+    "record_private_note",
+    "revise_private_note",
+    "retire_private_note",
     "write_note",
     "negotiate_message",
     "submit_night_action",
@@ -72,7 +76,7 @@ async def get_vote_history(ctx: Context) -> list[dict]:
 
 @mcp.tool()
 async def get_my_notes(ctx: Context) -> list[str]:
-    """Retrieve this seat's own past private scratchpad notes."""
+    """Retrieve the latest active content from this seat's private notebook."""
     game_id, seat_id = identity.resolve(ctx.session)
     orch = registry.get(game_id)
     return await actions.get_notes(orch, seat_id)
@@ -80,10 +84,64 @@ async def get_my_notes(ctx: Context) -> list[str]:
 
 @mcp.tool()
 async def write_note(note: str, ctx: Context) -> dict:
-    """Persist a private scratchpad note for future rounds."""
+    """Legacy shorthand: create a private note classified as a theory."""
     game_id, seat_id = identity.resolve(ctx.session)
     orch = registry.get(game_id)
     return await actions.write_note(orch, seat_id, note)
+
+
+@mcp.tool()
+async def get_my_note_history(ctx: Context) -> list[dict]:
+    """Retrieve only your own immutable private-note history, including retired theories."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.get_note_history(orch, seat_id)
+
+
+@mcp.tool()
+async def record_private_note(
+    kind: str,
+    content: str,
+    subject: str = "",
+    source_seq: int | None = None,
+    ctx: Context = None,
+) -> dict:
+    """Create a private suspicion, clue, theory, lie, or alliance note; optionally cite a visible event seq."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.record_private_note(
+        orch, seat_id, kind=kind, content=content, subject=subject, source_seq=source_seq,
+    )
+
+
+@mcp.tool()
+async def revise_private_note(
+    note_id: str,
+    content: str,
+    source_seq: int | None = None,
+    ctx: Context = None,
+) -> dict:
+    """Revise one of your active notes without deleting its earlier versions."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.revise_private_note(
+        orch, seat_id, note_id=note_id, content=content, source_seq=source_seq,
+    )
+
+
+@mcp.tool()
+async def retire_private_note(
+    note_id: str,
+    reason: str,
+    source_seq: int | None = None,
+    ctx: Context = None,
+) -> dict:
+    """Retire a disproved or obsolete note while preserving its full history."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.retire_private_note(
+        orch, seat_id, note_id=note_id, reason=reason, source_seq=source_seq,
+    )
 
 
 @mcp.tool()

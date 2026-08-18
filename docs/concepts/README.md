@@ -84,3 +84,6 @@ all general lessons that happened to surface here.
     (self-edges counted, cost localised by timestamp), and why a checkpoint
     here is *not* a clean point-in-time snapshot when nodes mutate shared
     state in place.
+14. [Agent-authored private notes](14-agent-authored-private-notes.md) — how
+    connection-bound agents maintain an immutable, evidence-linked belief
+    ledger without leaking notes across seats or duplicating replayed writes.

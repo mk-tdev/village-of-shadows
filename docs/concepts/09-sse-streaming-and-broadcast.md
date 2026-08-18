@@ -150,7 +150,7 @@ source.addEventListener("roles_assigned", (e) => {
   setGame(next);
 });
 ```
-([useGameStream.ts:86-93](../../frontend/lib/useGameStream.ts#L86-L93))
+([useGameStream.ts:110-118](../../frontend/lib/useGameStream.ts#L110-L118))
 
 Three fields (`current_node`, `phase`/`round`, now `players`) have hit this
 exact same shape of bug for the exact same reason: `begin_game` decoupled

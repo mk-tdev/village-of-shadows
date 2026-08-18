@@ -136,7 +136,10 @@ def _tool_calls(decision: dict) -> list[dict]:
 
 def _tool_status(tool: str, result: Any) -> str:
     """Classify calls without pretending every read tool is a game action."""
-    if not tool.startswith("submit_"):
+    writes = {
+        "write_note", "record_private_note", "revise_private_note", "retire_private_note",
+    }
+    if not tool.startswith("submit_") and tool not in writes:
         return "read"
     if isinstance(result, dict) and result.get("ok") is True:
         return "accepted"
@@ -150,12 +153,18 @@ def _action_summary(tool: str, args: Any) -> str:
         return text if len(text) <= 110 else f"{text[:107]}..."
     if tool in {"submit_vote", "submit_night_action"}:
         return f"targeted {args.get('target') or 'no target'}"
-    if tool == "write_note":
-        return "updated private notes"
+    if tool in {"write_note", "record_private_note"}:
+        return f"recorded {args.get('kind') or 'theory'} note"
+    if tool == "revise_private_note":
+        return f"revised {args.get('note_id') or 'a private note'}"
+    if tool == "retire_private_note":
+        return f"retired {args.get('note_id') or 'a private note'}"
     return tool.replace("_", " ")
 
 
-def _build_learning_debrief(final: GameState, seats: list[dict], decisions: list[dict]) -> dict:
+def _build_learning_debrief(
+    final: GameState, seats: list[dict], decisions: list[dict], note_events: list[dict],
+) -> dict:
     """Turn the technical trace into evidence for a closed learning loop.
 
     This deliberately reports observable behavior (actions, tool results,
@@ -238,6 +247,13 @@ def _build_learning_debrief(final: GameState, seats: list[dict], decisions: list
     rejected = sum(call["status"] == "rejected" for call in calls)
     read_calls = sum(call["status"] == "read" for call in calls)
     total_growth = sum(item["growth"] for item in memory)
+    note_evolution = [
+        {
+            **event,
+            "name": by_id[event["seat_id"]].name if event["seat_id"] in by_id else event["seat_id"],
+        }
+        for event in note_events
+    ]
 
     concept_evidence = [
         {
@@ -263,6 +279,13 @@ def _build_learning_debrief(final: GameState, seats: list[dict], decisions: list
             "concept": "Persistent independent memory",
             "evidence": (
                 f"{len(memory)} seat-mind thread(s) accumulated {total_growth} messages beyond their initial remembered context without sharing a global history."
+            ),
+        },
+        {
+            "concept": "Explicit belief revision",
+            "evidence": (
+                f"Agents authored {len(note_events)} private notebook event(s), preserving every "
+                "created, revised, and retired theory with its evidence source."
             ),
         },
         {
@@ -292,6 +315,7 @@ def _build_learning_debrief(final: GameState, seats: list[dict], decisions: list
             "reads": read_calls,
         },
         "memories": memory,
+        "note_evolution": note_evolution,
         "comparisons": comparisons,
         "concept_evidence": concept_evidence,
         "next_experiments": [
@@ -399,10 +423,12 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str, conn: Any 
                            "round": step["round"], "from_step": step["step"]})
 
     decisions: list[dict] = []
+    note_events: list[dict] = []
     if conn is not None:
         from app import persistence
 
         decisions = await persistence.get_decisions(conn, session_id)
+        note_events = await persistence.get_note_events(conn, session_id)
 
     return {
         "session_id": session_id,
@@ -425,5 +451,8 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str, conn: Any 
         "steps": steps,
         "events": events,
         "seats": seats,
-        "learning_debrief": _build_learning_debrief(final, seats, decisions) if final else None,
+        "private_notes": note_events,
+        "learning_debrief": (
+            _build_learning_debrief(final, seats, decisions, note_events) if final else None
+        ),
     }

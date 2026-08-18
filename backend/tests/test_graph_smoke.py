@@ -26,8 +26,11 @@ async def test_all_mock_game_runs_to_a_winner(tmp_path):
     assert (await cur.fetchone())[0] > 0
 
     from app.game import actions
-    await actions.write_note(orch, "seat_0", "a test note")
-    cur = await orch.conn.execute("SELECT COUNT(*) FROM agent_notes WHERE game_id = ?", (orch.session_id,))
+    living_seat = next(player.seat_id for player in orch.state.players if player.alive)
+    await actions.write_note(orch, living_seat, "a test note")
+    cur = await orch.conn.execute(
+        "SELECT COUNT(*) FROM agent_note_events WHERE game_id = ?", (orch.session_id,)
+    )
     assert (await cur.fetchone())[0] == 1
 
 

@@ -92,6 +92,8 @@ async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
                 tool_names = {t.name for t in (await session.list_tools()).tools}
                 assert "bind_seat" in tool_names
                 assert "submit_statement" in tool_names
+                assert "record_private_note" in tool_names
+                assert "get_my_note_history" in tool_names
 
                 bind_result = await session.call_tool("bind_seat", {"token": token})
                 assert _parse_result(bind_result) == {"ok": True, "game_id": session_id, "seat_id": "seat_0"}
@@ -100,6 +102,21 @@ async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
                 # session -- note it takes no seat_id argument at all.
                 result = await session.call_tool("submit_statement", {"text": "Hello, village."})
                 assert _parse_result(result) == {"ok": True}
+
+                note_result = await session.call_tool(
+                    "record_private_note",
+                    {
+                        "kind": "theory",
+                        "subject": "the village",
+                        "content": "My opening claim was deliberately neutral.",
+                        "source_seq": 0,
+                    },
+                )
+                note = _parse_result(note_result)["note"]
+                history_payload = _parse_result(await session.call_tool("get_my_note_history", {}))
+                history = history_payload.get("result", history_payload)
+                assert history == [note]
+                assert note["seat_id"] == "seat_0"
 
     assert state.log[-1].text == "Hello, village."
     assert state.log[-1].seat_id == "seat_0"

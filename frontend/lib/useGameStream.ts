@@ -12,6 +12,7 @@ import type {
   MemoryEvent,
   MindNodeEvent,
   Player,
+  PrivateNoteEvent,
   SeatMetrics,
   SeerResultEvent,
   TurnEvent,
@@ -34,6 +35,9 @@ export interface GameStreamState {
   mindNodeCounts: Record<string, number>;
   metrics: Record<string, SeatMetrics>;
   activity: ActivityEntry[];
+  /** Immutable note revisions for the God Mode observer. Agents can retrieve
+   * only their own rows through their connection-bound MCP identity. */
+  privateNotes: PrivateNoteEvent[];
 }
 
 const MAX_ACTIVITY_ENTRIES = 60;
@@ -58,6 +62,7 @@ export function useGameStream(sessionId: string): GameStreamState {
   const [mindNodeCounts, setMindNodeCounts] = useState<Record<string, number>>({});
   const [metrics, setMetrics] = useState<Record<string, SeatMetrics>>({});
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [privateNotes, setPrivateNotes] = useState<PrivateNoteEvent[]>([]);
   const gameRef = useRef<GameState | null>(null);
   const activityIdRef = useRef(0);
 
@@ -76,6 +81,24 @@ export function useGameStream(sessionId: string): GameStreamState {
       const data: GameState = JSON.parse((e as MessageEvent).data);
       gameRef.current = data;
       setGame(data);
+    });
+
+    source.addEventListener("private_notes", (e) => {
+      const data: { events: PrivateNoteEvent[] } = JSON.parse((e as MessageEvent).data);
+      setPrivateNotes(data.events);
+    });
+
+    source.addEventListener("private_note", (e) => {
+      const note: PrivateNoteEvent = JSON.parse((e as MessageEvent).data);
+      setPrivateNotes((previous) =>
+        previous.some((event) => event.event_key === note.event_key)
+          ? previous
+          : [...previous, note]
+      );
+      pushActivity(
+        "note",
+        `${note.name ?? note.seat_id} ${note.operation === "create" ? "recorded" : `${note.operation}d`} a private ${note.kind}`
+      );
     });
 
     // Fired once, right after assign_roles runs (see nodes.py). The initial
@@ -318,6 +341,6 @@ export function useGameStream(sessionId: string): GameStreamState {
 
   return {
     game, active, connected, errorMessage, currentNode,
-    mindNode, mindNodeCounts, metrics, activity,
+    mindNode, mindNodeCounts, metrics, activity, privateNotes,
   };
 }

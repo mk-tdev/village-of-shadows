@@ -79,11 +79,12 @@ it isn't in the prompt, isn't in any tool's schema.
 ```python
 MODEL_VISIBLE_TOOLS = {
     "get_public_transcript", "get_my_private_context", "get_vote_history",
-    "get_my_notes", "write_note", "negotiate_message",
+    "get_my_notes", "get_my_note_history", "record_private_note",
+    "revise_private_note", "retire_private_note", "write_note", "negotiate_message",
     "submit_night_action", "submit_statement", "submit_vote",
 }
 ```
-([server.py:27-37](../../backend/app/mcp_server/server.py#L27-L37))
+([server.py:27-41](../../backend/app/mcp_server/server.py#L27-L41))
 
 ```python
 all_tools = await load_mcp_tools(session)

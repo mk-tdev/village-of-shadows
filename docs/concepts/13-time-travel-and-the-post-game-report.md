@@ -24,7 +24,7 @@ be reconstructed after the fact from data that had to exist anyway:
 snapshots = [s async for s in graph.aget_state_history(config)]
 snapshots.reverse()   # history yields newest-first; execution order is the reverse
 ```
-([timeline.py:118-119](../../backend/app/game/timeline.py#L118-L119))
+([timeline.py:335-336](../../backend/app/game/timeline.py#L335-L336))
 
 This is what LangGraph calls **time travel**. Its headline use is forking a run
 from an earlier checkpoint to try a different path; the same history is equally

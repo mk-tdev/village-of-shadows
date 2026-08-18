@@ -59,6 +59,32 @@ CREATE TABLE IF NOT EXISTS agent_notes (
     note          TEXT NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- FE-07: an immutable, replay-safe notebook ledger. `agent_notes` remains
+-- above so databases created by older builds keep working; all new note
+-- tools write here. A revision or retirement is another row, never an
+-- UPDATE, which lets God Mode reconstruct how a theory changed over time.
+CREATE TABLE IF NOT EXISTS agent_note_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id       TEXT NOT NULL REFERENCES games(id),
+    seat_id       TEXT NOT NULL,
+    note_id       TEXT NOT NULL,
+    revision      INTEGER NOT NULL,
+    operation     TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    subject       TEXT,
+    content       TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    source_seq    INTEGER,
+    source_phase  TEXT NOT NULL,
+    source_round  INTEGER NOT NULL,
+    event_key     TEXT NOT NULL UNIQUE,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(game_id, seat_id, note_id, revision)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_note_events_owner
+ON agent_note_events(game_id, seat_id, note_id, revision);
 """
 
 

@@ -17,16 +17,22 @@ questions.
 CREATE TABLE IF NOT EXISTS log_entries (...);
 CREATE TABLE IF NOT EXISTS agent_decisions (...);
 CREATE TABLE IF NOT EXISTS agent_notes (...);
+CREATE TABLE IF NOT EXISTS agent_note_events (...);
 ```
 ([db.py](../../backend/app/db.py))
 
-These four tables (`games`, `seats`, `log_entries`, `agent_decisions`,
-`agent_notes`) exist to answer questions like "what did this game's log
+These application tables (`games`, `seats`, `log_entries`, `agent_decisions`,
+legacy `agent_notes`, and immutable `agent_note_events`) answer questions like "what did this game's log
 look like," "what prompt did seat 3 actually receive on round 2, and what
-did the model respond with," "what note did the seer write to itself."
+did the model respond with," or "how did the seer's theory change over time."
 `persistence.py` is a thin, hand-written set of `INSERT`/`SELECT` functions
 against this schema — ordinary application-level persistence, the same kind
 you'd write for any app with a database.
+
+The notebook event ledger is especially deliberate: revisions and retirements
+append rows, and a deterministic unique event key makes an identical replay a
+read of the existing event rather than a duplicate write. See
+[14-agent-authored-private-notes.md](14-agent-authored-private-notes.md).
 
 This is the layer that makes the "showcase agentic engineering" debug view
 possible after the fact: `GET /games/{id}/decisions`

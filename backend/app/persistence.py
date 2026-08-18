@@ -133,12 +133,116 @@ async def record_note(conn: aiosqlite.Connection, session_id: str, seat_id: str,
 
 
 async def get_notes(conn: aiosqlite.Connection, session_id: str, seat_id: str) -> list[str]:
-    cursor = await conn.execute(
-        "SELECT note FROM agent_notes WHERE game_id = ? AND seat_id = ? ORDER BY round, id",
-        (session_id, seat_id),
+    """Compatibility view of the active structured notes as plain strings."""
+    events = await get_note_events(conn, session_id, seat_id, latest_only=True)
+    return [event["content"] for event in events if event["status"] == "active"]
+
+
+NOTE_EVENT_COLUMNS = [
+    "id", "game_id", "seat_id", "note_id", "revision", "operation", "kind",
+    "subject", "content", "status", "source_seq", "source_phase", "source_round",
+    "event_key", "created_at",
+]
+
+
+def _note_event(row: tuple | None) -> dict | None:
+    if row is None:
+        return None
+    event = dict(zip(NOTE_EVENT_COLUMNS, row))
+    created_at = event.get("created_at")
+    if created_at is not None:
+        event["created_at"] = str(created_at)
+    return event
+
+
+async def record_note_event(
+    conn: aiosqlite.Connection,
+    *,
+    session_id: str,
+    seat_id: str,
+    note_id: str,
+    revision: int,
+    operation: str,
+    kind: str,
+    subject: str | None,
+    content: str,
+    status: str,
+    source_seq: int | None,
+    source_phase: str,
+    source_round: int,
+    event_key: str,
+) -> tuple[dict, bool]:
+    """Append one immutable notebook event, idempotent on ``event_key``."""
+    existing = await get_note_event_by_key(conn, event_key)
+    if existing is not None:
+        return existing, False
+
+    await conn.execute(
+        """INSERT OR IGNORE INTO agent_note_events
+           (game_id, seat_id, note_id, revision, operation, kind, subject, content, status,
+            source_seq, source_phase, source_round, event_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            session_id, seat_id, note_id, revision, operation, kind, subject, content,
+            status, source_seq, source_phase, source_round, event_key,
+        ),
     )
-    rows = await cursor.fetchall()
-    return [r[0] for r in rows]
+    await conn.commit()
+    inserted = await get_note_event_by_key(conn, event_key)
+    if inserted is None:  # pragma: no cover - protects against a corrupt DB
+        raise RuntimeError("Notebook event could not be persisted.")
+    return inserted, True
+
+
+async def get_note_event_by_key(
+    conn: aiosqlite.Connection, event_key: str,
+) -> dict | None:
+    cursor = await conn.execute(
+        f"SELECT {', '.join(NOTE_EVENT_COLUMNS)} FROM agent_note_events WHERE event_key = ?",
+        (event_key,),
+    )
+    return _note_event(await cursor.fetchone())
+
+
+async def get_latest_note_event(
+    conn: aiosqlite.Connection, session_id: str, seat_id: str, note_id: str,
+) -> dict | None:
+    cursor = await conn.execute(
+        f"""SELECT {', '.join(NOTE_EVENT_COLUMNS)} FROM agent_note_events
+            WHERE game_id = ? AND seat_id = ? AND note_id = ?
+            ORDER BY revision DESC LIMIT 1""",
+        (session_id, seat_id, note_id),
+    )
+    return _note_event(await cursor.fetchone())
+
+
+async def get_note_events(
+    conn: aiosqlite.Connection,
+    session_id: str,
+    seat_id: str | None = None,
+    *,
+    latest_only: bool = False,
+) -> list[dict]:
+    where = "WHERE game_id = ?"
+    params: list[object] = [session_id]
+    if seat_id is not None:
+        where += " AND seat_id = ?"
+        params.append(seat_id)
+
+    cursor = await conn.execute(
+        f"""SELECT {', '.join(NOTE_EVENT_COLUMNS)} FROM agent_note_events
+            {where} ORDER BY id""",
+        params,
+    )
+    events = [_note_event(row) for row in await cursor.fetchall()]
+    typed_events = [event for event in events if event is not None]
+    if not latest_only:
+        return typed_events
+
+    latest: dict[tuple[str, str], dict] = {}
+    for event in typed_events:
+        latest[(event["seat_id"], event["note_id"])] = event
+    return list(latest.values())
 
 
 async def get_vote_history(conn: aiosqlite.Connection, session_id: str) -> list[dict]:

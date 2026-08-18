@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
+from app import persistence
 from app.game import registry
 
 router = APIRouter(prefix="/games", tags=["stream"])
@@ -25,6 +26,23 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
         queue = orch.subscribe()
         try:
             yield {"event": "state", "data": json.dumps(orch.state.model_dump())}
+            # Notebook rows are deliberately persisted outside GameState so a
+            # pause/replay cannot duplicate or roll them back. Send their
+            # immutable history as a separate observer snapshot; the frontend
+            # renders it only while God Mode is enabled.
+            note_events = await persistence.get_note_events(
+                orch.conn, orch.session_id,
+            )
+            player_names = {player.seat_id: player.name for player in orch.state.players}
+            yield {
+                "event": "private_notes",
+                "data": json.dumps({
+                    "events": [
+                        {**event, "name": player_names.get(event["seat_id"], event["seat_id"])}
+                        for event in note_events
+                    ],
+                }),
+            }
             if orch.state.awaiting is not None:
                 yield {"event": "awaiting_input", "data": json.dumps(orch.state.awaiting.model_dump())}
             if orch.current_node is not None:

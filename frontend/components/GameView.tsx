@@ -25,7 +25,10 @@ const CouncilTable3D = dynamic(
 
 export function GameView({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-  const { game, active, connected, errorMessage, currentNode, mindNode, mindNodeCounts, metrics, activity } =
+  const {
+    game, active, connected, errorMessage, currentNode, mindNode, mindNodeCounts,
+    metrics, activity, privateNotes,
+  } =
     useGameStream(sessionId);
   const [godView, setGodView] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -327,11 +330,13 @@ export function GameView({ sessionId }: { sessionId: string }) {
       )}
 
       <DebugPanel
+        godView={godView}
         currentNode={currentNode}
         mindNode={mindNode}
         mindNodeCounts={mindNodeCounts}
         metrics={metrics}
         activity={activity}
+        privateNotes={privateNotes}
       />
     </div>
   );

@@ -28,6 +28,7 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
 | **A real human participant** | LangGraph suspends execution until the human speaks, votes, or completes a night action. |
 | **Partial observability** | Agents receive only the public discussion and private information their role is allowed to know. |
 | **Persistent per-seat memory** | Each agent remembers its own previous turns without sharing a hidden global conversation. |
+| **Private belief notebooks** | Agents record, revise, and retire seat-isolated theories with evidence citations and immutable history. |
 | **MCP tool actions** | Agents act through validated game tools instead of returning loosely structured text. |
 | **Unscripted social behavior** | Werewolves can lie, seers can conceal evidence, doctors can make mistakes, and villagers can confidently accuse one another. |
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
@@ -184,6 +185,7 @@ The game page makes the agent system visible while it runs:
 - The active node and active per-seat mind node.
 - A chronological feed of turns, MCP sessions, tool calls, memory updates, and decisions.
 - Per-agent provider, model, latency, calls, tokens, and remembered-message count.
+- Live private notebook evolution: suspicions, clues, lies, alliances, revisions, and retired theories.
 - Private thoughts and secret actions when God Mode is enabled.
 - A post-game report reconstructed from LangGraph checkpoint history.
 
@@ -236,7 +238,7 @@ cd ..
 python3 docs/concepts/check_citations.py
 ```
 
-The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, replay safety, pause/continue, human interrupt/resume, full mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
+The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, immutable private-note history, replay safety, pause/continue, human interrupt/resume, full mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
 
 ## 📚 Learn from the implementation
 

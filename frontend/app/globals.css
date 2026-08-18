@@ -1565,6 +1565,125 @@ select:focus {
 .activity-memory .activity-icon {
   color: #c9a0dc;
 }
+.activity-note .activity-icon {
+  color: #d9b063;
+}
+
+/* God Mode's observer-only view of FE-07's immutable private notebooks. */
+.private-notes-panel {
+  border-top: 1px solid var(--card-border);
+  padding-top: 18px;
+}
+.private-notes-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.private-notes-heading .debug-section-title {
+  color: var(--amber);
+  margin-bottom: 5px;
+}
+.private-notes-explainer {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.private-notes-count {
+  flex: 0 0 auto;
+  border: 1px solid var(--card-border-strong);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--ink-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+}
+.private-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 9px;
+  max-height: 430px;
+  overflow-y: auto;
+}
+.debrief-note-list {
+  max-height: none;
+}
+.private-note-card {
+  position: relative;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(232, 163, 61, 0.2);
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(232, 163, 61, 0.08), rgba(0, 0, 0, 0.18));
+}
+.private-note-card.is-retired {
+  opacity: 0.66;
+  border-style: dashed;
+}
+.private-note-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  padding-right: 48px;
+  color: var(--ink-faint);
+  font-size: 10px;
+}
+.private-note-meta strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+.private-note-kind {
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: rgba(168, 198, 232, 0.12);
+  color: #a8c6e8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 8px;
+  font-weight: 700;
+}
+.private-note-kind.kind-lie {
+  background: rgba(190, 83, 83, 0.14);
+  color: #e58c8c;
+}
+.private-note-kind.kind-clue {
+  background: rgba(130, 183, 138, 0.13);
+  color: #9bcda3;
+}
+.private-note-kind.kind-alliance {
+  background: rgba(201, 160, 220, 0.13);
+  color: #c9a0dc;
+}
+.private-note-card p {
+  margin: 9px 0 0;
+  color: var(--ink-dim);
+  font-family: "Spectral", serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.private-note-operation {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  color: var(--amber-dim);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
+}
+.private-notes-locked {
+  border-top: 1px solid var(--card-border);
+  padding-top: 16px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+}
 
 /* --- How-to-play page --- */
 .howto-heading {

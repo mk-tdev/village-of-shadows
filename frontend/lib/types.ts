@@ -95,6 +95,29 @@ export interface SeerResultEvent {
   role: Role;
 }
 
+export type PrivateNoteKind = "suspicion" | "clue" | "theory" | "lie" | "alliance";
+
+/** One immutable revision in a seat-owned notebook. The backend never sends
+ * these to another agent; this observer copy is rendered only in God Mode. */
+export interface PrivateNoteEvent {
+  id: number;
+  game_id: string;
+  seat_id: string;
+  name?: string;
+  note_id: string;
+  revision: number;
+  operation: "create" | "revise" | "retire";
+  kind: PrivateNoteKind;
+  subject: string | null;
+  content: string;
+  status: "active" | "retired";
+  source_seq: number | null;
+  source_phase: string;
+  source_round: number;
+  event_key: string;
+  created_at: string;
+}
+
 export interface GraphNode {
   id: string;
   name: string;
@@ -196,6 +219,7 @@ export interface LearningDebrief {
     growth: number;
     progression: { stage: number; messages: number }[];
   }[];
+  note_evolution: PrivateNoteEvent[];
   comparisons: {
     round: number;
     phase: string;
@@ -222,6 +246,7 @@ export interface Timeline {
   steps: TimelineStep[];
   events: TimelineEvent[];
   seats: TimelineSeat[];
+  private_notes?: PrivateNoteEvent[];
   learning_debrief?: LearningDebrief | null;
 }
 
@@ -284,6 +309,6 @@ export interface McpEvent {
  * -- see agent_turn.py's orch.publish("mcp", ...) calls. */
 export interface ActivityEntry {
   id: number;
-  kind: "node" | "turn" | "mcp" | "decision" | "memory";
+  kind: "node" | "turn" | "mcp" | "decision" | "memory" | "note";
   text: string;
 }
