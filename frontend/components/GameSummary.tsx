@@ -1,26 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { fetchTimeline } from "@/lib/api";
 import type { LearningDebrief, Timeline } from "@/lib/types";
 
-/** Post-game technical report, read out of the LangGraph checkpointer via time
- * travel (see backend/app/game/timeline.py).
- *
- * Fetched only once a game has actually ended, rather than streamed during
- * play, because that's the honest shape of the data: none of it is recorded as
- * the game runs. The checkpoints exist to make `interrupt()` durable, and this
- * view is a second reading of them after the fact.
- *
- * The layout deliberately separates graph mechanics (node order, counts,
- * timing — reliable) from the event narrative (taken from the game log, which
- * is authoritative). The backend's `caveat` explains why those two can't be
- * merged into one tidy per-step story; it's rendered rather than hidden. */
+type SummaryTab = "overview" | "learning" | "technical";
+
+const SUMMARY_TABS: { id: SummaryTab; label: string; hint: string }[] = [
+  { id: "overview", label: "Overview", hint: "Outcome and takeaways" },
+  { id: "learning", label: "Learning evidence", hint: "People, tools and beliefs" },
+  { id: "technical", label: "Technical trace", hint: "Graph and checkpoints" },
+];
+
+/** A focused post-game workspace. The report is divided into three views and
+ * long evidence is progressively disclosed, so opening the debrief no longer
+ * turns the game page into one continuous technical document. */
 export function GameSummary({ sessionId }: { sessionId: string }) {
   const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showAllSteps, setShowAllSteps] = useState(false);
-  const [showAllTools, setShowAllTools] = useState(false);
+  const [activeTab, setActiveTab] = useState<SummaryTab>("overview");
   const [prediction] = useState(() => {
     if (typeof window === "undefined") return "";
     try {
@@ -35,11 +34,11 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     let cancelled = false;
     fetchTimeline(sessionId)
-      .then((t) => {
-        if (!cancelled) setTimeline(t);
+      .then((value) => {
+        if (!cancelled) setTimeline(value);
       })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+      .catch((reason) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : "Failed to load");
       });
     return () => {
       cancelled = true;
@@ -47,7 +46,7 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   if (error) return <p className="metrics-empty">Could not load the technical summary: {error}</p>;
-  if (!timeline) return <p className="metrics-empty">Reading the checkpoint history...</p>;
+  if (!timeline) return <SummaryLoading />;
   if (!timeline.available) {
     return (
       <p className="metrics-empty">
@@ -56,355 +55,407 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
     );
   }
 
-  const steps = showAllSteps ? timeline.steps : timeline.steps.slice(0, 14);
-  const slowest = [...timeline.steps]
-    .filter((s) => s.elapsed_ms !== null)
-    .sort((a, b) => (b.elapsed_ms ?? 0) - (a.elapsed_ms ?? 0))[0];
-  const debrief = timeline.learning_debrief;
-
   return (
     <div className="summary">
-      {debrief && (
-        <LearningDebriefView
-          debrief={debrief}
-          prediction={prediction}
-          showAllTools={showAllTools}
-          onToggleTools={() => setShowAllTools((value) => !value)}
-        />
-      )}
-
-      <div className="summary-divider">
-        <span>TECHNICAL EVIDENCE</span>
-        <p>The checkpoint history and durable event trace behind the learning conclusions.</p>
-      </div>
-
-      <div className="summary-stats">
-        <Stat label="Outcome" value={timeline.winner ?? "—"} />
-        <Stat label="Rounds" value={String(timeline.rounds ?? "—")} />
-        <Stat label="Graph steps" value={String(timeline.total_steps ?? "—")} />
-        <Stat
-          label="Wall clock"
-          value={timeline.duration_ms != null ? `${(timeline.duration_ms / 1000).toFixed(2)}s` : "—"}
-        />
-        <Stat label="Log entries" value={String(timeline.events.length)} />
-        <Stat
-          label="Slowest step"
-          value={slowest ? `${slowest.next_node} ${slowest.elapsed_ms}ms` : "—"}
-        />
-      </div>
-
-      <p className="summary-caveat">{timeline.caveat}</p>
-
-      <section>
-        <p className="debug-section-title">How the game started</p>
-        <p className="summary-prose">
-          Seven seats were configured, then the graph sat unstarted at{" "}
-          <code>phase: lobby</code> until a human pressed <strong>Start Game</strong> — the
-          first checkpoint below is that idle state, before <code>assign_roles</code> had run.
-          Roles are dealt inside the graph, not at setup, which is why step 0 shows no roles yet.
-        </p>
-        <ul className="summary-phases">
-          {(timeline.phases ?? []).map((p) => (
-            <li key={p.label}>
-              <span className="summary-phase-step">step {p.from_step}</span>
-              <span className="summary-phase-label">{p.label}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <p className="debug-section-title">Node executions — the conditional self-edges, counted</p>
-        <p className="summary-prose">
-          One node execution per seat, per turn. The repeats are the self-loops from{" "}
-          <code>graph.py</code> resolving at runtime: one <code>day_discussion</code> per living
-          speaker, one <code>voting</code> per voter, one <code>night_wolves</code> per wolf.
-        </p>
-        <div className="summary-bars">
-          {(timeline.node_counts ?? []).map((n) => {
-            const max = timeline.node_counts?.[0]?.count ?? 1;
-            return (
-              <div className="summary-bar-row" key={n.node}>
-                <span className="summary-bar-label">{n.node}</span>
-                <span className="summary-bar-track">
-                  <span className="summary-bar-fill" style={{ width: `${(n.count / max) * 100}%` }} />
-                </span>
-                <span className="summary-bar-count">{n.count}</span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <p className="debug-section-title">Stage by stage, from the checkpoint history</p>
-        <div className="summary-table-wrap">
-          <table className="metrics-table">
-            <thead>
-              <tr>
-                <th className="num">Step</th>
-                <th>Next node</th>
-                <th>Phase</th>
-                <th className="num">Round</th>
-                <th className="num">Alive</th>
-                <th className="num">Log</th>
-                <th className="num">+ms</th>
-              </tr>
-            </thead>
-            <tbody>
-              {steps.map((s) => (
-                <tr key={s.step}>
-                  <td className="num">{s.step}</td>
-                  <td><code>{s.next_node ?? "—"}</code></td>
-                  <td>{s.phase ?? "—"}</td>
-                  <td className="num">{s.round ?? "—"}</td>
-                  <td className="num">{s.alive ?? "—"}</td>
-                  <td className="num">{s.log_count ?? "—"}</td>
-                  <td className="num">{s.elapsed_ms ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {timeline.steps.length > 14 && (
-          <button className="btn-ghost" type="button" onClick={() => setShowAllSteps((v) => !v)}>
-            {showAllSteps ? "Show fewer steps" : `Show all ${timeline.steps.length} steps`}
+      <nav className="summary-tabs" aria-label="Post-game summary views">
+        {SUMMARY_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            aria-pressed={activeTab === tab.id}
+            className={activeTab === tab.id ? "is-active" : ""}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <strong>{tab.label}</strong>
+            <span>{tab.hint}</span>
           </button>
-        )}
-      </section>
+        ))}
+      </nav>
 
-      <section>
-        <p className="debug-section-title">Per-seat agents</p>
-        <p className="summary-prose">
-          Each AI seat ran as its own subgraph under its own checkpoint thread, so its memory is
-          independent. <strong>Mem</strong> is how many messages that agent ended up reasoning
-          over; <strong>Ckpt</strong> is how many checkpoints its thread accumulated — several per
-          turn, not one, since every node it passes through writes one.
-        </p>
-        <div className="summary-table-wrap">
-          <table className="metrics-table">
-            <thead>
-              <tr>
-                <th>Seat</th>
-                <th>Role</th>
-                <th>Controller</th>
-                <th>Model</th>
-                <th className="num">Turns</th>
-                <th className="num">Mem</th>
-                <th className="num">Ckpt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {timeline.seats.map((s) => (
-                <tr key={s.seat_id} className={s.alive ? "" : "summary-dead"}>
-                  <td>{s.name}{!s.alive && <span className="summary-dead-tag">died</span>}</td>
-                  <td>{s.role ?? "—"}</td>
-                  <td>{s.controller}</td>
-                  <td>{s.controller === "human" ? "—" : s.model_name ?? s.provider ?? "—"}</td>
-                  <td className="num">{s.turns}</td>
-                  <td className="num">{s.controller === "human" ? "—" : s.memory_messages}</td>
-                  <td className="num">{s.controller === "human" ? "—" : s.memory_checkpoints}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div className="summary-tab-panel">
+        {activeTab === "overview" ? (
+          <SummaryOverview timeline={timeline} prediction={prediction} />
+        ) : activeTab === "learning" ? (
+          timeline.learning_debrief ? (
+            <LearningEvidence debrief={timeline.learning_debrief} prediction={prediction} />
+          ) : (
+            <p className="metrics-empty">No learning evidence was recorded for this game.</p>
+          )
+        ) : (
+          <TechnicalEvidence timeline={timeline} />
+        )}
+      </div>
     </div>
   );
 }
 
-function LearningDebriefView({
-  debrief,
-  prediction,
-  showAllTools,
-  onToggleTools,
-}: {
-  debrief: LearningDebrief;
-  prediction: string;
-  showAllTools: boolean;
-  onToggleTools: () => void;
-}) {
-  const comparison = debrief.comparisons.find((item) => item.decisions.length > 1);
+function SummaryLoading() {
+  return (
+    <div className="summary-loading" role="status">
+      <span className="summary-loading-mark">◈</span>
+      <div>
+        <strong>Reconstructing the game</strong>
+        <p>Reading orchestration checkpoints, tool calls, memories, and private evidence…</p>
+      </div>
+    </div>
+  );
+}
+
+function SummaryOverview({ timeline, prediction }: { timeline: Timeline; prediction: string }) {
+  const debrief = timeline.learning_debrief;
+  const slowest = [...timeline.steps]
+    .filter((step) => step.elapsed_ms !== null)
+    .sort((left, right) => (right.elapsed_ms ?? 0) - (left.elapsed_ms ?? 0))[0];
+  const winnerLabel = timeline.winner === "villagers" ? "The village survived" : "The shadows prevailed";
 
   return (
-    <div className="learning-debrief">
-      <header className="learning-debrief-hero">
+    <div className="summary-view summary-overview">
+      <header className={`summary-outcome is-${timeline.winner ?? "unknown"}`}>
         <div>
-          <span className="learning-kicker">CLOSED-LOOP LEARNING</span>
-          <h3>What this game demonstrated</h3>
+          <span className="learning-kicker">GAME CONCLUDED</span>
+          <h3>{winnerLabel}</h3>
           <p>
-            The conclusions below come from this game&apos;s checkpoints, tool results,
-            private/public event boundaries, and independent seat memories.
+            {timeline.winner === "villagers"
+              ? "The agents and human eliminated every werewolf before the village fell."
+              : "The werewolves reached parity and took control of the village."}
           </p>
         </div>
-        <div className="learning-loop" aria-label="Learning loop">
-          {['Configure', 'Predict', 'Play', 'Observe', 'Debrief', 'Compare'].map((step, index) => (
-            <span key={step}><b>{String(index + 1).padStart(2, '0')}</b>{step}</span>
-          ))}
-        </div>
+        <strong>{timeline.winner ?? "unknown"}</strong>
       </header>
 
-      {prediction && (
+      <div className="summary-stats summary-stats-primary">
+        <Stat label="Rounds" value={String(timeline.rounds ?? "—")} />
+        <Stat label="Human turns" value={String(debrief?.human_interrupts.length ?? 0)} />
+        <Stat label="Model tool calls" value={String(debrief?.tool_totals.all ?? 0)} />
+        <Stat label="Private events" value={String(debrief?.partial_observability.private_events ?? 0)} />
+        <Stat label="Belief revisions" value={String(debrief?.note_evolution.length ?? 0)} />
+        <Stat
+          label="Wall clock"
+          value={timeline.duration_ms != null ? `${(timeline.duration_ms / 1000).toFixed(2)}s` : "—"}
+        />
+      </div>
+
+      {prediction ? (
         <section className="prediction-result">
           <span>Your prediction</span>
           <blockquote>{prediction}</blockquote>
-          <p>Compare it with the evidence below. What surprised you, and what would you change in the next run?</p>
+          <p>Compare it with the evidence below. What surprised you?</p>
         </section>
-      )}
+      ) : null}
 
-      <section>
-        <p className="debug-section-title">Concept → evidence from this run</p>
-        <div className="learning-concept-grid">
-          {debrief.concept_evidence.map((item) => (
-            <article key={item.concept}>
-              <h4>{item.concept}</h4>
-              <p>{item.evidence}</p>
-            </article>
-          ))}
+      {debrief ? (
+        <>
+          <section>
+            <div className="summary-section-heading">
+              <div>
+                <span>WHAT THIS RUN PROVED</span>
+                <h3>Agentic concepts, backed by evidence</h3>
+              </div>
+              <p>Open Learning evidence for the complete trace behind each conclusion.</p>
+            </div>
+            <div className="learning-concept-grid">
+              {debrief.concept_evidence.map((item) => (
+                <article key={item.concept}>
+                  <h4>{item.concept}</h4>
+                  <p>{item.evidence}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="summary-next-move">
+            <div>
+              <span className="learning-kicker">NEXT EXPERIMENT</span>
+              <h3>Change one variable. Play again.</h3>
+              <p>{debrief.next_experiments[0] ?? "Replay with a different model and compare the outcome."}</p>
+            </div>
+            <div className="summary-mini-trace">
+              <span><b>{timeline.total_steps ?? 0}</b> graph steps</span>
+              <span><b>{timeline.events.length}</b> persisted events</span>
+              <span><b>{slowest?.elapsed_ms ?? 0}ms</b> slowest step</span>
+            </div>
+          </section>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function LearningEvidence({ debrief, prediction }: { debrief: LearningDebrief; prediction: string }) {
+  const [showAllTools, setShowAllTools] = useState(false);
+  const comparison = debrief.comparisons.find((item) => item.decisions.length > 1);
+  const maxMemory = Math.max(...debrief.memories.map((item) => item.end_messages), 1);
+
+  return (
+    <div className="summary-view learning-evidence-view">
+      <header className="summary-section-heading is-hero">
+        <div>
+          <span>CLOSED-LOOP LEARNING</span>
+          <h3>Follow the evidence, not a wall of text</h3>
         </div>
-      </section>
+        <p>Expand one evidence group at a time. Every statement below comes from persisted behavior.</p>
+      </header>
 
-      <section className="learning-evidence-grid">
-        <article>
-          <p className="debug-section-title">Where the human entered the graph</p>
-          {debrief.human_interrupts.length ? (
-            <ol className="evidence-list">
-              {debrief.human_interrupts.slice(0, 8).map((item) => (
-                <li key={item.seq}>
-                  <span>Round {item.round} · {item.phase}</span>
-                  <strong>{item.action}</strong>
+      {prediction ? (
+        <div className="summary-prediction-chip"><span>Prediction</span>{prediction}</div>
+      ) : null}
+
+      <div className="summary-disclosure-list">
+        <Disclosure title="Human participation and information boundaries" meta={`${debrief.human_interrupts.length} human turns`} open>
+          <div className="learning-evidence-grid">
+            <article>
+              <p className="debug-section-title">Where the human entered the graph</p>
+              {debrief.human_interrupts.length ? (
+                <ol className="evidence-list">
+                  {debrief.human_interrupts.slice(0, 8).map((item) => (
+                    <li key={item.seq}>
+                      <span>Round {item.round} · {item.phase}</span>
+                      <strong>{item.action}</strong>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="summary-prose">The human died before receiving a playable turn.</p>
+              )}
+            </article>
+            <article>
+              <p className="debug-section-title">What remained private</p>
+              <div className="observability-split">
+                <Stat label="Public" value={String(debrief.partial_observability.public_events)} />
+                <Stat label="Private" value={String(debrief.partial_observability.private_events)} />
+                <Stat label="Seer finds" value={String(debrief.partial_observability.seer_discoveries)} />
+              </div>
+              <p className="summary-prose">{debrief.partial_observability.explanation}</p>
+            </article>
+          </div>
+        </Disclosure>
+
+        <Disclosure title="Tool calls and rule validation" meta={`${debrief.tool_totals.accepted} accepted · ${debrief.tool_totals.rejected} rejected`}>
+          <div className="tool-totals">
+            <span><b>{debrief.tool_totals.all}</b> calls</span>
+            <span className="accepted"><b>{debrief.tool_totals.accepted}</b> accepted actions</span>
+            <span><b>{debrief.tool_totals.reads}</b> reads</span>
+            <span className={debrief.tool_totals.rejected ? "rejected" : ""}><b>{debrief.tool_totals.rejected}</b> rejected</span>
+          </div>
+          {debrief.tool_calls.length ? (
+            <div className="summary-table-wrap summary-evidence-table">
+              <table className="metrics-table">
+                <thead><tr><th>Agent</th><th>Round / phase</th><th>Tool</th><th>Result</th><th>Decision</th></tr></thead>
+                <tbody>
+                  {(showAllTools ? debrief.tool_calls : debrief.tool_calls.slice(0, 12)).map((call, index) => (
+                    <tr key={`${call.seat_id}-${call.round}-${call.tool}-${index}`}>
+                      <td>{call.name}<small className="learning-model">{call.model_name ?? call.provider ?? "—"}</small></td>
+                      <td>{call.round} · {call.phase}</td>
+                      <td><code>{call.tool}</code></td>
+                      <td><span className={`tool-status ${call.status}`}>{call.status}</span></td>
+                      <td>{call.summary}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="summary-prose">No persisted model tool calls were recorded.</p>
+          )}
+          {debrief.tool_calls.length > 12 ? (
+            <button className="btn-ghost" type="button" onClick={() => setShowAllTools((value) => !value)}>
+              {showAllTools ? "Show fewer calls" : `Show all ${debrief.tool_calls.length} calls`}
+            </button>
+          ) : null}
+        </Disclosure>
+
+        <Disclosure title="Independent memories" meta={`${debrief.memories.length} seat minds`}>
+          <div className="memory-growth-list">
+            {debrief.memories.map((memory) => (
+              <div className="memory-growth-row" key={memory.seat_id}>
+                <span><strong>{memory.name}</strong><small>{memory.model_name ?? "model"}</small></span>
+                <span className="memory-growth-track"><i style={{ width: `${(memory.end_messages / maxMemory) * 100}%` }} /></span>
+                <b>{memory.start_messages} → {memory.end_messages}</b>
+              </div>
+            ))}
+          </div>
+        </Disclosure>
+
+        <Disclosure title="Private belief evolution" meta={`${debrief.note_evolution.length} revisions`}>
+          <p className="summary-prose">
+            Revisions and retired theories remain visible, with the evidence event that prompted each change.
+          </p>
+          {debrief.note_evolution.length ? (
+            <ol className="private-notes-list summary-note-list">
+              {debrief.note_evolution.slice(-20).reverse().map((note) => (
+                <li key={note.event_key} className={`private-note-card is-${note.status}`}>
+                  <div className="private-note-meta">
+                    <span className={`private-note-kind kind-${note.kind}`}>{note.kind}</span>
+                    <strong>{note.name ?? note.seat_id}</strong>
+                    {note.subject ? <span>about {note.subject}</span> : null}
+                    <span>v{note.revision}</span>
+                    <span>{note.source_seq === null ? "opening belief" : `from event #${note.source_seq}`}</span>
+                  </div>
+                  <p>{note.content}</p>
+                  <span className="private-note-operation">{note.operation}</span>
                 </li>
               ))}
             </ol>
           ) : (
-            <p className="summary-prose">The human died before receiving a playable turn, so no human interrupt completed in this run.</p>
+            <p className="summary-prose">No model committed a private notebook update in this run.</p>
           )}
-        </article>
+        </Disclosure>
 
-        <article>
-          <p className="debug-section-title">Information boundaries</p>
-          <div className="observability-split">
-            <Stat label="Public events" value={String(debrief.partial_observability.public_events)} />
-            <Stat label="Private events" value={String(debrief.partial_observability.private_events)} />
-            <Stat label="Seer discoveries" value={String(debrief.partial_observability.seer_discoveries)} />
-          </div>
-          <p className="summary-prose">{debrief.partial_observability.explanation}</p>
-        </article>
-      </section>
-
-      <section>
-        <p className="debug-section-title">Tools called — and what validation accepted</p>
-        <div className="tool-totals">
-          <span><b>{debrief.tool_totals.all}</b> calls</span>
-          <span className="accepted"><b>{debrief.tool_totals.accepted}</b> accepted actions</span>
-          <span><b>{debrief.tool_totals.reads}</b> reads</span>
-          <span className={debrief.tool_totals.rejected ? "rejected" : ""}><b>{debrief.tool_totals.rejected}</b> rejected</span>
-        </div>
-        {debrief.tool_calls.length ? (
-          <div className="summary-table-wrap">
-            <table className="metrics-table">
-            <thead><tr><th>Agent</th><th>Round / phase</th><th>Tool</th><th>Result</th><th>Decision</th></tr></thead>
-            <tbody>
-              {(showAllTools ? debrief.tool_calls : debrief.tool_calls.slice(0, 14)).map((call, index) => (
-                <tr key={`${call.seat_id}-${call.round}-${call.tool}-${index}`}>
-                  <td>{call.name}<small className="learning-model">{call.model_name ?? call.provider ?? '—'}</small></td>
-                  <td>{call.round} · {call.phase}</td>
-                  <td><code>{call.tool}</code></td>
-                  <td><span className={`tool-status ${call.status}`}>{call.status}</span></td>
-                  <td>{call.summary}</td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="summary-prose">
-            This run used no persisted model tool calls. Human actions still passed through the
-            same rule-validation functions, but they are represented in the interrupt evidence above.
-          </p>
-        )}
-        {debrief.tool_calls.length > 14 && (
-          <button className="btn-ghost" type="button" onClick={onToggleTools}>
-            {showAllTools ? "Show fewer tool calls" : `Show all ${debrief.tool_calls.length} tool calls`}
-          </button>
-        )}
-      </section>
-
-      <section>
-        <p className="debug-section-title">How independent memories evolved</p>
-        <div className="memory-growth-list">
-          {debrief.memories.map((memory) => {
-            const max = Math.max(...debrief.memories.map((item) => item.end_messages), 1);
-            return (
-              <div className="memory-growth-row" key={memory.seat_id}>
-                <span><strong>{memory.name}</strong><small>{memory.model_name ?? 'model'}</small></span>
-                <span className="memory-growth-track"><i style={{ width: `${(memory.end_messages / max) * 100}%` }} /></span>
-                <b>{memory.start_messages} → {memory.end_messages}</b>
+        <Disclosure title="Same evidence, different decisions" meta={comparison ? `${comparison.decisions.length} agents compared` : "No comparable stage"}>
+          {comparison ? (
+            <>
+              <p className="summary-prose">{comparison.context}</p>
+              <div className="comparison-strip">
+                {comparison.decisions.map((decision, index) => (
+                  <article key={`${decision.seat_id}-${decision.tool}-${index}`}>
+                    <span>{decision.name} · {decision.model_name ?? decision.provider}</span>
+                    <strong>{decision.summary}</strong>
+                    <small><code>{decision.tool}</code></small>
+                  </article>
+                ))}
               </div>
-            );
-          })}
-        </div>
-      </section>
+            </>
+          ) : (
+            <p className="summary-prose">Replay with at least two differently configured AI seats to create a useful comparison.</p>
+          )}
+        </Disclosure>
 
-      <section>
-        <p className="debug-section-title">How private beliefs evolved</p>
-        <p className="summary-prose">
-          Notes are an immutable ledger: revisions and retired theories remain visible instead of
-          being overwritten, with the round and evidence event that prompted each change.
-        </p>
-        {debrief.note_evolution.length ? (
-          <ol className="private-notes-list debrief-note-list">
-            {debrief.note_evolution.slice(-20).reverse().map((note) => (
-              <li key={note.event_key} className={`private-note-card is-${note.status}`}>
-                <div className="private-note-meta">
-                  <span className={`private-note-kind kind-${note.kind}`}>{note.kind}</span>
-                  <strong>{note.name ?? note.seat_id}</strong>
-                  {note.subject ? <span>about {note.subject}</span> : null}
-                  <span>v{note.revision}</span>
-                  <span>{note.source_seq === null ? "opening belief" : `from event #${note.source_seq}`}</span>
-                </div>
-                <p>{note.content}</p>
-                <span className="private-note-operation">{note.operation}</span>
+        <Disclosure title="Experiments for the next run" meta={`${debrief.next_experiments.length} suggestions`}>
+          <div className="next-experiments is-embedded">
+            <ol>{debrief.next_experiments.map((experiment) => <li key={experiment}>{experiment}</li>)}</ol>
+          </div>
+        </Disclosure>
+      </div>
+    </div>
+  );
+}
+
+function TechnicalEvidence({ timeline }: { timeline: Timeline }) {
+  const [showAllSteps, setShowAllSteps] = useState(false);
+  const steps = showAllSteps ? timeline.steps : timeline.steps.slice(0, 14);
+
+  return (
+    <div className="summary-view technical-evidence-view">
+      <header className="summary-section-heading is-hero">
+        <div>
+          <span>TECHNICAL EVIDENCE</span>
+          <h3>The trace is here when you need it</h3>
+        </div>
+        <p>Graph mechanics are separated from the narrative and collapsed by default.</p>
+      </header>
+
+      <div className="summary-stats">
+        <Stat label="Graph steps" value={String(timeline.total_steps ?? "—")} />
+        <Stat label="Log entries" value={String(timeline.events.length)} />
+        <Stat label="Phases" value={String(timeline.phases?.length ?? 0)} />
+        <Stat label="Seat agents" value={String(timeline.seats.length)} />
+      </div>
+
+      <div className="summary-disclosure-list">
+        <Disclosure title="How to read this trace" meta="Important caveat">
+          <p className="summary-caveat">{timeline.caveat}</p>
+        </Disclosure>
+
+        <Disclosure title="Game lifecycle" meta={`${timeline.phases?.length ?? 0} transitions`} open>
+          <p className="summary-prose">
+            The graph waited in <code>phase: lobby</code> until the human pressed Start Game. Roles were dealt inside the graph.
+          </p>
+          <ul className="summary-phases">
+            {(timeline.phases ?? []).map((phase) => (
+              <li key={phase.label}>
+                <span className="summary-phase-step">step {phase.from_step}</span>
+                <span className="summary-phase-label">{phase.label}</span>
               </li>
             ))}
-          </ol>
-        ) : (
-          <p className="summary-prose">No model committed a private notebook update in this run.</p>
-        )}
-      </section>
+          </ul>
+        </Disclosure>
 
-      {comparison ? (
-        <section>
-          <p className="debug-section-title">Same public round, different decisions</p>
-          <p className="summary-prose">{comparison.context}</p>
-          <div className="comparison-strip">
-            {comparison.decisions.map((decision, index) => (
-              <article key={`${decision.seat_id}-${decision.tool}-${index}`}>
-                <span>{decision.name} · {decision.model_name ?? decision.provider}</span>
-                <strong>{decision.summary}</strong>
-                <small><code>{decision.tool}</code></small>
-              </article>
-            ))}
+        <Disclosure title="Node execution counts" meta={`${timeline.node_counts?.length ?? 0} graph nodes`}>
+          <div className="summary-bars">
+            {(timeline.node_counts ?? []).map((node) => {
+              const max = timeline.node_counts?.[0]?.count ?? 1;
+              return (
+                <div className="summary-bar-row" key={node.node}>
+                  <span className="summary-bar-label">{node.node}</span>
+                  <span className="summary-bar-track"><span className="summary-bar-fill" style={{ width: `${(node.count / max) * 100}%` }} /></span>
+                  <span className="summary-bar-count">{node.count}</span>
+                </div>
+              );
+            })}
           </div>
-        </section>
-      ) : (
-        <section>
-          <p className="debug-section-title">Same public round, different decisions</p>
-          <p className="summary-prose">
-            This run did not preserve a stage with two comparable model decisions. Replay with at
-            least two AI seats and keep their models different to create a useful comparison.
-          </p>
-        </section>
-      )}
+        </Disclosure>
 
-      <section className="next-experiments">
-        <p className="debug-section-title">Try next</p>
-        <ol>
-          {debrief.next_experiments.map((experiment) => <li key={experiment}>{experiment}</li>)}
-        </ol>
-      </section>
+        <Disclosure title="Checkpoint history" meta={`${timeline.steps.length} stages`}>
+          <div className="summary-table-wrap summary-evidence-table">
+            <table className="metrics-table">
+              <thead><tr><th className="num">Step</th><th>Next node</th><th>Phase</th><th className="num">Round</th><th className="num">Alive</th><th className="num">Log</th><th className="num">+ms</th></tr></thead>
+              <tbody>
+                {steps.map((step) => (
+                  <tr key={step.step}>
+                    <td className="num">{step.step}</td><td><code>{step.next_node ?? "—"}</code></td><td>{step.phase ?? "—"}</td>
+                    <td className="num">{step.round ?? "—"}</td><td className="num">{step.alive ?? "—"}</td>
+                    <td className="num">{step.log_count ?? "—"}</td><td className="num">{step.elapsed_ms ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {timeline.steps.length > 14 ? (
+            <button className="btn-ghost" type="button" onClick={() => setShowAllSteps((value) => !value)}>
+              {showAllSteps ? "Show fewer stages" : `Show all ${timeline.steps.length} stages`}
+            </button>
+          ) : null}
+        </Disclosure>
+
+        <Disclosure title="Per-seat agent threads" meta={`${timeline.seats.length} seats`}>
+          <p className="summary-prose">Each AI seat has an independent checkpoint thread and conversation memory.</p>
+          <div className="summary-table-wrap">
+            <table className="metrics-table">
+              <thead><tr><th>Seat</th><th>Role</th><th>Controller</th><th>Model</th><th className="num">Turns</th><th className="num">Mem</th><th className="num">Ckpt</th></tr></thead>
+              <tbody>
+                {timeline.seats.map((seat) => (
+                  <tr key={seat.seat_id} className={seat.alive ? "" : "summary-dead"}>
+                    <td>{seat.name}{seat.alive ? null : <span className="summary-dead-tag">died</span>}</td>
+                    <td>{seat.role ?? "—"}</td><td>{seat.controller}</td>
+                    <td>{seat.controller === "human" ? "—" : seat.model_name ?? seat.provider ?? "—"}</td>
+                    <td className="num">{seat.turns}</td><td className="num">{seat.controller === "human" ? "—" : seat.memory_messages}</td>
+                    <td className="num">{seat.controller === "human" ? "—" : seat.memory_checkpoints}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Disclosure>
+      </div>
     </div>
+  );
+}
+
+function Disclosure({
+  title,
+  meta,
+  open = false,
+  children,
+}: {
+  title: string;
+  meta: string;
+  open?: boolean;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(open);
+
+  return (
+    <details
+      className="summary-disclosure"
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary>
+        <span><strong>{title}</strong><small>{meta}</small></span>
+        <i aria-hidden="true">⌄</i>
+      </summary>
+      <div className="summary-disclosure-content">{children}</div>
+    </details>
   );
 }
 

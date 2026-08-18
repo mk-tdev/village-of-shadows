@@ -54,6 +54,20 @@ export function GameView({ sessionId }: { sessionId: string }) {
     return () => document.body.classList.remove("phase-day");
   }, [isNight]);
 
+  useEffect(() => {
+    if (!showSummary) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowSummary(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [showSummary]);
+
   if (errorMessage) {
     return (
       <div className="app">
@@ -313,21 +327,44 @@ export function GameView({ sessionId }: { sessionId: string }) {
         </div>
       )}
 
-      {/* Only after a game ends: everything here is read back out of the
-          checkpointer rather than streamed live, so there is nothing to show
-          mid-game (see backend/app/game/timeline.py). */}
-      {game.winner && (
-        <section className="debug-panel">
-          <div className="debug-panel-header">
-            <h2 className="debug-panel-title">
-              <span>◈</span> Learning debrief &amp; technical trace
-            </h2>
-          </div>
-          <div className="summary-body">
-            <GameSummary sessionId={sessionId} />
-          </div>
-        </section>
-      )}
+      {/* The report used to render inline below the entire game and made an
+          already information-dense page several screens longer. Keep it in a
+          focused, internally scrolling workspace instead. */}
+      {game.winner && showSummary ? (
+        <div
+          className="summary-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowSummary(false);
+          }}
+        >
+          <section
+            className="summary-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="post-game-summary-title"
+          >
+            <header className="summary-modal-header">
+              <div>
+                <span>POST-GAME ANALYSIS</span>
+                <h2 id="post-game-summary-title">Learning debrief &amp; technical trace</h2>
+              </div>
+              <button
+                className="summary-modal-close"
+                type="button"
+                autoFocus
+                aria-label="Close post-game summary"
+                onClick={() => setShowSummary(false)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="summary-modal-scroll">
+              <GameSummary sessionId={sessionId} />
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <DebugPanel
         godView={godView}

@@ -153,3 +153,10 @@ Finished games keep both.
 `game.winner` is set, reachable from the game-over overlay. It is fetched
 post-game rather than streamed for the same reason the data exists at all: none
 of it is recorded as the game runs.
+
+The report is presented as a focused modal workspace rather than appended to
+the game page. Its Overview, Learning evidence, and Technical trace views keep
+the outcome and educational takeaways immediately visible, while long tables
+and forensic evidence use native expandable sections. The report owns its
+scroll container, so inspecting every checkpoint no longer makes the game page
+itself several screens longer.

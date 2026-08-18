@@ -187,7 +187,7 @@ The game page makes the agent system visible while it runs:
 - Per-agent provider, model, latency, calls, tokens, and remembered-message count.
 - Live private notebook evolution: suspicions, clues, lies, alliances, revisions, and retired theories.
 - Private thoughts and secret actions when God Mode is enabled.
-- A post-game report reconstructed from LangGraph checkpoint history.
+- A focused, tabbed post-game report reconstructed from LangGraph checkpoint history, with expandable learning evidence and technical details.
 
 God Mode changes only presentation. It does not change what any AI agent or human player is legitimately allowed to know.
 
