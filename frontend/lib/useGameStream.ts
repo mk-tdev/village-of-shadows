@@ -7,6 +7,7 @@ import type {
   AwaitingInput,
   DecisionEvent,
   GameState,
+  InputAcceptedEvent,
   LogEntry,
   McpEvent,
   MemoryEvent,
@@ -281,6 +282,22 @@ export function useGameStream(sessionId: string): GameStreamState {
       const current = gameRef.current;
       if (!current) return;
       const next = { ...current, awaiting: data };
+      gameRef.current = next;
+      setGame(next);
+    });
+
+    // Positive acknowledgement for a human action. The POST response alone
+    // cannot mutate EventSource-owned state, so without this event the old
+    // vote prompt can remain visible after the backend has already resumed.
+    source.addEventListener("input_accepted", (e) => {
+      const data: InputAcceptedEvent = JSON.parse((e as MessageEvent).data);
+      const current = gameRef.current;
+      if (!current?.awaiting) return;
+      if (
+        current.awaiting.seat_id !== data.seat_id ||
+        current.awaiting.kind !== data.kind
+      ) return;
+      const next: GameState = { ...current, awaiting: null };
       gameRef.current = next;
       setGame(next);
     });

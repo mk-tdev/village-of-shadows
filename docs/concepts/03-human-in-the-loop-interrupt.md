@@ -47,7 +47,7 @@ async def _run(self, input_: Any) -> None:
                 return
         ...
 ```
-([orchestrator.py:162-177](../../backend/app/game/orchestrator.py#L162-L177))
+([orchestrator.py:175-188](../../backend/app/game/orchestrator.py#L175-L188))
 
 `GameOrchestrator._run` drives the graph with `graph.astream(...)` inside a
 background `asyncio.Task` (see `start()`,
@@ -63,10 +63,16 @@ zero — no task, no thread, nothing — until they actually answer.
 
 ```python
 def resume(self, value: Any) -> None:
+    pending = self.state.awaiting
     self.state.awaiting = None
+    if pending is not None:
+        self.publish(
+            "input_accepted",
+            {"seat_id": pending.seat_id, "kind": pending.kind},
+        )
     self._task = asyncio.create_task(self._run(Command(resume=value)))
 ```
-([orchestrator.py:108-110](../../backend/app/game/orchestrator.py#L108-L110))
+([orchestrator.py:108-123](../../backend/app/game/orchestrator.py#L108-L123))
 
 ```python
 @router.post("/{session_id}/input")
@@ -87,6 +93,13 @@ from the top, with the crucial difference that **this time, the `interrupt()`
 call returns `value` instead of raising** — so `answer = interrupt(...)`
 actually gets the human's submitted dict as `answer`, and execution
 continues past it into `actions.apply_night_action(...)`.
+
+`input_accepted` closes the browser's specific pending prompt as soon as the
+server accepts the response. This acknowledgement is separate from the POST
+response because the frontend's game state is owned by the SSE reducer. It also
+prevents a slow following agent turn from leaving the already-used vote grid on
+screen. A second POST is rejected with `409` because `state.awaiting` was
+cleared synchronously before the graph resumed.
 
 This is why the module docstring in `nodes.py` warns that a node re-runs
 *from the top* on resume (see
@@ -127,7 +140,7 @@ covered yet — what happens when a turn genuinely fails, not just suspends:
 except Exception as exc:  # surfaced to the SSE stream rather than swallowed
     self.publish("error", {"message": _describe_exception(exc)})
 ```
-([orchestrator.py:178-179](../../backend/app/game/orchestrator.py#L178-L179))
+([orchestrator.py:191-192](../../backend/app/game/orchestrator.py#L191-L192))
 
 The first version of this line was just `self.publish("error", {"message":
 str(exc)})` — reasonable-looking, and wrong in a way that only shows up

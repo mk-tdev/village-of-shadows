@@ -72,6 +72,11 @@ export interface AwaitingInput {
   options: string[];
 }
 
+export interface InputAcceptedEvent {
+  seat_id: string;
+  kind: AwaitingInput["kind"];
+}
+
 export interface GameState {
   session_id: string;
   players: Player[];

@@ -104,7 +104,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
     .find((entry) => entry.type === "statement" || entry.type === "vote" || entry.type === "death") ?? null;
 
   const handleSubmit = async (value: Record<string, unknown>) => {
-    if (!game.awaiting) return;
+    if (!game.awaiting) return false;
     setSubmitting(true);
     try {
       await submitInput(sessionId, {
@@ -112,8 +112,10 @@ export function GameView({ sessionId }: { sessionId: string }) {
         kind: game.awaiting.kind,
         value,
       });
+      return true;
     } catch (err) {
       console.error(err);
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -300,6 +302,11 @@ export function GameView({ sessionId }: { sessionId: string }) {
                 onSubmit={handleSubmit}
                 onContinue={handleContinue}
                 submitting={submitting}
+                promptKey={
+                  game.awaiting
+                    ? `${game.round}:${game.phase}:${game.awaiting.seat_id}:${game.awaiting.kind}`
+                    : null
+                }
               />
             )}
           </div>

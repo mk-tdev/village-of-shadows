@@ -9,32 +9,21 @@ export function Controls({
   onSubmit,
   onContinue,
   submitting,
+  promptKey,
 }: {
   awaiting: AwaitingInput | null;
   paused: boolean;
-  onSubmit: (value: Record<string, unknown>) => void;
+  onSubmit: (value: Record<string, unknown>) => Promise<boolean>;
   onContinue: () => void;
   submitting: boolean;
+  promptKey: string | null;
 }) {
   const [text, setText] = useState("");
-  // `submitting` only covers the in-flight fetch itself, so the controls
-  // re-enabled the instant it resolved -- well before the backend actually
-  // advanced past this turn, letting a human fire off several submissions
-  // for what should be a single answer. `awaiting` gets a new object
-  // reference every time a genuinely new turn starts (see
-  // orchestrator.py's _run / useGameStream.ts's "awaiting_input" handler),
-  // so locking on submit and clearing only when `awaiting` itself changes
-  // keeps the controls disabled for the entire rest of this turn. Compared
-  // during render via a second piece of state rather than a ref -- this
-  // project's stricter hooks lint (react-hooks/refs) forbids reading/writing
-  // a ref during render, so this uses React's own documented "adjusting
-  // state while rendering" pattern instead of the ref-diffing idiom.
-  const [locked, setLocked] = useState(false);
-  const [prevAwaiting, setPrevAwaiting] = useState(awaiting);
-  if (prevAwaiting !== awaiting) {
-    setPrevAwaiting(awaiting);
-    setLocked(false);
-  }
+  // Lock against a logical turn key, not the parsed object's identity. An SSE
+  // reconnect can deliver the same pending prompt as a fresh object; comparing
+  // references treated that duplicate as a new turn and re-enabled voting.
+  const [lockedPromptKey, setLockedPromptKey] = useState<string | null>(null);
+  const locked = promptKey !== null && lockedPromptKey === promptKey;
 
   if (paused) {
     return (
@@ -64,10 +53,11 @@ export function Controls({
         <button
           className="btn"
           disabled={submitting || locked}
-          onClick={() => {
-            setLocked(true);
-            onSubmit({ text: text.trim() || "(says nothing)" });
-            setText("");
+          onClick={async () => {
+            setLockedPromptKey(promptKey);
+            const accepted = await onSubmit({ text: text.trim() || "(says nothing)" });
+            if (accepted) setText("");
+            else setLockedPromptKey(null);
           }}
         >
           Speak
@@ -86,9 +76,10 @@ export function Controls({
             key={option}
             className="vote-btn"
             disabled={submitting || locked}
-            onClick={() => {
-              setLocked(true);
-              onSubmit({ target: option });
+            onClick={async () => {
+              setLockedPromptKey(promptKey);
+              const accepted = await onSubmit({ target: option });
+              if (!accepted) setLockedPromptKey(null);
             }}
           >
             {option}

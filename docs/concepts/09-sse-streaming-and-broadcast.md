@@ -57,6 +57,14 @@ translating whatever the orchestrator publishes into SSE frames, checking
 every 15 seconds whether the client disconnected so the generator doesn't
 loop forever after the browser tab closes.
 
+Human prompts have an explicit closing event too. Accepting a statement, vote,
+or night action publishes `input_accepted` with the expected seat and input
+kind. `useGameStream` clears `game.awaiting` only when both fields match the
+currently displayed prompt. This removes the control immediately while the
+graph continues and avoids a stale or reconnected event closing a newer turn.
+The controls also lock against a stable round/phase prompt key, so receiving
+the same pending prompt as a newly parsed object cannot re-enable it.
+
 ## A second staleness bug the same "catch-up on connect" idea fixes
 
 The `"node"` catch-up line above wasn't there from the start, and its

@@ -85,7 +85,7 @@ exists, where it previously often wasn't. See
 def request_pause(self) -> None:
     self.pause_requested = True
 ```
-([orchestrator.py:112-113](../../backend/app/game/orchestrator.py#L112-L113))
+([orchestrator.py:125-126](../../backend/app/game/orchestrator.py#L125-L126))
 
 ```python
 @router.post("/{session_id}/pause")
@@ -166,7 +166,7 @@ if isinstance(event, dict) and "__interrupt__" in event:
     self.state.awaiting = AwaitingInput(**payload)
     ...
 ```
-([orchestrator.py:165-173](../../backend/app/game/orchestrator.py#L165-L173))
+([orchestrator.py:178-188](../../backend/app/game/orchestrator.py#L178-L188))
 
 `GameOrchestrator._run` distinguishes a pause-interrupt from a
 human-turn-interrupt purely by the `"kind"` field in the payload — a pause
@@ -183,7 +183,7 @@ def continue_game(self) -> None:
     # this is a plain truthy sentinel the pause interrupt discards.
     self.resume(True)
 ```
-([orchestrator.py:115-119](../../backend/app/game/orchestrator.py#L115-L119))
+([orchestrator.py:128-132](../../backend/app/game/orchestrator.py#L128-L132))
 
 `continue_game()` calls the exact same `resume()` method
 `POST /input` calls for a human answer — see

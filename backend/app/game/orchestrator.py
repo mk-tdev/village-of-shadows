@@ -106,7 +106,20 @@ class GameOrchestrator:
         self._task = asyncio.create_task(self._run({"game": self.state}))
 
     def resume(self, value: Any) -> None:
+        pending = self.state.awaiting
         self.state.awaiting = None
+        # `awaiting_input` is a one-way event unless we explicitly close it.
+        # Without this acknowledgement the browser keeps rendering the old
+        # vote/statement prompt until some unrelated later event happens to
+        # replace it, which can make an already accepted vote look clickable
+        # again. Publish before the graph resumes so the control disappears
+        # as soon as the server accepts the answer, independent of how long
+        # the next model turn takes.
+        if pending is not None:
+            self.publish(
+                "input_accepted",
+                {"seat_id": pending.seat_id, "kind": pending.kind},
+            )
         self._task = asyncio.create_task(self._run(Command(resume=value)))
 
     def request_pause(self) -> None:
