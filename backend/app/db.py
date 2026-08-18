@@ -85,6 +85,30 @@ CREATE TABLE IF NOT EXISTS agent_note_events (
 
 CREATE INDEX IF NOT EXISTS idx_agent_note_events_owner
 ON agent_note_events(game_id, seat_id, note_id, revision);
+
+-- FE-02: each observer's evolving opinion of another seat. Values are
+-- appended rather than updated so God Mode and the post-game debrief can
+-- replay exactly when and why trust changed. Suspicion is 0 (trusted) to
+-- 100 (certain threat); trust is the derived inverse shown by the UI.
+CREATE TABLE IF NOT EXISTS agent_belief_events (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id         TEXT NOT NULL REFERENCES games(id),
+    observer_seat_id TEXT NOT NULL,
+    subject_seat_id  TEXT NOT NULL,
+    revision        INTEGER NOT NULL,
+    suspicion       INTEGER NOT NULL CHECK(suspicion BETWEEN 0 AND 100),
+    confidence      INTEGER NOT NULL CHECK(confidence BETWEEN 0 AND 100),
+    reason          TEXT NOT NULL,
+    source_seq      INTEGER,
+    source_phase    TEXT NOT NULL,
+    source_round    INTEGER NOT NULL,
+    event_key       TEXT NOT NULL UNIQUE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(game_id, observer_seat_id, subject_seat_id, revision)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_belief_events_pair
+ON agent_belief_events(game_id, observer_seat_id, subject_seat_id, revision);
 """
 
 

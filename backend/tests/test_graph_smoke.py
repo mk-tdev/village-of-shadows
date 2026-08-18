@@ -33,6 +33,11 @@ async def test_all_mock_game_runs_to_a_winner(tmp_path):
     )
     assert (await cur.fetchone())[0] == 1
 
+    cur = await orch.conn.execute(
+        "SELECT COUNT(*) FROM agent_belief_events WHERE game_id = ?", (orch.session_id,)
+    )
+    assert (await cur.fetchone())[0] > 0
+
 
 @pytest.mark.asyncio
 async def test_human_seat_interrupts_and_resumes_to_completion(tmp_path):

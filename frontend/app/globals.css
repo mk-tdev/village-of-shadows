@@ -1568,6 +1568,150 @@ select:focus {
 .activity-note .activity-icon {
   color: #d9b063;
 }
+.activity-belief .activity-icon {
+  color: #e58c8c;
+}
+
+/* FE-02: God Mode's observer × subject trust/suspicion view. */
+.belief-panel {
+  border-top: 1px solid var(--card-border);
+  padding-top: 18px;
+  margin-bottom: 18px;
+}
+.belief-panel .debug-section-title {
+  color: #e58c8c;
+  margin-bottom: 5px;
+}
+.belief-matrix-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  background: rgba(4, 8, 12, 0.34);
+}
+.belief-matrix {
+  width: 100%;
+  min-width: 610px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 10px;
+}
+.belief-matrix th,
+.belief-matrix td {
+  height: 48px;
+  border-right: 1px solid rgba(255, 255, 255, 0.045);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  text-align: center;
+}
+.belief-matrix th:first-child {
+  width: 112px;
+  padding: 0 10px;
+  text-align: left;
+  color: var(--ink-dim);
+}
+.belief-matrix thead th {
+  height: 36px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+}
+.belief-matrix td strong,
+.belief-matrix td small {
+  display: block;
+}
+.belief-matrix td strong {
+  font-size: 15px;
+}
+.belief-matrix td small {
+  margin-top: 2px;
+  opacity: 0.72;
+  font-size: 8px;
+}
+.belief-score.is-trusted,
+.belief-history b.is-trusted,
+.belief-legend .is-trusted {
+  color: #91c99a;
+  background: rgba(79, 149, 91, 0.14);
+}
+.belief-score.is-uncertain,
+.belief-history b.is-uncertain,
+.belief-legend .is-uncertain {
+  color: #b8c2ca;
+  background: rgba(137, 151, 163, 0.12);
+}
+.belief-score.is-wary,
+.belief-history b.is-wary,
+.belief-legend .is-wary {
+  color: #e5c07b;
+  background: rgba(205, 144, 46, 0.14);
+}
+.belief-score.is-danger,
+.belief-history b.is-danger,
+.belief-legend .is-danger {
+  color: #ed9292;
+  background: rgba(190, 67, 67, 0.18);
+}
+.belief-self,
+.belief-unknown {
+  color: rgba(255, 255, 255, 0.18);
+}
+.belief-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 9px 0 13px;
+}
+.belief-legend span,
+.belief-history b {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+}
+.belief-legend small {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 9px;
+}
+.belief-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px;
+}
+.belief-history li {
+  padding: 10px 12px;
+  border: 1px solid rgba(190, 83, 83, 0.16);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(190, 83, 83, 0.06), rgba(0, 0, 0, 0.12));
+}
+.belief-history li > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-faint);
+  font-size: 10px;
+}
+.belief-history li strong {
+  color: var(--ink);
+}
+.belief-history li b {
+  margin-left: auto;
+}
+.belief-history p {
+  margin: 7px 0 5px;
+  color: var(--ink-dim);
+  font-family: "Spectral", serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.belief-history li > small {
+  color: var(--ink-faint);
+  font-size: 9px;
+}
 
 /* God Mode's observer-only view of FE-07's immutable private notebooks. */
 .private-notes-panel {

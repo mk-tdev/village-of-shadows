@@ -8,7 +8,7 @@
 [![MCP](https://img.shields.io/badge/MCP-agent%20tools-0f766e?style=flat-square)](https://modelcontextprotocol.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?style=flat-square)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
-[![Tests](https://img.shields.io/badge/backend%20tests-27%20passing-2e7d32?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/backend%20tests-35%20passing-2e7d32?style=flat-square)](#testing)
 
 <img src="assets/youtube-thumbnail-1280x720.jpg" alt="Village of Shadows — six AI agents versus one human" width="100%" />
 
@@ -29,6 +29,7 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
 | **Partial observability** | Agents receive only the public discussion and private information their role is allowed to know. |
 | **Persistent per-seat memory** | Each agent remembers its own previous turns without sharing a hidden global conversation. |
 | **Private belief notebooks** | Agents record, revise, and retire seat-isolated theories with evidence citations and immutable history. |
+| **Trust & suspicion ledger** | Every agent privately scores other players, cites evidence, and preserves each revision for live and post-game comparison. |
 | **MCP tool actions** | Agents act through validated game tools instead of returning loosely structured text. |
 | **Unscripted social behavior** | Werewolves can lie, seers can conceal evidence, doctors can make mistakes, and villagers can confidently accuse one another. |
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
@@ -186,6 +187,7 @@ The game page makes the agent system visible while it runs:
 - A chronological feed of turns, MCP sessions, tool calls, memory updates, and decisions.
 - Per-agent provider, model, latency, calls, tokens, and remembered-message count.
 - Live private notebook evolution: suspicions, clues, lies, alliances, revisions, and retired theories.
+- A live observer × subject trust/suspicion matrix with confidence, cited evidence, and immutable score history.
 - Private thoughts and secret actions when God Mode is enabled.
 - A focused, tabbed post-game report reconstructed from LangGraph checkpoint history, with expandable learning evidence and technical details.
 
@@ -202,7 +204,7 @@ Village of Shadows now makes its educational outcome explicit instead of leaving
 5. **Debrief** against durable evidence reconstructed from LangGraph checkpoints, game logs, and model-decision records.
 6. **Compare** by replaying with one changed model or personality.
 
-The post-game Learning Debrief identifies where execution suspended for the human, counts public versus role-private events, lists model tool calls with accepted or rejected validation results, visualizes each seat's memory growth, compares decisions made during the same public round, maps observations to core agentic-AI concepts, and suggests controlled experiments for the next run. It reports stated rationale and observable actions, not hidden chain-of-thought.
+The post-game Learning Debrief identifies where execution suspended for the human, counts public versus role-private events, lists model tool calls with accepted or rejected validation results, visualizes each seat's memory growth, replays evidence-backed trust and suspicion changes, compares decisions made during the same public round, maps observations to core agentic-AI concepts, and suggests controlled experiments for the next run. It reports stated rationale and observable actions, not hidden chain-of-thought.
 
 ## 📁 Project map
 
@@ -221,7 +223,7 @@ frontend/
 ├── lib/                     # API client, SSE reducer, models, portrait mapping
 └── public/                  # Character portraits, role artifacts, and scene art
 
-docs/concepts/               # 13-part agentic engineering guide
+docs/concepts/               # 15-part agentic engineering guide
 ```
 
 ## ✅ Testing
@@ -238,7 +240,7 @@ cd ..
 python3 docs/concepts/check_citations.py
 ```
 
-The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, immutable private-note history, replay safety, pause/continue, human interrupt/resume, full mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
+The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, immutable private-note and trust/suspicion history, replay safety, pause/continue, human interrupt/resume, full mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
 
 ## 📚 Learn from the implementation
 

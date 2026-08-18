@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { fetchGraphStructure } from "@/lib/api";
 import type {
   ActivityEntry,
+  BeliefEvent,
   GraphStructure,
   MindNodeEvent,
+  Player,
   PrivateNoteEvent,
   SeatMetrics,
 } from "@/lib/types";
+import { BeliefMatrix } from "./BeliefMatrix";
 import { GraphFlow } from "./GraphFlow";
 import { SeatMindFlow } from "./SeatMindFlow";
 
@@ -19,6 +22,7 @@ const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
   decision: "✓",
   memory: "🧠",
   note: "✎",
+  belief: "◉",
 };
 
 /** Engineering debug panel, embedded directly in the page (not a sliding
@@ -38,6 +42,8 @@ export function DebugPanel({
   metrics,
   activity,
   privateNotes,
+  beliefEvents,
+  players,
 }: {
   godView: boolean;
   currentNode: string | null;
@@ -46,6 +52,8 @@ export function DebugPanel({
   metrics: Record<string, SeatMetrics>;
   activity: ActivityEntry[];
   privateNotes: PrivateNoteEvent[];
+  beliefEvents: BeliefEvent[];
+  players: Player[];
 }) {
   const [graph, setGraph] = useState<GraphStructure | null>(null);
 
@@ -163,43 +171,57 @@ export function DebugPanel({
       </div>
 
       {godView ? (
-        <div className="private-notes-panel">
-          <div className="private-notes-heading">
-            <div>
-              <p className="debug-section-title">God Mode · private notebook evolution</p>
-              <p className="private-notes-explainer">
-                Immutable, seat-isolated belief updates. Each line cites the event that changed the agent&apos;s mind.
-              </p>
+        <>
+          <div className="belief-panel">
+            <div className="private-notes-heading">
+              <div>
+                <p className="debug-section-title">God Mode · trust &amp; suspicion matrix</p>
+                <p className="private-notes-explainer">
+                  Rows are observers; columns are subjects. Scores are private, evidence-backed, and never shared automatically.
+                </p>
+              </div>
+              <span className="private-notes-count">{beliefEvents.length} revisions</span>
             </div>
-            <span className="private-notes-count">{privateNotes.length} revisions</span>
+            <BeliefMatrix people={players} events={beliefEvents} />
           </div>
-          {recentNotes.length === 0 ? (
-            <p className="metrics-empty">No agent has committed a private note yet.</p>
-          ) : (
-            <ol className="private-notes-list">
-              {recentNotes.map((note) => (
-                <li
-                  key={note.event_key}
-                  className={`private-note-card is-${note.status}`}
-                >
-                  <div className="private-note-meta">
-                    <span className={`private-note-kind kind-${note.kind}`}>{note.kind}</span>
-                    <strong>{note.name ?? note.seat_id}</strong>
-                    {note.subject ? <span>about {note.subject}</span> : null}
-                    <span>v{note.revision}</span>
-                    <span>round {note.source_round} · {note.source_phase}</span>
-                    <span>{note.source_seq === null ? "opening belief" : `from event #${note.source_seq}`}</span>
-                  </div>
-                  <p>{note.content}</p>
-                  <span className="private-note-operation">{note.operation}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+          <div className="private-notes-panel">
+            <div className="private-notes-heading">
+              <div>
+                <p className="debug-section-title">God Mode · private notebook evolution</p>
+                <p className="private-notes-explainer">
+                  Immutable, seat-isolated belief updates. Each line cites the event that changed the agent&apos;s mind.
+                </p>
+              </div>
+              <span className="private-notes-count">{privateNotes.length} revisions</span>
+            </div>
+            {recentNotes.length === 0 ? (
+              <p className="metrics-empty">No agent has committed a private note yet.</p>
+            ) : (
+              <ol className="private-notes-list">
+                {recentNotes.map((note) => (
+                  <li
+                    key={note.event_key}
+                    className={`private-note-card is-${note.status}`}
+                  >
+                    <div className="private-note-meta">
+                      <span className={`private-note-kind kind-${note.kind}`}>{note.kind}</span>
+                      <strong>{note.name ?? note.seat_id}</strong>
+                      {note.subject ? <span>about {note.subject}</span> : null}
+                      <span>v{note.revision}</span>
+                      <span>round {note.source_round} · {note.source_phase}</span>
+                      <span>{note.source_seq === null ? "opening belief" : `from event #${note.source_seq}`}</span>
+                    </div>
+                    <p>{note.content}</p>
+                    <span className="private-note-operation">{note.operation}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </>
       ) : (
         <div className="private-notes-locked">
-          Enable God Mode to inspect each agent&apos;s private notebook evolution.
+          Enable God Mode to inspect private trust scores and notebook evolution.
         </div>
       )}
     </section>

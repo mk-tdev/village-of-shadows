@@ -5,6 +5,7 @@ import { streamUrl } from "./api";
 import type {
   ActivityEntry,
   AwaitingInput,
+  BeliefEvent,
   DecisionEvent,
   GameState,
   InputAcceptedEvent,
@@ -39,6 +40,8 @@ export interface GameStreamState {
   /** Immutable note revisions for the God Mode observer. Agents can retrieve
    * only their own rows through their connection-bound MCP identity. */
   privateNotes: PrivateNoteEvent[];
+  /** Observer-only belief ledger used by God Mode. */
+  beliefEvents: BeliefEvent[];
 }
 
 const MAX_ACTIVITY_ENTRIES = 60;
@@ -64,6 +67,7 @@ export function useGameStream(sessionId: string): GameStreamState {
   const [metrics, setMetrics] = useState<Record<string, SeatMetrics>>({});
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [privateNotes, setPrivateNotes] = useState<PrivateNoteEvent[]>([]);
+  const [beliefEvents, setBeliefEvents] = useState<BeliefEvent[]>([]);
   const gameRef = useRef<GameState | null>(null);
   const activityIdRef = useRef(0);
 
@@ -99,6 +103,24 @@ export function useGameStream(sessionId: string): GameStreamState {
       pushActivity(
         "note",
         `${note.name ?? note.seat_id} ${note.operation === "create" ? "recorded" : `${note.operation}d`} a private ${note.kind}`
+      );
+    });
+
+    source.addEventListener("belief_snapshot", (e) => {
+      const data: { events: BeliefEvent[] } = JSON.parse((e as MessageEvent).data);
+      setBeliefEvents(data.events);
+    });
+
+    source.addEventListener("belief_update", (e) => {
+      const belief: BeliefEvent = JSON.parse((e as MessageEvent).data);
+      setBeliefEvents((previous) =>
+        previous.some((event) => event.event_key === belief.event_key)
+          ? previous
+          : [...previous, belief]
+      );
+      pushActivity(
+        "belief",
+        `${belief.observer_name} moved ${belief.subject_name} to ${belief.suspicion}/100 suspicion`
       );
     });
 
@@ -358,6 +380,6 @@ export function useGameStream(sessionId: string): GameStreamState {
 
   return {
     game, active, connected, errorMessage, currentNode,
-    mindNode, mindNodeCounts, metrics, activity, privateNotes,
+    mindNode, mindNodeCounts, metrics, activity, privateNotes, beliefEvents,
   };
 }

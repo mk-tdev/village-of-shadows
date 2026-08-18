@@ -87,3 +87,6 @@ all general lessons that happened to surface here.
 14. [Agent-authored private notes](14-agent-authored-private-notes.md) — how
     connection-bound agents maintain an immutable, evidence-linked belief
     ledger without leaking notes across seats or duplicating replayed writes.
+15. [Trust and suspicion as explicit agent state](15-trust-and-suspicion.md) —
+    how private observer-to-subject scores evolve through validated tools,
+    stream into God Mode, and become replayable learning evidence.

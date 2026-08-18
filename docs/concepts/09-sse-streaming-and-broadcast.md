@@ -158,7 +158,7 @@ source.addEventListener("roles_assigned", (e) => {
   setGame(next);
 });
 ```
-([useGameStream.ts:110-118](../../frontend/lib/useGameStream.ts#L110-L118))
+([useGameStream.ts:133-140](../../frontend/lib/useGameStream.ts#L133-L140))
 
 Three fields (`current_node`, `phase`/`round`, now `players`) have hit this
 exact same shape of bug for the exact same reason: `begin_game` decoupled
@@ -172,6 +172,12 @@ project has so far reached for the narrower, per-field event each time a
 new staleness bug was actually hit, rather than broadcasting the full
 `GameState` on every node transition — cheaper per-event, at the cost of
 being the kind of bug that only surfaces one missed field at a time.
+
+FE-02's private relationship ledger follows a related but deliberately
+separate pattern: persisted history is sent as a `belief_snapshot` when an
+observer connects, while each append publishes a narrow `belief_update`.
+Those events feed only the God Mode observer UI; agents read their own rows
+through connection-bound MCP tools rather than through SSE.
 
 ## A fourth staleness bug: the human seer's result existed only on the server
 

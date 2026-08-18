@@ -138,6 +138,7 @@ def _tool_status(tool: str, result: Any) -> str:
     """Classify calls without pretending every read tool is a game action."""
     writes = {
         "write_note", "record_private_note", "revise_private_note", "retire_private_note",
+        "update_belief",
     }
     if not tool.startswith("submit_") and tool not in writes:
         return "read"
@@ -159,11 +160,20 @@ def _action_summary(tool: str, args: Any) -> str:
         return f"revised {args.get('note_id') or 'a private note'}"
     if tool == "retire_private_note":
         return f"retired {args.get('note_id') or 'a private note'}"
+    if tool == "update_belief":
+        return (
+            f"rated {args.get('subject') or 'a player'} at "
+            f"{args.get('suspicion', '?')}/100 suspicion"
+        )
     return tool.replace("_", " ")
 
 
 def _build_learning_debrief(
-    final: GameState, seats: list[dict], decisions: list[dict], note_events: list[dict],
+    final: GameState,
+    seats: list[dict],
+    decisions: list[dict],
+    note_events: list[dict],
+    belief_events: list[dict],
 ) -> dict:
     """Turn the technical trace into evidence for a closed learning loop.
 
@@ -254,6 +264,24 @@ def _build_learning_debrief(
         }
         for event in note_events
     ]
+    belief_evolution = [
+        {
+            **event,
+            "observer_name": (
+                by_id[event["observer_seat_id"]].name
+                if event["observer_seat_id"] in by_id else event["observer_seat_id"]
+            ),
+            "subject_name": (
+                by_id[event["subject_seat_id"]].name
+                if event["subject_seat_id"] in by_id else event["subject_seat_id"]
+            ),
+            "subject_alive": (
+                by_id[event["subject_seat_id"]].alive
+                if event["subject_seat_id"] in by_id else False
+            ),
+        }
+        for event in belief_events
+    ]
 
     concept_evidence = [
         {
@@ -284,8 +312,8 @@ def _build_learning_debrief(
         {
             "concept": "Explicit belief revision",
             "evidence": (
-                f"Agents authored {len(note_events)} private notebook event(s), preserving every "
-                "created, revised, and retired theory with its evidence source."
+                f"Agents authored {len(note_events)} private notebook event(s) and "
+                f"{len(belief_events)} scored trust/suspicion revision(s), preserving each evidence source."
             ),
         },
         {
@@ -316,6 +344,7 @@ def _build_learning_debrief(
         },
         "memories": memory,
         "note_evolution": note_evolution,
+        "belief_evolution": belief_evolution,
         "comparisons": comparisons,
         "concept_evidence": concept_evidence,
         "next_experiments": [
@@ -323,6 +352,7 @@ def _build_learning_debrief(
             "Use one model in every AI seat, then vary only personalities to isolate persona effects.",
             "Replay with God Mode off, record your trust ranking, then compare it with the revealed private trace.",
             "Compare memory growth and tool choices between a short game and a game that survives more rounds.",
+            "Track one observer-to-subject score across rounds and identify the exact evidence that moved it.",
         ],
     }
 
@@ -424,11 +454,13 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str, conn: Any 
 
     decisions: list[dict] = []
     note_events: list[dict] = []
+    belief_events: list[dict] = []
     if conn is not None:
         from app import persistence
 
         decisions = await persistence.get_decisions(conn, session_id)
         note_events = await persistence.get_note_events(conn, session_id)
+        belief_events = await persistence.get_belief_events(conn, session_id)
 
     return {
         "session_id": session_id,
@@ -452,7 +484,9 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str, conn: Any 
         "events": events,
         "seats": seats,
         "private_notes": note_events,
+        "belief_events": belief_events,
         "learning_debrief": (
-            _build_learning_debrief(final, seats, decisions, note_events) if final else None
+            _build_learning_debrief(final, seats, decisions, note_events, belief_events)
+            if final else None
         ),
     }

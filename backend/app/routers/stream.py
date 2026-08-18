@@ -43,6 +43,28 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
                     ],
                 }),
             }
+            belief_events = await persistence.get_belief_events(
+                orch.conn, orch.session_id,
+            )
+            alive = {player.seat_id: player.alive for player in orch.state.players}
+            yield {
+                "event": "belief_snapshot",
+                "data": json.dumps({
+                    "events": [
+                        {
+                            **event,
+                            "observer_name": player_names.get(
+                                event["observer_seat_id"], event["observer_seat_id"],
+                            ),
+                            "subject_name": player_names.get(
+                                event["subject_seat_id"], event["subject_seat_id"],
+                            ),
+                            "subject_alive": alive.get(event["subject_seat_id"], False),
+                        }
+                        for event in belief_events
+                    ],
+                }),
+            }
             if orch.state.awaiting is not None:
                 yield {"event": "awaiting_input", "data": json.dumps(orch.state.awaiting.model_dump())}
             if orch.current_node is not None:

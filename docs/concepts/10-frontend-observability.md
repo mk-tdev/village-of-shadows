@@ -187,7 +187,7 @@ source.addEventListener("decision", (e) => {
   });
 });
 ```
-([useGameStream.ts:222-240](../../frontend/lib/useGameStream.ts#L222-L240))
+([useGameStream.ts:245-263](../../frontend/lib/useGameStream.ts#L245-L263))
 
 Every `"decision"` event (published from `_record_decision` in
 `agent_turn.py` — see
@@ -242,7 +242,7 @@ source.addEventListener("mcp", (e) => {
   );
 });
 ```
-([useGameStream.ts:72-76](../../frontend/lib/useGameStream.ts#L72-L76), [212-220](../../frontend/lib/useGameStream.ts#L212-L220))
+([useGameStream.ts:77-81](../../frontend/lib/useGameStream.ts#L77-L81), [235-243](../../frontend/lib/useGameStream.ts#L235-L243))
 
 Each existing listener (`"turn"`, `"node"`, `"decision"`) got one extra line
 calling `pushActivity(...)` alongside whatever it already did — the feed is

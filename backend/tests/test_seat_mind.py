@@ -286,6 +286,8 @@ async def test_timeline_reconstructs_the_game_from_checkpoints(tmp_path):
     assert debrief["partial_observability"]["private_events"] > 0
     assert len(debrief["memories"]) == 7
     assert any(memory["growth"] > 0 for memory in debrief["memories"])
+    assert len(debrief["belief_evolution"]) > 0
+    assert len(report["belief_events"]) == len(debrief["belief_evolution"])
     assert len(debrief["concept_evidence"]) >= 5
     assert len(debrief["next_experiments"]) >= 3
 

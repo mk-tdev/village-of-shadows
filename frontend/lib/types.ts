@@ -123,6 +123,28 @@ export interface PrivateNoteEvent {
   created_at: string;
 }
 
+/** One immutable, observer-private trust/suspicion revision. Trust is the
+ * inverse of suspicion and is included by the API for presentation only. */
+export interface BeliefEvent {
+  id: number;
+  game_id: string;
+  observer_seat_id: string;
+  observer_name: string;
+  subject_seat_id: string;
+  subject_name: string;
+  subject_alive: boolean;
+  revision: number;
+  suspicion: number;
+  trust: number;
+  confidence: number;
+  reason: string;
+  source_seq: number | null;
+  source_phase: string;
+  source_round: number;
+  event_key: string;
+  created_at: string;
+}
+
 export interface GraphNode {
   id: string;
   name: string;
@@ -225,6 +247,7 @@ export interface LearningDebrief {
     progression: { stage: number; messages: number }[];
   }[];
   note_evolution: PrivateNoteEvent[];
+  belief_evolution: BeliefEvent[];
   comparisons: {
     round: number;
     phase: string;
@@ -252,6 +275,7 @@ export interface Timeline {
   events: TimelineEvent[];
   seats: TimelineSeat[];
   private_notes?: PrivateNoteEvent[];
+  belief_events?: BeliefEvent[];
   learning_debrief?: LearningDebrief | null;
 }
 
@@ -314,6 +338,6 @@ export interface McpEvent {
  * -- see agent_turn.py's orch.publish("mcp", ...) calls. */
 export interface ActivityEntry {
   id: number;
-  kind: "node" | "turn" | "mcp" | "decision" | "memory" | "note";
+  kind: "node" | "turn" | "mcp" | "decision" | "memory" | "note" | "belief";
   text: string;
 }

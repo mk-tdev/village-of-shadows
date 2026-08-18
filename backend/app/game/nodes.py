@@ -568,6 +568,8 @@ def _persona(player, game: GameState) -> str:
         " Maintain a concise private notebook when evidence changes. Use record_private_note for a new "
         "suspicion, clue, theory, lie, or alliance; cite the visible event seq when possible. Use "
         "revise_private_note when your belief changes and retire_private_note when evidence disproves it, "
-        "so your earlier reasoning remains auditable. Never put secret-role facts into public speech."
+        "so your earlier reasoning remains auditable. Use get_my_beliefs and update_belief to keep an "
+        "evidence-backed 0-100 suspicion score for other players; update it when statements, votes, deaths, "
+        "or role discoveries materially change your view. Never put secret-role facts into public speech."
     )
     return ctx

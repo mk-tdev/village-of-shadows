@@ -30,9 +30,12 @@ MODEL_VISIBLE_TOOLS = {
     "get_vote_history",
     "get_my_notes",
     "get_my_note_history",
+    "get_my_beliefs",
+    "get_my_belief_history",
     "record_private_note",
     "revise_private_note",
     "retire_private_note",
+    "update_belief",
     "write_note",
     "negotiate_message",
     "submit_night_action",
@@ -141,6 +144,45 @@ async def retire_private_note(
     orch = registry.get(game_id)
     return await actions.retire_private_note(
         orch, seat_id, note_id=note_id, reason=reason, source_seq=source_seq,
+    )
+
+
+@mcp.tool()
+async def get_my_beliefs(ctx: Context) -> list[dict]:
+    """Read only your latest private trust/suspicion scores for other players."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.get_beliefs(orch, seat_id)
+
+
+@mcp.tool()
+async def get_my_belief_history(ctx: Context) -> list[dict]:
+    """Read only your own immutable trust/suspicion revision history."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.get_belief_history(orch, seat_id)
+
+
+@mcp.tool()
+async def update_belief(
+    subject: str,
+    suspicion: int,
+    confidence: int,
+    reason: str,
+    source_seq: int | None = None,
+    ctx: Context = None,
+) -> dict:
+    """Revise your private 0-100 suspicion score for a player and cite visible evidence."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.update_belief(
+        orch,
+        seat_id,
+        subject=subject,
+        suspicion=suspicion,
+        confidence=confidence,
+        reason=reason,
+        source_seq=source_seq,
     )
 
 

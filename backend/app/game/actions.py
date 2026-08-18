@@ -183,7 +183,7 @@ def _clean_note_text(value: str, *, field: str, maximum: int) -> str:
     return cleaned
 
 
-def _resolve_note_source(
+def _resolve_private_source(
     orch: "GameOrchestrator", seat_id: str, source_seq: int | None,
 ) -> int | None:
     # A seat may cite public evidence or one of its own private actions (for
@@ -228,7 +228,7 @@ async def record_private_note(
     clean_subject = " ".join(subject.split()) or None
     if clean_subject and len(clean_subject) > 80:
         raise ActionError("subject must be 80 characters or fewer.")
-    source_seq = _resolve_note_source(orch, seat_id, source_seq)
+    source_seq = _resolve_private_source(orch, seat_id, source_seq)
 
     provisional = _note_event_key(
         orch, seat_id, operation="create", note_id="new", kind=kind,
@@ -278,7 +278,7 @@ async def revise_private_note(
     if not orch.state.find_seat(seat_id).alive:
         raise ActionError("Dead seats cannot revise private notes.")
     content = _clean_note_text(content, field="content", maximum=600)
-    source_seq = _resolve_note_source(orch, seat_id, source_seq)
+    source_seq = _resolve_private_source(orch, seat_id, source_seq)
     latest = await persistence.get_latest_note_event(orch.conn, orch.session_id, seat_id, note_id)
     if latest is None:
         raise ActionError("No private note with that id belongs to this seat.")
@@ -322,7 +322,7 @@ async def retire_private_note(
     if not orch.state.find_seat(seat_id).alive:
         raise ActionError("Dead seats cannot retire private notes.")
     reason = _clean_note_text(reason, field="reason", maximum=600)
-    source_seq = _resolve_note_source(orch, seat_id, source_seq)
+    source_seq = _resolve_private_source(orch, seat_id, source_seq)
     latest = await persistence.get_latest_note_event(orch.conn, orch.session_id, seat_id, note_id)
     if latest is None:
         raise ActionError("No private note with that id belongs to this seat.")
@@ -356,6 +356,103 @@ async def retire_private_note(
 
 async def get_note_history(orch: "GameOrchestrator", seat_id: str) -> list[dict]:
     return await persistence.get_note_events(orch.conn, orch.session_id, seat_id)
+
+
+def _belief_event_key(
+    orch: "GameOrchestrator",
+    observer_seat_id: str,
+    subject_seat_id: str,
+    suspicion: int,
+    confidence: int,
+    reason: str,
+    source_seq: int | None,
+) -> str:
+    material = "|".join([
+        orch.session_id, observer_seat_id, subject_seat_id,
+        str(orch.state.round), orch.state.phase, str(suspicion), str(confidence),
+        reason, str(source_seq),
+    ])
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _enrich_belief(orch: "GameOrchestrator", event: dict) -> dict:
+    observer = orch.state.find_seat(event["observer_seat_id"])
+    subject = orch.state.find_seat(event["subject_seat_id"])
+    return {
+        **event,
+        "observer_name": observer.name,
+        "subject_name": subject.name,
+        "subject_alive": subject.alive,
+    }
+
+
+async def update_belief(
+    orch: "GameOrchestrator",
+    observer_seat_id: str,
+    *,
+    subject: str,
+    suspicion: int,
+    confidence: int,
+    reason: str,
+    source_seq: int | None = None,
+) -> dict[str, Any]:
+    """Append one evidence-backed, seat-private trust/suspicion revision."""
+    observer = orch.state.find_seat(observer_seat_id)
+    if not observer.alive:
+        raise ActionError("Dead seats cannot update beliefs.")
+    clean_subject = " ".join(subject.split())
+    target = next((player for player in orch.state.players if player.name == clean_subject), None)
+    if target is None:
+        raise ActionError(f"{subject} is not a player in this game.")
+    if target.seat_id == observer_seat_id:
+        raise ActionError("A seat cannot assign a suspicion score to itself.")
+    if isinstance(suspicion, bool) or not isinstance(suspicion, int) or not 0 <= suspicion <= 100:
+        raise ActionError("suspicion must be an integer from 0 to 100.")
+    if isinstance(confidence, bool) or not isinstance(confidence, int) or not 0 <= confidence <= 100:
+        raise ActionError("confidence must be an integer from 0 to 100.")
+    clean_reason = _clean_note_text(reason, field="reason", maximum=400)
+    source_seq = _resolve_private_source(orch, observer_seat_id, source_seq)
+    event_key = _belief_event_key(
+        orch, observer_seat_id, target.seat_id, suspicion, confidence,
+        clean_reason, source_seq,
+    )
+    existing = await persistence.get_belief_event_by_key(orch.conn, event_key)
+    if existing is not None:
+        return {"ok": True, "replayed": True, "belief": _enrich_belief(orch, existing)}
+
+    latest = await persistence.get_latest_belief_event(
+        orch.conn, orch.session_id, observer_seat_id, target.seat_id,
+    )
+    event, inserted = await persistence.record_belief_event(
+        orch.conn,
+        session_id=orch.session_id,
+        observer_seat_id=observer_seat_id,
+        subject_seat_id=target.seat_id,
+        revision=(latest["revision"] + 1) if latest else 1,
+        suspicion=suspicion,
+        confidence=confidence,
+        reason=clean_reason,
+        source_seq=source_seq,
+        source_phase=orch.state.phase,
+        source_round=orch.state.round,
+        event_key=event_key,
+    )
+    enriched = _enrich_belief(orch, event)
+    if inserted:
+        orch.publish("belief_update", enriched)
+    return {"ok": True, "replayed": not inserted, "belief": enriched}
+
+
+async def get_beliefs(orch: "GameOrchestrator", seat_id: str) -> list[dict]:
+    events = await persistence.get_belief_events(
+        orch.conn, orch.session_id, seat_id, latest_only=True,
+    )
+    return [_enrich_belief(orch, event) for event in events]
+
+
+async def get_belief_history(orch: "GameOrchestrator", seat_id: str) -> list[dict]:
+    events = await persistence.get_belief_events(orch.conn, orch.session_id, seat_id)
+    return [_enrich_belief(orch, event) for event in events]
 
 
 async def get_vote_history(orch: "GameOrchestrator") -> list[dict]:

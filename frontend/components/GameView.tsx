@@ -27,7 +27,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const {
     game, active, connected, errorMessage, currentNode, mindNode, mindNodeCounts,
-    metrics, activity, privateNotes,
+    metrics, activity, privateNotes, beliefEvents,
   } =
     useGameStream(sessionId);
   const [godView, setGodView] = useState(true);
@@ -381,6 +381,8 @@ export function GameView({ sessionId }: { sessionId: string }) {
         metrics={metrics}
         activity={activity}
         privateNotes={privateNotes}
+        beliefEvents={beliefEvents}
+        players={game.players}
       />
     </div>
   );

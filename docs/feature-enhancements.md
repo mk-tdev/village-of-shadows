@@ -38,6 +38,8 @@ Initial acceptance criteria:
 
 ## FE-02: Trust and suspicion system
 
+**Status: Complete — implemented and verified on `codex/fe-02-trust-suspicion`.**
+
 Give every agent a private opinion of every other living player. Trust and
 suspicion can change after statements, votes, contradictions, investigations,
 deaths, and revealed roles.
@@ -55,6 +57,28 @@ Initial acceptance criteria:
 - A role reveal can update beliefs without rewriting historical values.
 - God Mode can display a live relationship graph or matrix.
 - The post-game report can replay belief changes over time.
+
+Implemented behavior:
+
+- SQLite stores an immutable `agent_belief_events` ledger per observer and
+  subject. Suspicion and confidence use bounded 0–100 scores; trust is the
+  derived inverse rather than a second source of truth.
+- `update_belief`, `get_my_beliefs`, and `get_my_belief_history` are
+  connection-bound MCP tools. A model never supplies its observer identity.
+- Every change includes a concise reason and may cite only a public event or
+  that observer's own private event. Deterministic event keys make identical
+  pause/replay writes idempotent.
+- God Mode receives live `belief_update` events and renders an observer ×
+  subject matrix plus recent evidence. Ordinary players never receive this
+  information through their agent context.
+- The Learning Debrief shows the final matrix and replays immutable revisions,
+  including belief changes after deaths and revealed roles.
+- Offline `mock-v1` seats also create belief revisions so the complete learning
+  experience remains demonstrable without provider API keys.
+- Backend coverage verifies observer isolation, hidden-evidence rejection,
+  validation, role-reveal revision, idempotent replay, mock gameplay, and the
+  real MCP protocol path. The production frontend build verifies the live and
+  post-game views.
 
 ## FE-03: Branching replay
 
@@ -341,8 +365,8 @@ Initial acceptance criteria:
 
 ### Phase 1 — Deeper agent behavior
 
-1. **FE-07 Agent-authored private notes** — supplies structured belief data.
-2. **FE-02 Trust and suspicion system** — builds on private notes.
+1. **FE-07 Agent-authored private notes** — complete; supplies structured belief data.
+2. **FE-02 Trust and suspicion system** — complete; adds scored relationship state.
 3. **FE-01 Real werewolf negotiation** — adds cooperative agent planning.
 
 ### Phase 2 — Understand and compare decisions
@@ -384,7 +408,8 @@ Every enhancement should preserve these project invariants:
 
 ## Recommended next feature
 
-Start with **FE-07 Agent-authored private notes**, then build **FE-02 Trust and
-suspicion system** on top of it. Together they create structured, inspectable
-belief state that later powers negotiation, perspective viewing, deception
-analysis, branching comparisons, and model tournaments.
+With **FE-07 Agent-authored private notes** and **FE-02 Trust and suspicion
+system** complete, proceed to **FE-01 Real werewolf negotiation**. The two
+completed belief layers provide structured, inspectable context for coordinated
+planning and later power perspective viewing, deception analysis, branching
+comparisons, and model tournaments.

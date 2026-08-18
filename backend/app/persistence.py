@@ -245,6 +245,115 @@ async def get_note_events(
     return list(latest.values())
 
 
+BELIEF_EVENT_COLUMNS = [
+    "id", "game_id", "observer_seat_id", "subject_seat_id", "revision",
+    "suspicion", "confidence", "reason", "source_seq", "source_phase",
+    "source_round", "event_key", "created_at",
+]
+
+
+def _belief_event(row: tuple | None) -> dict | None:
+    if row is None:
+        return None
+    event = dict(zip(BELIEF_EVENT_COLUMNS, row))
+    created_at = event.get("created_at")
+    if created_at is not None:
+        event["created_at"] = str(created_at)
+    event["trust"] = 100 - int(event["suspicion"])
+    return event
+
+
+async def record_belief_event(
+    conn: aiosqlite.Connection,
+    *,
+    session_id: str,
+    observer_seat_id: str,
+    subject_seat_id: str,
+    revision: int,
+    suspicion: int,
+    confidence: int,
+    reason: str,
+    source_seq: int | None,
+    source_phase: str,
+    source_round: int,
+    event_key: str,
+) -> tuple[dict, bool]:
+    """Append one private belief revision, idempotent on ``event_key``."""
+    existing = await get_belief_event_by_key(conn, event_key)
+    if existing is not None:
+        return existing, False
+
+    await conn.execute(
+        """INSERT OR IGNORE INTO agent_belief_events
+           (game_id, observer_seat_id, subject_seat_id, revision, suspicion,
+            confidence, reason, source_seq, source_phase, source_round, event_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            session_id, observer_seat_id, subject_seat_id, revision, suspicion,
+            confidence, reason, source_seq, source_phase, source_round, event_key,
+        ),
+    )
+    await conn.commit()
+    inserted = await get_belief_event_by_key(conn, event_key)
+    if inserted is None:  # pragma: no cover - protects against a corrupt DB
+        raise RuntimeError("Belief event could not be persisted.")
+    return inserted, True
+
+
+async def get_belief_event_by_key(
+    conn: aiosqlite.Connection, event_key: str,
+) -> dict | None:
+    cursor = await conn.execute(
+        f"SELECT {', '.join(BELIEF_EVENT_COLUMNS)} FROM agent_belief_events WHERE event_key = ?",
+        (event_key,),
+    )
+    return _belief_event(await cursor.fetchone())
+
+
+async def get_latest_belief_event(
+    conn: aiosqlite.Connection,
+    session_id: str,
+    observer_seat_id: str,
+    subject_seat_id: str,
+) -> dict | None:
+    cursor = await conn.execute(
+        f"""SELECT {', '.join(BELIEF_EVENT_COLUMNS)} FROM agent_belief_events
+            WHERE game_id = ? AND observer_seat_id = ? AND subject_seat_id = ?
+            ORDER BY revision DESC LIMIT 1""",
+        (session_id, observer_seat_id, subject_seat_id),
+    )
+    return _belief_event(await cursor.fetchone())
+
+
+async def get_belief_events(
+    conn: aiosqlite.Connection,
+    session_id: str,
+    observer_seat_id: str | None = None,
+    *,
+    latest_only: bool = False,
+) -> list[dict]:
+    where = "WHERE game_id = ?"
+    params: list[object] = [session_id]
+    if observer_seat_id is not None:
+        where += " AND observer_seat_id = ?"
+        params.append(observer_seat_id)
+
+    cursor = await conn.execute(
+        f"""SELECT {', '.join(BELIEF_EVENT_COLUMNS)} FROM agent_belief_events
+            {where} ORDER BY id""",
+        params,
+    )
+    events = [_belief_event(row) for row in await cursor.fetchall()]
+    typed_events = [event for event in events if event is not None]
+    if not latest_only:
+        return typed_events
+
+    latest: dict[tuple[str, str], dict] = {}
+    for event in typed_events:
+        latest[(event["observer_seat_id"], event["subject_seat_id"])] = event
+    return list(latest.values())
+
+
 async def get_vote_history(conn: aiosqlite.Connection, session_id: str) -> list[dict]:
     cursor = await conn.execute(
         "SELECT round, seat_id, text FROM log_entries WHERE game_id = ? AND type = 'vote' ORDER BY seq",

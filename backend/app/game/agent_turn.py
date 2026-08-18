@@ -270,6 +270,25 @@ async def _run_mock_turn(
     test suite rather than only on paths that cost money."""
     start = time.monotonic()
     result, args = await _apply_fallback(orch, player, commit_tool_name, fallback)
+    tool_calls = [{"tool": commit_tool_name, "args": args, "result": result}]
+    target = args.get("target")
+    if target and target != player.name:
+        suspicion, confidence, reason = _mock_belief_update(
+            player, phase, commit_tool_name, target, result,
+        )
+        belief_args = {
+            "subject": target,
+            "suspicion": suspicion,
+            "confidence": confidence,
+            "reason": reason,
+            "source_seq": None,
+        }
+        belief_result = await actions.update_belief(
+            orch, player.seat_id, **belief_args,
+        )
+        tool_calls.append({
+            "tool": "update_belief", "args": belief_args, "result": belief_result,
+        })
     latency_ms = int((time.monotonic() - start) * 1000)
     raw_response = json.dumps(result)
     prompt = _describe_prompt(history)
@@ -277,12 +296,37 @@ async def _run_mock_turn(
         orch, player, phase=phase,
         prompt=prompt,
         raw_response=raw_response,
-        tool_calls=[{"tool": commit_tool_name, "args": args, "result": result}],
+        tool_calls=tool_calls,
         latency_ms=latency_ms,
         input_tokens=_estimate_tokens(prompt),
         output_tokens=_estimate_tokens(raw_response),
     )
     return result, [AIMessage(content=f"(mock) called {commit_tool_name} with {raw_response}")], args
+
+
+def _mock_belief_update(
+    player: "Player",
+    phase: str,
+    commit_tool_name: str,
+    target: str,
+    result: dict[str, Any],
+) -> tuple[int, int, str]:
+    """Give free/offline games visible belief evolution without pretending
+    the scripted mock is doing hidden model reasoning."""
+    if player.role == "seer" and result.get("role"):
+        is_werewolf = result["role"] == "werewolf"
+        return (
+            98 if is_werewolf else 4,
+            100,
+            f"My private investigation identified {target} as {result['role']}.",
+        )
+    if commit_tool_name == "submit_vote":
+        return 78, 72, f"I voted for {target}; they remain my strongest current suspect."
+    if player.role == "doctor" and commit_tool_name == "submit_night_action":
+        return 24, 42, f"I protected {target}, reflecting provisional trust rather than certainty."
+    if player.role == "werewolf" and commit_tool_name == "submit_night_action":
+        return 36, 30, f"I selected {target} as a strategic threat, not as a role conclusion."
+    return 56, 35, f"I am watching {target} after this {phase} exchange, but evidence is limited."
 
 
 async def _record_decision(

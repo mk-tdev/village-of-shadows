@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { fetchTimeline } from "@/lib/api";
-import type { LearningDebrief, Timeline } from "@/lib/types";
+import type { LearningDebrief, Timeline, TimelineSeat } from "@/lib/types";
+import { BeliefMatrix } from "./BeliefMatrix";
 
 type SummaryTab = "overview" | "learning" | "technical";
 
@@ -77,7 +78,11 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
           <SummaryOverview timeline={timeline} prediction={prediction} />
         ) : activeTab === "learning" ? (
           timeline.learning_debrief ? (
-            <LearningEvidence debrief={timeline.learning_debrief} prediction={prediction} />
+            <LearningEvidence
+              debrief={timeline.learning_debrief}
+              prediction={prediction}
+              people={timeline.seats}
+            />
           ) : (
             <p className="metrics-empty">No learning evidence was recorded for this game.</p>
           )
@@ -128,7 +133,7 @@ function SummaryOverview({ timeline, prediction }: { timeline: Timeline; predict
         <Stat label="Human turns" value={String(debrief?.human_interrupts.length ?? 0)} />
         <Stat label="Model tool calls" value={String(debrief?.tool_totals.all ?? 0)} />
         <Stat label="Private events" value={String(debrief?.partial_observability.private_events ?? 0)} />
-        <Stat label="Belief revisions" value={String(debrief?.note_evolution.length ?? 0)} />
+        <Stat label="Scored belief changes" value={String(debrief?.belief_evolution.length ?? 0)} />
         <Stat
           label="Wall clock"
           value={timeline.duration_ms != null ? `${(timeline.duration_ms / 1000).toFixed(2)}s` : "—"}
@@ -181,7 +186,15 @@ function SummaryOverview({ timeline, prediction }: { timeline: Timeline; predict
   );
 }
 
-function LearningEvidence({ debrief, prediction }: { debrief: LearningDebrief; prediction: string }) {
+function LearningEvidence({
+  debrief,
+  prediction,
+  people,
+}: {
+  debrief: LearningDebrief;
+  prediction: string;
+  people: TimelineSeat[];
+}) {
   const [showAllTools, setShowAllTools] = useState(false);
   const comparison = debrief.comparisons.find((item) => item.decisions.length > 1);
   const maxMemory = Math.max(...debrief.memories.map((item) => item.end_messages), 1);
@@ -274,6 +287,13 @@ function LearningEvidence({ debrief, prediction }: { debrief: LearningDebrief; p
               </div>
             ))}
           </div>
+        </Disclosure>
+
+        <Disclosure title="Trust and suspicion replay" meta={`${debrief.belief_evolution.length} scored revisions`}>
+          <p className="summary-prose">
+            Each score is private to its observer. The matrix shows final positions; the cards replay the evidence-backed changes in reverse order.
+          </p>
+          <BeliefMatrix people={people} events={debrief.belief_evolution} historyLimit={20} />
         </Disclosure>
 
         <Disclosure title="Private belief evolution" meta={`${debrief.note_evolution.length} revisions`}>

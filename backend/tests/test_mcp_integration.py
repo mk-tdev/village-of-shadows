@@ -60,9 +60,13 @@ async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
 
     session_id = str(uuid.uuid4())
     configs = [
-        AgentConfig(seat_id="seat_0", display_name="Mara", personality="sly", controller="ai", provider="mock", model_name="mock-v1")
+        AgentConfig(seat_id="seat_0", display_name="Mara", personality="sly", controller="ai", provider="mock", model_name="mock-v1"),
+        AgentConfig(seat_id="seat_1", display_name="Elin", personality="careful", controller="ai", provider="mock", model_name="mock-v1"),
     ]
-    players = [Player(seat_id="seat_0", name="Mara", personality="sly", controller="ai", role="villager")]
+    players = [
+        Player(seat_id="seat_0", name="Mara", personality="sly", controller="ai", role="villager"),
+        Player(seat_id="seat_1", name="Elin", personality="careful", controller="ai", role="villager"),
+    ]
     state = GameState(session_id=session_id, players=players, phase="day-discuss")
     await persistence.create_game(conn, session_id, configs)
     orch = GameOrchestrator(session_id, state, conn, graph)
@@ -94,6 +98,8 @@ async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
                 assert "submit_statement" in tool_names
                 assert "record_private_note" in tool_names
                 assert "get_my_note_history" in tool_names
+                assert "update_belief" in tool_names
+                assert "get_my_beliefs" in tool_names
 
                 bind_result = await session.call_tool("bind_seat", {"token": token})
                 assert _parse_result(bind_result) == {"ok": True, "game_id": session_id, "seat_id": "seat_0"}
@@ -117,6 +123,23 @@ async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
                 history = history_payload.get("result", history_payload)
                 assert history == [note]
                 assert note["seat_id"] == "seat_0"
+
+                belief_result = await session.call_tool(
+                    "update_belief",
+                    {
+                        "subject": "Elin",
+                        "suspicion": 62,
+                        "confidence": 51,
+                        "reason": "Elin's silence deserves attention.",
+                        "source_seq": 0,
+                    },
+                )
+                belief = _parse_result(belief_result)["belief"]
+                beliefs_payload = _parse_result(await session.call_tool("get_my_beliefs", {}))
+                beliefs = beliefs_payload.get("result", beliefs_payload)
+                assert beliefs == [belief]
+                assert belief["observer_seat_id"] == "seat_0"
+                assert belief["subject_seat_id"] == "seat_1"
 
     assert state.log[-1].text == "Hello, village."
     assert state.log[-1].seat_id == "seat_0"
