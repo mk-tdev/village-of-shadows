@@ -1,8 +1,8 @@
-# Village of Shadows — Project Brief
+# Village of Shadows - Project Brief
 
 **Track:** Boundless Agents  
-**Selected topic:** Topic 4 — AI + Education  
-**Project name:** Village of Shadows: Learning Agentic AI from Inside a Multi-Agent World
+**Selected topic:** Topic 4 - AI + Education
+**Work title:** Village of Shadows: Learning Agentic AI from Inside a Multi-Agent World
 
 **Target users**  
 Software developers, university students, AI educators, technical bootcamps, and teams learning how to design reliable agentic systems.
@@ -13,7 +13,7 @@ Most agentic-AI learning examples are chatbots, research assistants, or fixed re
 **Solution**  
 Village of Shadows turns the social-deduction game Werewolf into an experiential learning laboratory. Six independent AI agents and one human player inhabit the same seven-player game. Every AI seat can use a different LLM and personality, receives a secret role, sees only role-authorized information, remembers previous rounds, discusses and reasons about other players, and acts through validated tools. LangGraph governs the world—night actions, discussion, voting, resolution, state transitions, and genuine suspension when the human must act—without scripting whom an agent trusts, accuses, protects, investigates, deceives, or eliminates.
 
-The learning loop is **configure, predict, participate, observe, debrief, and compare**. Learners record a prediction, configure agents, play inside the system, and use God Mode to compare dialogue with each model’s stated rationale, tools, private context, memory, and decisions. After the winner is declared, a Learning Debrief reconstructs evidence from checkpoints, logs, and decision records. It shows human suspension, public and role-private information, accepted or rejected tools, memory growth, and different decisions within the same public round. It then maps evidence to agentic-AI concepts and proposes a controlled replay experiment.
+The learning loop is **configure, predict, participate, observe, debrief, and compare**. Learners record a prediction, configure agents, play inside the system, and use God Mode to inspect orchestration, private context, memory, stated rationale, tool calls, and decisions. After the winner is declared, a Learning Debrief reconstructs evidence from checkpoints, logs, and decision records. It identifies where human-in-the-loop suspension occurred, how public and role-private information shaped behavior, which tool actions were accepted or rejected, how memory grew, and how agents made different decisions within the same public round. It then maps evidence to agentic-AI concepts and proposes a controlled replay experiment.
 
 **Innovation**  
 The human is not an external supervisor; the human is a stateful participant whose actions pass through the same rule-validation boundary as AI actions. Competing objectives and incomplete information produce emergent dialogue rather than a predefined workflow. This makes abstract engineering concepts visible, memorable, and testable while preserving a complete task loop from role assignment to a validated winner and reviewable trace.
