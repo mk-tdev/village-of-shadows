@@ -245,7 +245,7 @@ export default function LandingPage() {
       <footer className="landing-footer">
         <Link className="landing-mark" href="/"><span><MoonIcon /></span><strong>VILLAGE OF SHADOWS</strong></Link>
         <p>An open multi-agent learning experience built with LangGraph and MCP.</p>
-        <div><Link href="/how-to-play">How to play</Link><Link href="/setup">Configure agents</Link></div>
+        <div><Link href="/how-to-play">How to play</Link><Link href="/setup">Configure agents</Link><Link href="/connect">Connect</Link></div>
       </footer>
     </main>
   );

@@ -10,6 +10,7 @@ The frontend is a Next.js 16 application for the Village of Shadows multi-agent 
 | `/setup` | Human-seat, provider, model, and personality configuration with model readiness checks |
 | `/game/[sessionId]` | Live game, 3D village, human controls, God Mode, LangGraph diagrams, and Learning Debrief |
 | `/how-to-play` | Rules, architecture overview, provider requirements, and suggested models |
+| `/connect` | Full-screen presentation finale with the GitHub QR code and creator links |
 
 ## Development
 
