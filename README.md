@@ -9,6 +9,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?style=flat-square)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
 [![Tests](https://img.shields.io/badge/backend%20tests-35%20passing-2e7d32?style=flat-square)](#testing)
+[![Built with Codex](https://img.shields.io/badge/Built%20with-Codex-111827?style=flat-square&logo=openai&logoColor=white)](https://openai.com/codex/)
 
 <img src="assets/youtube-thumbnail-1280x720.jpg" alt="Village of Shadows — six AI agents versus one human" width="100%" />
 
@@ -19,6 +20,8 @@
 LangGraph controls the rules of the world—turn order, night actions, discussion, voting, resolution, pauses, and human interrupts—but it does not write the story. The agents decide whom to trust, accuse, protect, investigate, deceive, or eliminate.
 
 > This is an agentic-AI learning project built to explore something beyond another chatbot or fixed research workflow: multiple autonomous agents, incomplete information, competing objectives, persistent memory, validated tools, and a human genuinely participating inside the orchestration.
+
+> **Built with Codex.** Village of Shadows was designed and developed in collaboration with [OpenAI Codex](https://openai.com/codex/) across architecture exploration, implementation, debugging, visual iteration, testing, and technical documentation. Repository commits remain attributed to the human project owner, `mk-tdev`.
 
 The experience now begins at a cinematic, animated landing page that introduces the village and the agent architecture before the player configures the council. The flow is deliberately staged as **enter the world → configure the agents → sit inside the graph → inspect what happened**.
 
