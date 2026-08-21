@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Village of Shadows",
-  description: "A multi-agent game of Werewolf, played out in real time",
+  description: "Enter a living multi-agent game where six AI minds and one human player reason, remember, deceive, and decide.",
 };
 
 export default function RootLayout({

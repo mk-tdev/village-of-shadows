@@ -20,6 +20,8 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
 
 > This is an agentic-AI learning project built to explore something beyond another chatbot or fixed research workflow: multiple autonomous agents, incomplete information, competing objectives, persistent memory, validated tools, and a human genuinely participating inside the orchestration.
 
+The experience now begins at a cinematic, animated landing page that introduces the village and the agent architecture before the player configures the council. The flow is deliberately staged as **enter the world → configure the agents → sit inside the graph → inspect what happened**.
+
 ## ✨ What makes it different
 
 | Capability | What happens in the game |
@@ -36,6 +38,7 @@ LangGraph controls the rules of the world—turn order, night actions, discussio
 | **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth. |
 | **Closed-loop Learning Debrief** | Predict before play, then connect human interrupts, information boundaries, tool validation, memory growth, and divergent decisions to agentic-AI concepts. |
 | **Living cinematic village** | A full-body, identity-matched cast inhabits a moonlit 3D village, with automatic camera direction, speaker staging, voting trails, memorials, and phase-aware atmosphere. |
+| **Cinematic agentic landing** | An animated introduction presents the seven seats, shared LangGraph world, private agent minds, validated actions, and human participation before configuration begins. |
 
 ## 🕯️ Meet the village
 
@@ -144,12 +147,13 @@ OLLAMA_API_KEY=
 
 Open **http://localhost:4001**.
 
-1. Choose your human seat.
-2. Give the AI seats models and personalities.
-3. Click **Test Models & Start Game**.
-4. Review the per-seat readiness results.
-5. On the connected game page, click **Start Game** to begin from the first LangGraph node.
-6. When the game ends, open **Learning Debrief** to compare your prediction with evidence from the run.
+1. Enter the cinematic village from the landing page.
+2. Choose your human seat on `/setup`.
+3. Give the AI seats models and personalities.
+4. Click **Test Models & Start Game**.
+5. Review the per-seat readiness results.
+6. On the connected game page, click **Start Game** to begin from the first LangGraph node.
+7. When the game ends, open **Learning Debrief** to compare your prediction with evidence from the run.
 
 Stop both applications with:
 
@@ -213,12 +217,12 @@ backend/app/
 ├── adapters.py              # Provider-neutral LangChain model construction
 ├── model_preflight.py       # Real message + required tool-call readiness gate
 ├── game/                    # LangGraph nodes, orchestration, memory, views
-├── mcp_server.py            # MCP tools and connection-bound seat identity
+├── mcp_server/              # MCP tools and connection-bound seat identity
 ├── persistence.py           # SQLite game records and decisions
 └── routers/                 # REST, SSE, game lifecycle, graph inspection
 
 frontend/
-├── app/                     # Next.js setup, game, and How to Play pages
+├── app/                     # Cinematic landing, setup, game, and How to Play routes
 ├── components/              # Cinematic 3D village, player UI, feed, controls, debug views
 ├── lib/                     # API client, SSE reducer, models, portrait mapping
 └── public/                  # Character portraits, role artifacts, and scene art
@@ -259,11 +263,15 @@ The [Concept Guide](docs/concepts/README.md) explains the design and the failure
 11. A complete turn walkthrough
 12. Persistent per-seat agent memory
 13. LangGraph time travel and the post-game report
+14. Agent-authored private notes with immutable revision history
+15. Trust and suspicion as explicit, evidence-backed agent state
 
 Additional references:
 
+- [Three-minute Codex meetup demo guide](docs/codex-meetup-demo-guide.md)
 - [Original implementation plan](village-of-shadows-plan.md)
 - [Deployment and user-supplied-key plan](docs/deployment-plan.md)
+- [Planned feature enhancements](docs/feature-enhancements.md)
 - [`werewolf_game.html`](werewolf_game.html), the original single-file prototype
 
 ## ⚠️ Current limitations

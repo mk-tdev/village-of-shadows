@@ -206,7 +206,7 @@ export default function HowToPlayPage() {
       </div>
 
       <div style={{ marginTop: 22 }}>
-        <Link className="btn btn-secondary" href="/">
+        <Link className="btn btn-secondary" href="/setup">
           ← Back to setup
         </Link>
       </div>
