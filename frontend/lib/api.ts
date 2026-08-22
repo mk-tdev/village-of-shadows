@@ -3,6 +3,77 @@ import type { AgentConfig, GameState, GraphStructure, ModelPreflightResponse, Ti
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
+const BACKEND_WAKE_TIMEOUT_MS = 180_000;
+const HEALTH_REQUEST_TIMEOUT_MS = 12_000;
+const HEALTH_RETRY_DELAY_MS = 2_000;
+
+export type BackendWakeProgress = {
+  status: "checking" | "retrying" | "ready";
+  attempt: number;
+  elapsedMs: number;
+};
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Render's free instances can be asleep when the first visitor arrives. Keep
+ * the setup page in a visible wake-up phase until the real backend confirms
+ * that its full FastAPI lifespan has completed and /health returns {ok:true}.
+ */
+export async function waitForBackend(
+  onProgress?: (progress: BackendWakeProgress) => void
+): Promise<{ attempts: number; elapsedMs: number }> {
+  const startedAt = Date.now();
+  let attempt = 0;
+
+  while (Date.now() - startedAt < BACKEND_WAKE_TIMEOUT_MS) {
+    attempt += 1;
+    const report = (status: BackendWakeProgress["status"]) =>
+      onProgress?.({ status, attempt, elapsedMs: Date.now() - startedAt });
+
+    report("checking");
+    const heartbeat = setInterval(() => report("checking"), 1_000);
+    const controller = new AbortController();
+    const remainingMs = BACKEND_WAKE_TIMEOUT_MS - (Date.now() - startedAt);
+    const requestTimeout = setTimeout(
+      () => controller.abort(),
+      Math.min(HEALTH_REQUEST_TIMEOUT_MS, Math.max(1, remainingMs))
+    );
+
+    try {
+      const res = await fetch(`${API_BASE}/health`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
+      });
+      const payload = res.ok ? await res.json().catch(() => null) : null;
+      if (res.ok && payload?.ok === true) {
+        const elapsedMs = Date.now() - startedAt;
+        onProgress?.({ status: "ready", attempt, elapsedMs });
+        return { attempts: attempt, elapsedMs };
+      }
+    } catch {
+      // A sleeping Render instance commonly drops or times out the first
+      // request. Retrying is the intended recovery path.
+    } finally {
+      clearInterval(heartbeat);
+      clearTimeout(requestTimeout);
+    }
+
+    report("retrying");
+    const remainingAfterAttempt = BACKEND_WAKE_TIMEOUT_MS - (Date.now() - startedAt);
+    if (remainingAfterAttempt > 0) {
+      await delay(Math.min(HEALTH_RETRY_DELAY_MS, remainingAfterAttempt));
+    }
+  }
+
+  throw new Error(
+    "The game server did not wake within 3 minutes. Render may still be restarting; wait a moment and try again."
+  );
+}
+
 export async function createGame(configs: AgentConfig[]): Promise<{ session_id: string }> {
   const res = await fetch(`${API_BASE}/games`, {
     method: "POST",

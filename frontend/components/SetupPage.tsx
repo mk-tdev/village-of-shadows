@@ -3,19 +3,48 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createGame, preflightModels } from "@/lib/api";
+import { createGame, preflightModels, waitForBackend } from "@/lib/api";
+import type { BackendWakeProgress } from "@/lib/api";
 import { defaultSeats, PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
 import { SeatRow } from "@/components/SeatRow";
 import { Select } from "@/components/Select";
 import { Combobox } from "@/components/Combobox";
 import type { AgentConfig, ModelPreflightResult, Provider } from "@/lib/types";
 
+type StartPhase = "idle" | "waking" | "checking" | "creating";
+type ProgressState = "pending" | "active" | "complete" | "failed";
+
+function LaunchStep({
+  number,
+  title,
+  detail,
+  state,
+}: {
+  number: string;
+  title: string;
+  detail: string;
+  state: ProgressState;
+}) {
+  return (
+    <li className={`launch-step ${state}`}>
+      <span className="launch-step-mark" aria-hidden="true">
+        {state === "complete" ? "✓" : state === "failed" ? "×" : number}
+      </span>
+      <span>
+        <strong>{title}</strong>
+        <small>{detail}</small>
+      </span>
+    </li>
+  );
+}
+
 export default function SetupPage() {
   const router = useRouter();
   const [humanIndex, setHumanIndex] = useState(0);
   const [seats, setSeats] = useState<AgentConfig[]>(() => defaultSeats(0));
-  const [starting, setStarting] = useState(false);
-  const [checking, setChecking] = useState(false);
+  const [startPhase, setStartPhase] = useState<StartPhase>("idle");
+  const [failedPhase, setFailedPhase] = useState<Exclude<StartPhase, "idle"> | null>(null);
+  const [wakeProgress, setWakeProgress] = useState<BackendWakeProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preflightResults, setPreflightResults] = useState<ModelPreflightResult[]>([]);
   const [prediction, setPrediction] = useState("");
@@ -33,8 +62,36 @@ export default function SetupPage() {
   }, [seats]);
 
   const canStart = !duplicateNames && seats.every((s) => s.display_name.trim().length > 0);
+  const starting = startPhase !== "idle";
+
+  const wakeStepState: ProgressState = failedPhase === "waking"
+    ? "failed"
+    : wakeProgress?.status === "ready"
+      ? "complete"
+      : startPhase === "waking"
+        ? "active"
+        : "pending";
+  const modelStepState: ProgressState = failedPhase === "checking" || preflightResults.some((result) => !result.ok)
+    ? "failed"
+    : preflightResults.length > 0 && preflightResults.every((result) => result.ok)
+      ? "complete"
+      : startPhase === "checking"
+        ? "active"
+        : "pending";
+  const createStepState: ProgressState = failedPhase === "creating"
+    ? "failed"
+    : startPhase === "creating"
+      ? "active"
+      : "pending";
+
+  function clearLaunchFeedback() {
+    if (starting) return;
+    setFailedPhase(null);
+    setWakeProgress(null);
+  }
 
   function updateHumanIndex(index: number) {
+    clearLaunchFeedback();
     setPreflightResults([]);
     setError(null);
     setHumanIndex(index);
@@ -49,12 +106,14 @@ export default function SetupPage() {
   }
 
   function updateSeat(index: number, next: AgentConfig) {
+    clearLaunchFeedback();
     setPreflightResults([]);
     setError(null);
     setSeats((prev) => prev.map((s, i) => (i === index ? next : s)));
   }
 
   function applyMasterToAllAiSeats(provider: Provider, modelName: string) {
+    clearLaunchFeedback();
     setPreflightResults([]);
     setError(null);
     setSeats((prev) =>
@@ -86,17 +145,25 @@ export default function SetupPage() {
 
   async function handleStart() {
     setError(null);
-    setStarting(true);
-    setChecking(true);
+    setPreflightResults([]);
+    setFailedPhase(null);
+    setWakeProgress({ status: "checking", attempt: 1, elapsedMs: 0 });
+    setStartPhase("waking");
+    let activePhase: Exclude<StartPhase, "idle"> = "waking";
     try {
+      await waitForBackend(setWakeProgress);
+      activePhase = "checking";
+      setStartPhase("checking");
       const preflight = await preflightModels(seats);
       setPreflightResults(preflight.results);
-      setChecking(false);
       if (!preflight.ok) {
         setError("One or more AI seats failed the readiness check. Fix them before starting.");
-        setStarting(false);
+        setFailedPhase("checking");
+        setStartPhase("idle");
         return;
       }
+      activePhase = "creating";
+      setStartPhase("creating");
       const { session_id } = await createGame(seats);
       try {
         window.localStorage.setItem(
@@ -110,8 +177,8 @@ export default function SetupPage() {
       router.push(`/game/${session_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start game");
-      setChecking(false);
-      setStarting(false);
+      setFailedPhase(activePhase);
+      setStartPhase("idle");
     }
   }
 
@@ -198,6 +265,58 @@ export default function SetupPage() {
           </p>
         )}
 
+        {wakeProgress && (
+          <section className="launch-progress" aria-live="polite" aria-busy={starting}>
+            <div className="launch-progress-heading">
+              <div>
+                <span className="launch-progress-kicker">LAUNCH SEQUENCE</span>
+                <h2>Preparing the village</h2>
+              </div>
+              {startPhase === "waking" && (
+                <span className="launch-elapsed">
+                  {Math.max(0, Math.floor(wakeProgress.elapsedMs / 1000))}s elapsed
+                </span>
+              )}
+            </div>
+
+            <ol className="launch-steps">
+              <LaunchStep
+                number="1"
+                title="Wake the game server"
+                detail={wakeStepState === "complete" ? "Render is online and healthy." : "Wait for the FastAPI service to become ready."}
+                state={wakeStepState}
+              />
+              <LaunchStep
+                number="2"
+                title="Test every AI model"
+                detail="Each configured model must answer and call a validation tool."
+                state={modelStepState}
+              />
+              <LaunchStep
+                number="3"
+                title="Create the village"
+                detail="Save the seven seats, then open the connected game."
+                state={createStepState}
+              />
+            </ol>
+
+            {startPhase === "waking" && (
+              <div className="server-wake-note">
+                <span className="server-wake-orb" aria-hidden="true" />
+                <span>
+                  <strong>
+                    {wakeProgress.status === "retrying" ? "The server is still waking up." : "Contacting the sleeping server..."}
+                  </strong>
+                  <small>
+                    Render&apos;s free service may take a minute or more on the first visit. Retrying automatically
+                    {wakeProgress.attempt > 1 ? ` · attempt ${wakeProgress.attempt}` : ""}.
+                  </small>
+                </span>
+              </div>
+            )}
+          </section>
+        )}
+
         {preflightResults.length > 0 && (
           <div className="preflight-panel" aria-live="polite">
             <div className="preflight-title">AI model readiness</div>
@@ -219,7 +338,13 @@ export default function SetupPage() {
           disabled={!canStart || starting}
           onClick={handleStart}
         >
-          {checking ? "Checking every AI model..." : starting ? "Creating village..." : "Test Models & Start Game"}
+          {startPhase === "waking"
+            ? "Waking game server..."
+            : startPhase === "checking"
+              ? "Checking every AI model..."
+              : startPhase === "creating"
+                ? "Creating village..."
+                : "Test Models & Start Game"}
         </button>
       </div>
     </div>
