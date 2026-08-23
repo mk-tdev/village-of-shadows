@@ -9,9 +9,10 @@ const ROLES = [
     Icon: WolfIcon,
     count: "2 seats",
     body:
-      "Each night, secretly propose a villager to attack (you can't target your fellow werewolf). " +
-      "The two werewolves' proposals are tallied together, and whoever gets the most votes is the target " +
-      "for the night. During the day, blend in — never reveal that you or your teammate are werewolves.",
+      "Each night, enter a private council with your fellow werewolf. Both wolves make an opening " +
+      "proposal and may revise it after hearing the other. Agreement becomes the attack; if the bounded " +
+      "council ends in disagreement, the earliest living wolf acts as pack leader. During the day, blend " +
+      "in — never reveal that you or your teammate are werewolves.",
   },
   {
     role: "seer",
@@ -52,7 +53,7 @@ export default function HowToPlayPage() {
       <header style={{ marginBottom: 22 }}>
         <h1 className="village-title">How to Play</h1>
         <div className="subtitle">
-          What Village of Shadows is, who the four roles are, and how to configure and run a game.
+          Enter the council, configure its minds, and learn from every decision the world produces.
         </div>
       </header>
 
@@ -73,7 +74,7 @@ export default function HowToPlayPage() {
       </div>
 
       <div className="setup-card" style={{ marginBottom: 20 }}>
-        <h2 className="howto-heading">The four roles</h2>
+        <h2 className="howto-heading">The standard roles</h2>
         <p className="howto-p">
           Roles are dealt at random the moment you click <strong>Start Game</strong> — nobody, including you,
           picks or knows their role in advance. A 7-seat game always deals the same deck: 2 werewolves, 1 seer,
@@ -98,11 +99,25 @@ export default function HowToPlayPage() {
       </div>
 
       <div className="setup-card" style={{ marginBottom: 20 }}>
+        <h2 className="howto-heading">The expanded role pack</h2>
+        <p className="howto-p">
+          Enable <strong>Expanded roles</strong> under World rules to replace the three ordinary villagers
+          with roles whose behavior is enforced by the server, not merely suggested in a prompt.
+        </p>
+        <ul className="howto-list">
+          <li><strong>Hunter.</strong> When killed at night or by vote, chooses one living player to take down before the graph continues.</li>
+          <li><strong>Mayor.</strong> Participates normally, but every validated village vote counts twice.</li>
+          <li><strong>Jester.</strong> Has an independent objective and wins instantly if the village votes them out.</li>
+        </ul>
+      </div>
+
+      <div className="setup-card" style={{ marginBottom: 20 }}>
         <h2 className="howto-heading">How a round plays out</h2>
         <ol className="howto-list">
           <li>
-            <strong>Night.</strong> Each werewolf, then the doctor, then the seer takes a private turn in that
-            order — attack proposal, protection, investigation. Nobody else sees what happened until dawn.
+            <strong>Night.</strong> The living werewolves first conduct a bounded private negotiation, with an
+            opening proposal and one possible revision each. The graph deterministically resolves their final
+            target, then the doctor protects and the seer investigates. Nobody else sees what happened until dawn.
           </li>
           <li>
             <strong>Resolution.</strong> If the werewolves’ target wasn’t protected by the doctor, that player
@@ -119,7 +134,7 @@ export default function HowToPlayPage() {
           <li>
             <strong>Win check, after every death.</strong> Villagers win the instant every werewolf is dead.
             Werewolves win the instant they equal or outnumber everyone left alive. Otherwise, night falls
-            again and the round repeats.
+            again and the round repeats. In the expanded pack, the Jester wins immediately when voted out.
           </li>
         </ol>
       </div>
@@ -128,9 +143,9 @@ export default function HowToPlayPage() {
         <h2 className="howto-heading">Configuring a game</h2>
         <ul className="howto-list">
           <li>
-            <strong>Which seat do you want to play?</strong> Pick exactly one seat to be your own — it’s
-            highlighted with a <span className="controller-badge you">YOU</span> badge in the seat list below
-            it. Every other seat is played by an AI.
+            <strong>Who is human?</strong> Pick your own host seat and optionally mark more seats as human.
+            The setup creates private, revocable join links; each browser is cryptographically bound to one
+            seat and receives only that character’s permitted state.
           </li>
           <li>
             <strong>Name</strong> is just what everyone calls that seat in the transcript and log.
@@ -151,7 +166,28 @@ export default function HowToPlayPage() {
             You can mix and match freely — a game can have several different real providers and models seated
             at once, alongside mock seats, all playing the same game together.
           </li>
+          <li>
+            Open <strong>Agent laboratory</strong> on any AI seat to tune risk, honesty, aggressiveness,
+            reasoning depth, memory and tool strategy, token limits, timeout, retry, and fallback behavior.
+            Presets can be saved, duplicated, exported, and re-used; the immutable base role and safety prompt remains in control.
+          </li>
+          <li>
+            <strong>World rules</strong> enable expanded roles, deterministic village events, opt-in cross-game
+            relationships, a room name, and a server-enforced total token ceiling.
+          </li>
         </ul>
+      </div>
+
+      <div className="setup-card" style={{ marginBottom: 20 }}>
+        <h2 className="howto-heading">Optional village events</h2>
+        <p className="howto-p">One server-selected event can alter each day without bypassing ordinary action validation:</p>
+        <ul className="howto-list">
+          <li><strong>Silence</strong> skips exactly one speaker for that discussion.</li>
+          <li><strong>Secret ballot</strong> hides individual votes until the sealed tally opens.</li>
+          <li><strong>Forced testimony</strong> changes who must speak first.</li>
+          <li><strong>Discovered evidence</strong> adds an ambiguous public clue for every mind to interpret.</li>
+        </ul>
+        <p className="howto-p">Selection is deterministic under checkpoint replay, so a branch begins from the same world before your changed decision alters it.</p>
       </div>
 
       <div className="setup-card" style={{ marginBottom: 20 }}>
@@ -198,10 +234,43 @@ export default function HowToPlayPage() {
             where it left off, whenever you want.
           </li>
           <li>
+            <strong>Voice Council</strong> is an explicit opt-in. Choose lifelike neural narration or a
+            no-cost device voice, select ceremonial, measured, or urgent pacing, and mute, skip, or replay.
+            Neural speech is AI-generated; visible persisted captions remain authoritative.
+          </li>
+          <li>
             Scroll down for the <strong>Agent Engineering Debug</strong> panel — drag to pan and scroll to zoom
             the live orchestration graph, and watch the activity feed for exactly when each agent’s turn
             starts, when it opens an MCP session, which tools it calls, and when it commits its decision.
           </li>
+        </ul>
+      </div>
+
+      <div className="setup-card" style={{ marginTop: 20 }}>
+        <h2 className="howto-heading">After the village falls silent</h2>
+        <ul className="howto-list">
+          <li><strong>Perspective</strong> reconstructs exactly what one agent knew, believed, remembered, and could legally do at a chosen event.</li>
+          <li><strong>Deception report</strong> separates persisted facts from interpretation, then follows claims, suspicion shifts, vote pivots, and ignored clues.</li>
+          <li><strong>Branch replay</strong> restores a human interrupt from a real LangGraph checkpoint, replaces one answer, and continues as a new immutable game.</li>
+          <li><strong>Share replay</strong> publishes a sealed read-only snapshot. Public links exclude private actions; God Mode links require an extra secret and can expire or be revoked.</li>
+          <li><Link href="/tournament"><strong>Model tournament</strong></Link> rotates roles across autonomous games and compares wins, deception, voting, survival, latency, tokens, and estimated spend.</li>
+          <li><Link href="/relationships"><strong>Relationship archive</strong></Link> lets you inspect, edit, or erase opt-in memories between recurring personas. Previous secret roles are never carried forward.</li>
+        </ul>
+      </div>
+
+      <div className="setup-card" style={{ marginTop: 20 }}>
+        <h2 className="howto-heading">Comprehensive feature guides</h2>
+        <p className="howto-p">
+          The repository includes player-facing guides for every shipped enhancement, including where to find
+          it, how to operate it, what its signals mean, controlled experiments to try, and conclusions the
+          evidence does not support.
+        </p>
+        <ul className="howto-list">
+          <li><a href="https://github.com/mk-tdev/village-of-shadows/blob/main/docs/player-guides/01-play-the-live-council.md">Play the live council</a> — negotiation, beliefs, notes, multiple humans, voices, and events.</li>
+          <li><a href="https://github.com/mk-tdev/village-of-shadows/blob/main/docs/player-guides/02-configure-the-experiment.md">Configure the experiment</a> — roles, Agent Laboratory, relationships, and resilience.</li>
+          <li><a href="https://github.com/mk-tdev/village-of-shadows/blob/main/docs/player-guides/03-use-the-post-game-laboratory.md">Use the post-game laboratory</a> — Perspective, deception, branches, and replays.</li>
+          <li><a href="https://github.com/mk-tdev/village-of-shadows/blob/main/docs/player-guides/04-run-model-tournaments.md">Run model tournaments</a> — fair setup, metrics, costs, and analytical pitfalls.</li>
+          <li><a href="https://github.com/mk-tdev/village-of-shadows/blob/main/docs/player-guides/05-read-the-observability-panels.md">Read observability correctly</a> — graph nodes, context, memory, tools, validation, and God Mode.</li>
         </ul>
       </div>
 

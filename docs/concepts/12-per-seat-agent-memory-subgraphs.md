@@ -202,7 +202,7 @@ if orch.seat_mind is not None:
         if player.controller == "ai":
             await remember(orch, player.seat_id, text)
 ```
-([nodes.py:534-541](../../backend/app/game/nodes.py#L534-L541))
+([nodes.py:748-751](../../backend/app/game/nodes.py#L748-L751))
 
 `remember` appends straight into a seat's conversation with `aupdate_state` and
 **no model invocation**
@@ -244,7 +244,7 @@ identical stamp:
 def _turn_stamp(game: GameState, phase: str, index: int) -> str:
     return f"{game.round}:{phase}:{index}"
 ```
-([nodes.py:76-83](../../backend/app/game/nodes.py#L76-L83))
+([nodes.py:84-90](../../backend/app/game/nodes.py#L84-L90))
 
 and the mind's first node compares it against the last one it saw:
 

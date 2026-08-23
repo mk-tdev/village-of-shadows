@@ -6,9 +6,23 @@ function SpeakerPortrait({ entry }: { entry: LogEntry }) {
   return <CharacterPortrait seatId={entry.seat_id} name={entry.name} variant="feed" />;
 }
 
-export function FeedEntry({ entry, godView }: { entry: LogEntry; godView: boolean }) {
+export function FeedEntry({
+  entry,
+  godView,
+  canSeeWerewolfCouncil,
+}: {
+  entry: LogEntry;
+  godView: boolean;
+  canSeeWerewolfCouncil: boolean;
+}) {
   if (entry.type === "system") {
     return <div className="entry entry-system">{entry.text}</div>;
+  }
+  if (entry.type === "village_event") {
+    return <div className="entry entry-village-event"><span>ROUND EVENT</span>{entry.text}</div>;
+  }
+  if (entry.type === "hunter") {
+    return <div className="entry entry-death entry-hunter">⚔ {entry.text}</div>;
   }
   if (entry.type === "death") {
     return <div className="entry entry-death">{entry.text}</div>;
@@ -29,6 +43,7 @@ export function FeedEntry({ entry, godView }: { entry: LogEntry; godView: boolea
     );
   }
   if (entry.type === "vote") {
+    if (entry.private && !godView) return null;
     return (
       <div className="entry entry-statement">
         <SpeakerPortrait entry={entry} />
@@ -38,6 +53,23 @@ export function FeedEntry({ entry, godView }: { entry: LogEntry; godView: boolea
           <div className="entry-vote">
             {entry.name} votes to eliminate <b>{entry.target}</b>
           </div>
+        </div>
+      </div>
+    );
+  }
+  if (entry.type === "werewolf_negotiation") {
+    if (!godView && !canSeeWerewolfCouncil) return null;
+    return (
+      <div className="entry entry-statement private wolf-council-entry">
+        <SpeakerPortrait entry={entry} />
+        <div className="entry-body">
+          <div className="entry-name">
+            {entry.name ?? "The pack"} <span className="private-tag">wolf council</span>
+          </div>
+          <div className="entry-said">{entry.text}</div>
+          {entry.target && entry.seat_id && (
+            <div className="wolf-council-target">Proposes: {entry.target}</div>
+          )}
         </div>
       </div>
     );

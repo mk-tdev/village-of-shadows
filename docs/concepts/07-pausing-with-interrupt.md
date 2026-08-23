@@ -28,7 +28,7 @@ registry.register(orch)
 # Deliberately not orch.start() here -- see GameOrchestrator.started's
 # docstring.
 ```
-([routers/games.py:52-58](../../backend/app/routers/games.py#L52-L58))
+([routers/games.py:98-104](../../backend/app/routers/games.py#L98-L104))
 
 `create_game` builds and registers the orchestrator, but never calls
 `orch.start()`. If it did — which is what this project's first version
@@ -60,7 +60,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:63-78](../../backend/app/routers/games.py#L63-L78))
+([routers/games.py:130-146](../../backend/app/routers/games.py#L130-L146))
 
 `GameState.phase` starts at `"lobby"` and stays there until `begin_game`
 actually calls `orch.start()`. The frontend's game page already opens its
@@ -97,7 +97,7 @@ async def pause_game(session_id: str) -> dict:
     orch.request_pause()
     return {"ok": True}
 ```
-([games.py:114-125](../../backend/app/routers/games.py#L114-L125))
+([games.py:299-311](../../backend/app/routers/games.py#L299-L311))
 
 `POST /pause` doesn't stop anything immediately — it just sets a plain
 boolean on the orchestrator. Whatever seat's turn is currently mid-flight
@@ -239,9 +239,9 @@ shift and steal an answer meant for an earlier call.
 ```python
 """Pause-via-interrupt. Deliberately placed at the very end of a node,
 always *after* any human `interrupt()` call earlier in that same node body
-(e.g. night_wolves' human branch) -- never before it."""
+(e.g. werewolf_negotiation's human branch) -- never before it."""
 ```
-([nodes.py:148-151](../../backend/app/game/nodes.py#L148-L151))
+([nodes.py:157-159](../../backend/app/game/nodes.py#L157-L159))
 
 This was caught by careful reasoning about LangGraph's position-based
 resume matching *before* writing the code — and then confirmed with a

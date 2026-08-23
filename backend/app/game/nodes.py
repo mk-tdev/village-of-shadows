@@ -14,15 +14,23 @@ why this is the one rule that can't be relaxed here.
 from __future__ import annotations
 
 import random
+import hashlib
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
 from app import persistence
 from app.game import actions, registry
+from app.game.rules import (
+    WEREWOLF_NEGOTIATION_TOKEN_BUDGET,
+    expected_werewolf,
+    living_werewolves,
+    resolve_werewolf_target,
+    werewolf_turn_limit,
+)
 from app.game.seat_mind import remember, run_seat_turn
 from app.game.views import build_agent_view
-from app.models import GameState, Role
+from app.models import GameState, Role, VillageEventState
 
 
 class GraphState(dict):
@@ -148,7 +156,7 @@ def _briefing(game: GameState, seat, instruction: str) -> str:
 def _maybe_pause(orch, game: GameState) -> None:
     """Pause-via-interrupt. Deliberately placed at the very end of a node,
     always *after* any human `interrupt()` call earlier in that same node
-    body (e.g. night_wolves' human branch) -- never before it.
+    body (e.g. werewolf_negotiation's human branch) -- never before it.
 
     Why the ordering matters: LangGraph matches a resumed value to an
     `interrupt()` call by its position within the node, counted fresh from
@@ -186,13 +194,21 @@ async def _log_death(orch, *, seat_id: str, name: str, text: str) -> None:
     await _log(orch, type_="death", seat_id=seat_id, target=name, text=text)
 
 
-async def _log(orch, *, type_: str, text: str, seat_id: str | None = None, target: str | None = None) -> None:
+async def _log(
+    orch,
+    *,
+    type_: str,
+    text: str,
+    seat_id: str | None = None,
+    target: str | None = None,
+    private: bool = False,
+) -> None:
     from app.models import LogEntry
 
     state = orch.state
     entry = LogEntry(
         seq=state.next_seq(), round=state.round, phase=state.phase, type=type_,
-        seat_id=seat_id, target=target, text=text,
+        seat_id=seat_id, target=target, text=text, private=private,
     )
     state.log.append(entry)
     await persistence.record_log_entry(orch.conn, orch.session_id, entry)
@@ -203,9 +219,15 @@ async def assign_roles(state: dict, config: RunnableConfig) -> dict:
     game: GameState = state["game"]
     orch = _sync(config, game)
 
-    roles: list[Role] = ["werewolf", "werewolf", "seer", "doctor", "villager", "villager", "villager"]
+    default_deck: list[Role] = (
+        ["werewolf", "werewolf", "seer", "doctor", "hunter", "mayor", "jester"]
+        if game.options.role_pack == "expanded"
+        else ["werewolf", "werewolf", "seer", "doctor", "villager", "villager", "villager"]
+    )
+    roles: list[Role] = game.role_deck or default_deck
     roles = roles[: len(game.players)]
-    random.shuffle(roles)
+    if game.role_deck is None:
+        random.shuffle(roles)
     for player, role in zip(game.players, roles):
         player.role = role
         await persistence.set_seat_role(orch.conn, orch.session_id, player.seat_id, role)
@@ -234,11 +256,15 @@ async def start_night(state: dict, config: RunnableConfig) -> dict:
     game.phase = "night"
     game.wolf_index = 0
     game.night_proposals = []
+    game.wolf_proposals = {}
+    game.wolf_negotiation_commits = {}
+    game.night_target = None
     game.night_saved = None
+    game.village_event = None
     # On the first night only, say what order the night runs in. Without it the
     # night looks like it skips around the table at random -- it doesn't, but
     # the reason isn't visible: night turns are dispatched by *role* (see
-    # night_wolves/night_doctor/night_seer below, which look their seat up by
+    # werewolf_negotiation/night_doctor/night_seer below, which look their seat up by
     # role and ignore seat position), while roles were dealt randomly in
     # assign_roles. So the 5th seat acting first is normal, and only makes
     # sense once you know the wolves go first. Repeating this every night would
@@ -259,40 +285,126 @@ async def start_night(state: dict, config: RunnableConfig) -> dict:
     return {"game": game}
 
 
-async def night_wolves(state: dict, config: RunnableConfig) -> dict:
+def _werewolf_negotiation_briefing(game: GameState, wolf, pool: list[str]) -> str:
+    channel = [
+        entry
+        for entry in game.log
+        if entry.round == game.round
+        and entry.type == "werewolf_negotiation"
+        and entry.seat_id is not None
+    ]
+    exchange = "\n".join(
+        f"  - {entry.name}: {entry.text} (currently favors {entry.target})"
+        for entry in channel
+    ) or "  - No one has spoken yet."
+    wolves = living_werewolves(game)
+    proposals = ", ".join(
+        f"{member.name} → {game.wolf_proposals.get(member.seat_id, 'undecided')}"
+        for member in wolves
+    )
+    return _briefing(
+        game,
+        wolf,
+        (
+            f"It is night {game.round}. You are speaking in the private werewolf council; only living "
+            "werewolves can hear this channel. Persuade your teammate and coordinate tomorrow's cover story.\n"
+            f"Private council so far:\n{exchange}\n"
+            f"Latest proposals: {proposals}.\n"
+            f"Legal targets: {', '.join(pool)}.\n"
+            f"This is council turn {game.wolf_index + 1} of {werewolf_turn_limit(game)}. You may revise "
+            f"your earlier target. Call `negotiate_message` with a private message, your target, and no "
+            f"more than approximately {WEREWOLF_NEGOTIATION_TOKEN_BUDGET} tokens of message text."
+        ),
+    )
+
+
+async def werewolf_negotiation(state: dict, config: RunnableConfig) -> dict:
     game: GameState = state["game"]
     orch = _sync(config, game)
-    wolves = [p for p in game.players if p.role == "werewolf" and p.alive]
+    wolves = living_werewolves(game)
 
-    if game.wolf_index >= len(wolves):
+    if game.wolf_index >= werewolf_turn_limit(game):
         return {"game": game}
 
-    wolf = wolves[game.wolf_index]
+    wolf = expected_werewolf(game)
+    if wolf is None:
+        return {"game": game}
     pool = [p.name for p in game.alive_players() if p.role != "werewolf"]
     if not pool:
-        game.wolf_index += 1
+        game.wolf_index = werewolf_turn_limit(game)
         return {"game": game}
 
     _emit_turn(orch, wolf.seat_id, wolf.name)
-    if wolf.controller == "human":
-        answer = interrupt(
-            {"kind": "night_action", "seat_id": wolf.seat_id, "prompt": "Choose which villager to attack.", "options": pool}
-        )
-        await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
+    if len(wolves) == 1:
+        if wolf.controller == "human":
+            answer = interrupt(
+                {"kind": "night_action", "seat_id": wolf.seat_id, "prompt": "Choose which villager to attack.", "options": pool}
+            )
+            await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
+        else:
+            await run_seat_turn(
+                orch, wolf, phase="night",
+                briefing=_briefing(game, wolf, (
+                    f"It is night {game.round}. You are the only living werewolf. Choose a villager to attack.\n"
+                    f"Options: {', '.join(pool)}\n"
+                    "Call `submit_night_action` with your chosen target."
+                )),
+                turn_stamp=_turn_stamp(game, "night-wolf-solo", game.wolf_index),
+                commit_tool="submit_night_action",
+                fallback={"pool": pool},
+            )
     else:
-        await run_seat_turn(
-            orch, wolf, phase="night",
-            briefing=_briefing(game, wolf, (
-                f"It is night {game.round}. Choose which villager the werewolves should attack tonight.\n"
-                f"Options: {', '.join(pool)}\n"
-                "Call `submit_night_action` with your chosen target."
-            )),
-            turn_stamp=_turn_stamp(game, "night-wolves", game.wolf_index),
-            commit_tool="submit_night_action",
-            fallback={"pool": pool},
-        )
+        if wolf.controller == "human":
+            answer = interrupt({
+                "kind": "werewolf_negotiation",
+                "seat_id": wolf.seat_id,
+                "prompt": "Privately persuade your fellow werewolf and propose tonight's target.",
+                "options": pool,
+                "turn_id": _turn_stamp(game, "werewolf-negotiation", game.wolf_index),
+            })
+            await actions.negotiate_message(
+                orch,
+                wolf.seat_id,
+                answer.get("text", "I favor this target."),
+                answer["target"],
+            )
+        else:
+            await run_seat_turn(
+                orch,
+                wolf,
+                phase="night-negotiation",
+                briefing=_werewolf_negotiation_briefing(game, wolf, pool),
+                turn_stamp=_turn_stamp(game, "werewolf-negotiation", game.wolf_index),
+                commit_tool="negotiate_message",
+                fallback={
+                    "pool": pool,
+                    "text": "I favor this target as the strongest threat; we should redirect suspicion tomorrow.",
+                },
+            )
     game.wolf_index += 1
     _emit_turn(orch, None, None)
+    _maybe_pause(orch, game)
+    return {"game": game}
+
+
+async def resolve_wolf_plan(state: dict, config: RunnableConfig) -> dict:
+    game: GameState = state["game"]
+    orch = _sync(config, game)
+    wolves = living_werewolves(game)
+
+    if len(wolves) > 1:
+        game.night_target, method = resolve_werewolf_target(game)
+        if game.night_target is not None:
+            await _log(
+                orch,
+                type_="werewolf_negotiation",
+                text=f"The pack commits to attacking {game.night_target} via {method}.",
+                target=game.night_target,
+                private=True,
+            )
+    elif game.night_target is None and game.night_proposals:
+        game.night_target = game.night_proposals[-1]
+
     _maybe_pause(orch, game)
     return {"game": game}
 
@@ -366,8 +478,8 @@ async def resolve_night(state: dict, config: RunnableConfig) -> dict:
     game: GameState = state["game"]
     orch = _sync(config, game)
 
-    victim_name = None
-    if game.night_proposals:
+    victim_name = game.night_target
+    if victim_name is None and game.night_proposals:
         tally: dict[str, int] = {}
         for name in game.night_proposals:
             tally[name] = tally.get(name, 0) + 1
@@ -381,6 +493,8 @@ async def resolve_night(state: dict, config: RunnableConfig) -> dict:
     elif victim_name:
         victim = game.find_by_name(victim_name)
         victim.alive = False
+        if victim.role == "hunter":
+            game.hunter_pending = victim.seat_id
         await _log_death(
             orch, seat_id=victim.seat_id, name=victim.name,
             text=f"Dawn breaks. The village finds {victim.name} dead. They were a {victim.role}.",
@@ -388,6 +502,44 @@ async def resolve_night(state: dict, config: RunnableConfig) -> dict:
     else:
         await _log_system(orch, "A quiet night. No one was harmed.")
 
+    _maybe_pause(orch, game)
+    return {"game": game}
+
+
+async def hunter_retaliation(state: dict, config: RunnableConfig) -> dict:
+    """The expanded deck's one-shot, server-validated death retaliation."""
+    game: GameState = state["game"]
+    orch = _sync(config, game)
+    if game.hunter_pending is None:
+        return {"game": game}
+    hunter = game.find_seat(game.hunter_pending)
+    pool = [player.name for player in game.alive_players()]
+    if not pool:
+        game.hunter_pending = None
+        return {"game": game}
+    _emit_turn(orch, hunter.seat_id, hunter.name)
+    if hunter.controller == "human":
+        answer = interrupt({
+            "kind": "hunter_action",
+            "seat_id": hunter.seat_id,
+            "prompt": "Your final shot: choose one living player to take with you.",
+            "options": pool,
+        })
+        await actions.hunter_retaliate(
+            orch, hunter.seat_id, answer["target"], answer.get("thought", ""),
+        )
+    else:
+        await run_seat_turn(
+            orch, hunter, phase="hunter-retaliation",
+            briefing=(
+                "You have been eliminated, but your Hunter role grants one final shot. "
+                f"Choose one living target: {', '.join(pool)}. Call `hunter_retaliate`."
+            ),
+            turn_stamp=_turn_stamp(game, "hunter-retaliation", game.next_seq()),
+            commit_tool="hunter_retaliate",
+            fallback={"pool": pool},
+        )
+    _emit_turn(orch, None, None)
     _maybe_pause(orch, game)
     return {"game": game}
 
@@ -402,16 +554,64 @@ async def start_day(state: dict, config: RunnableConfig) -> dict:
     return {"game": game}
 
 
+async def select_village_event(state: dict, config: RunnableConfig) -> dict:
+    """Choose one deterministic, bounded round modifier from server rules."""
+    game: GameState = state["game"]
+    orch = _sync(config, game)
+    if not game.options.village_events:
+        game.village_event = None
+        return {"game": game}
+
+    digest = hashlib.sha256(f"{game.session_id}:{game.round}:event".encode()).digest()
+    kinds = ["silence", "secret_vote", "forced_testimony", "discovered_evidence"]
+    kind = kinds[digest[0] % len(kinds)]
+    living = game.alive_players()
+    target = living[digest[1] % len(living)] if living else None
+    descriptions = {
+        "silence": f"A choking fog steals {target.name}'s voice for this council." if target else "A choking fog settles over the council.",
+        "secret_vote": "The ballot is sealed. Individual votes remain hidden until the village resolves them.",
+        "forced_testimony": f"The old bell names {target.name}. They must address the council first." if target else "The old bell demands testimony.",
+        "discovered_evidence": f"Fresh claw-marked tracks are discovered near {target.name}'s home. The clue may be genuine or planted." if target else "Ambiguous tracks are found at dawn.",
+    }
+    event = VillageEventState(
+        kind=kind,
+        round=game.round,
+        target_seat_id=target.seat_id if target else None,
+        description=descriptions[kind],
+    )
+    game.village_event = event
+    game.event_history.append(event)
+    await _log(orch, type_="village_event", text=event.description)
+    _maybe_pause(orch, game)
+    return {"game": game}
+
+
+def _discussion_order(game: GameState):
+    living = game.alive_players()
+    event = game.village_event
+    if event and event.kind == "forced_testimony" and event.target_seat_id:
+        living.sort(key=lambda player: player.seat_id != event.target_seat_id)
+    return living
+
+
 async def day_discussion(state: dict, config: RunnableConfig) -> dict:
     game: GameState = state["game"]
     orch = _sync(config, game)
-    alive = game.alive_players()
+    alive = _discussion_order(game)
 
     if game.day_index >= len(alive):
         return {"game": game}
 
     speaker = alive[game.day_index]
     _emit_turn(orch, speaker.seat_id, speaker.name)
+
+    event = game.village_event
+    if event and event.kind == "silence" and event.target_seat_id == speaker.seat_id:
+        await _log_system(orch, f"{speaker.name} is silenced by the round event and loses this speaking turn.")
+        game.day_index += 1
+        _emit_turn(orch, None, None)
+        _maybe_pause(orch, game)
+        return {"game": game}
 
     if speaker.controller == "human":
         answer = interrupt({"kind": "statement", "seat_id": speaker.seat_id, "prompt": "What do you want to say to the village?", "options": []})
@@ -485,11 +685,19 @@ async def resolve_vote(state: dict, config: RunnableConfig) -> dict:
         await _log_system(orch, "No votes were cast. The village remains as it was.")
         return {"game": game}
 
+    if game.village_event and game.village_event.kind == "secret_vote":
+        totals = ", ".join(f"{name}: {count}" for name, count in sorted(game.vote_tally.items()))
+        await _log_system(orch, f"The sealed ballot opens. Final tally — {totals}.")
+
     top = max(game.vote_tally.values())
     top_names = [n for n, c in game.vote_tally.items() if c == top]
     eliminated_name = random.choice(top_names)
     eliminated = game.find_by_name(eliminated_name)
     eliminated.alive = False
+    if eliminated.role == "hunter":
+        game.hunter_pending = eliminated.seat_id
+    if eliminated.role == "jester":
+        game.winner = "jester"
     await _log_death(
         orch, seat_id=eliminated.seat_id, name=eliminated.name,
         text=f"The village has spoken. {eliminated.name} is cast out — they were a {eliminated.role}.",
@@ -505,26 +713,28 @@ async def check_win(state: dict, config: RunnableConfig) -> dict:
     wolves = len([p for p in game.alive_players() if p.role == "werewolf"])
     others = len([p for p in game.alive_players() if p.role != "werewolf"])
 
-    winner = None
-    if wolves == 0:
+    winner = game.winner
+    if winner is None and wolves == 0:
         winner = "villagers"
-    elif wolves >= others:
+    elif winner is None and wolves >= others:
         winner = "werewolves"
 
     if winner:
         game.winner = winner
         game.phase = "gameover"
-        text = (
-            "The village has rooted out every werewolf. Villagers win!"
-            if winner == "villagers"
-            else "The werewolves have taken the village. Werewolves win!"
-        )
+        text = {
+            "villagers": "The village has rooted out every werewolf. Villagers win!",
+            "werewolves": "The werewolves have taken the village. Werewolves win!",
+            "jester": "The village cast out the Jester. Their impossible performance wins the game!",
+        }[winner]
         from app.models import LogEntry
 
         entry = LogEntry(seq=game.next_seq(), round=game.round, phase=game.phase, type="winner", text=text)
         game.log.append(entry)
         await persistence.record_log_entry(orch.conn, orch.session_id, entry)
         await persistence.finish_game(orch.conn, orch.session_id, winner)
+        from app.game.relationships import capture_game
+        await capture_game(orch.conn, game)
         orch.publish("log", entry.model_dump())
         orch.publish("game_over", {"winner": winner})
 
@@ -564,6 +774,25 @@ def _persona(player, game: GameState) -> str:
         ctx += " Each night you secretly learn one player's true role."
     elif player.role == "doctor":
         ctx += " Each night you may secretly protect one player (including yourself) from being killed."
+    elif player.role == "hunter":
+        ctx += " If you are eliminated, you receive one final server-validated shot at a living player."
+    elif player.role == "mayor":
+        ctx += " Your public vote counts twice; use that authority carefully."
+    elif player.role == "jester":
+        ctx += " You win only if the village votes you out. Encourage suspicion without explicitly revealing this role."
+    behavior = player.behavior
+    ctx += (
+        f" Experiment profile v{behavior.version}: risk {behavior.risk_tolerance}/100, "
+        f"honesty {behavior.honesty}/100, aggression {behavior.aggressiveness}/100, "
+        f"{behavior.reasoning_level} reasoning, {behavior.memory_strategy} memory, "
+        f"and {behavior.tool_strategy} tool use."
+    )
+    if behavior.system_prompt_addition:
+        ctx += f" Additional speaking direction: {behavior.system_prompt_addition}"
+    if player.cross_game_memories:
+        ctx += " Opt-in memories from earlier games (behaviour only; roles reset): " + " ".join(
+            memory.memory for memory in player.cross_game_memories[-6:]
+        )
     ctx += (
         " Maintain a concise private notebook when evidence changes. Use record_private_note for a new "
         "suspicion, clue, theory, lie, or alliance; cite the visible event seq when possible. Use "

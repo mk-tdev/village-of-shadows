@@ -7,14 +7,17 @@ export function PlayerCard({
   active,
   godView,
   knownRole,
+  viewerSeatId,
 }: {
   player: Player;
   active: boolean;
   godView: boolean;
   knownRole?: Role;
+  viewerSeatId?: string | null;
 }) {
+  const isYou = player.seat_id === viewerSeatId;
   const visibleRole =
-    player.controller === "human" || !player.alive || godView
+    isYou || !player.alive || godView
       ? player.role
       : knownRole;
 
@@ -30,13 +33,14 @@ export function PlayerCard({
       <div className="p-info">
         <div className="p-name">
           {player.name}
-          {player.controller === "human" && <span className="you-tag">YOU</span>}
+          {isYou && <span className="you-tag">YOU</span>}
+          {!isYou && player.controller === "human" && <span className="human-tag">HUMAN</span>}
         </div>
         <div className="p-meta">
           {!player.alive ? (
             <SkullIcon className="skull" />
           ) : (
-            <span>{player.controller === "human" ? "you" : player.personality}</span>
+            <span>{isYou ? "you" : player.controller === "human" ? "human player" : player.personality}</span>
           )}
           {visibleRole && (
             <span className={`role-chip role-${visibleRole}`}>{visibleRole}</span>

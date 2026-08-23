@@ -8,6 +8,7 @@ import type {
   BeliefEvent,
   DecisionEvent,
   GameState,
+  GameAccessCredentials,
   InputAcceptedEvent,
   LogEntry,
   McpEvent,
@@ -17,6 +18,7 @@ import type {
   PrivateNoteEvent,
   SeatMetrics,
   SeerResultEvent,
+  ResilienceEvent,
   TurnEvent,
 } from "./types";
 
@@ -56,7 +58,7 @@ const MAX_ACTIVITY_ENTRIES = 60;
  * accumulated from "decision" events, and a rolling live-activity feed built
  * from "node"/"turn"/"mcp"/"decision" events together -- see routers/graph.py
  * and agent_turn.py on the backend for where these originate. */
-export function useGameStream(sessionId: string): GameStreamState {
+export function useGameStream(sessionId: string, access?: GameAccessCredentials): GameStreamState {
   const [game, setGame] = useState<GameState | null>(null);
   const [active, setActive] = useState<TurnEvent | null>(null);
   const [connected, setConnected] = useState(false);
@@ -72,7 +74,7 @@ export function useGameStream(sessionId: string): GameStreamState {
   const activityIdRef = useRef(0);
 
   useEffect(() => {
-    const source = new EventSource(streamUrl(sessionId));
+    const source = new EventSource(streamUrl(sessionId, access));
 
     function pushActivity(kind: ActivityEntry["kind"], text: string) {
       activityIdRef.current += 1;
@@ -122,6 +124,11 @@ export function useGameStream(sessionId: string): GameStreamState {
         "belief",
         `${belief.observer_name} moved ${belief.subject_name} to ${belief.suspicion}/100 suspicion`
       );
+    });
+
+    source.addEventListener("resilience", (e) => {
+      const event: ResilienceEvent = JSON.parse((e as MessageEvent).data);
+      pushActivity("resilience", `${event.name}: ${event.message}`);
     });
 
     // Fired once, right after assign_roles runs (see nodes.py). The initial
@@ -376,7 +383,7 @@ export function useGameStream(sessionId: string): GameStreamState {
     source.onerror = () => setConnected(false);
 
     return () => source.close();
-  }, [sessionId]);
+  }, [sessionId, access]);
 
   return {
     game, active, connected, errorMessage, currentNode,

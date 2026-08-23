@@ -14,6 +14,12 @@ import hashlib
 from typing import TYPE_CHECKING, Any
 
 from app import persistence
+from app.game.rules import (
+    WEREWOLF_NEGOTIATION_CHAR_BUDGET,
+    WEREWOLF_NEGOTIATION_TOKEN_BUDGET,
+    expected_werewolf,
+    living_werewolves,
+)
 from app.models import LogEntry
 
 if TYPE_CHECKING:
@@ -71,6 +77,7 @@ async def apply_night_action(
         if target_name not in pool:
             raise ActionError(f"{target_name} is not a valid werewolf target.")
         state.night_proposals.append(target_name)
+        state.night_target = target_name
         await _append_log(
             orch, type_="werewolf", seat_id=seat_id, name=player.name,
             text=f"proposes attacking {target_name}.", thought=thought,
@@ -138,13 +145,39 @@ async def apply_vote(
     pool = [p.name for p in state.alive_players() if p.name != player.name]
     if target_name not in pool:
         raise ActionError(f"{target_name} is not a valid vote target.")
-    state.vote_tally[target_name] = state.vote_tally.get(target_name, 0) + 1
+    weight = 2 if player.role == "mayor" else 1
+    state.vote_tally[target_name] = state.vote_tally.get(target_name, 0) + weight
     await _append_log(
         orch, type_="vote", seat_id=seat_id, name=player.name,
-        text=f"votes to eliminate {target_name}.", thought=thought,
-        target=target_name, private=False,
+        text=(
+            f"casts the Mayor's two votes to eliminate {target_name}."
+            if weight == 2 else f"votes to eliminate {target_name}."
+        ), thought=thought,
+        target=target_name,
+        private=bool(state.village_event and state.village_event.kind == "secret_vote"),
     )
-    return {"ok": True, "target": target_name}
+    return {"ok": True, "target": target_name, "weight": weight}
+
+
+async def hunter_retaliate(
+    orch: "GameOrchestrator", seat_id: str, target_name: str, thought: str = "",
+) -> dict[str, Any]:
+    state = orch.state
+    hunter = state.find_seat(seat_id)
+    if hunter.role != "hunter" or hunter.alive or state.hunter_pending != seat_id:
+        raise ActionError("Only the just-eliminated Hunter may take this action.")
+    pool = [player.name for player in state.alive_players()]
+    if target_name not in pool:
+        raise ActionError(f"{target_name} is not a living Hunter target.")
+    target = state.find_by_name(target_name)
+    target.alive = False
+    state.hunter_pending = None
+    await _append_log(
+        orch, type_="hunter", seat_id=seat_id, name=hunter.name,
+        text=f"fires a final shot at {target.name}, who was a {target.role}.",
+        thought=thought, target=target.name, private=False,
+    )
+    return {"ok": True, "target": target.name, "role": target.role}
 
 
 async def write_note(orch: "GameOrchestrator", seat_id: str, note: str) -> dict[str, Any]:
@@ -463,15 +496,46 @@ def get_public_transcript(orch: "GameOrchestrator") -> list[dict]:
     return [e.model_dump() for e in orch.state.log if not e.private]
 
 
-async def negotiate_message(orch: "GameOrchestrator", seat_id: str, text: str) -> dict[str, Any]:
-    """Private werewolf-channel chatter. Logged but not yet wired into a
-    multi-turn negotiation loop in this pass — see plan §5 / README for the
-    deferred multi-turn negotiation sub-loop this tool is reserved for."""
+async def negotiate_message(
+    orch: "GameOrchestrator", seat_id: str, text: str, target: str,
+) -> dict[str, Any]:
+    """Commit one bounded turn in the private werewolf council."""
+    state = orch.state
     player = orch.state.find_seat(seat_id)
     if player.role != "werewolf":
         raise ActionError("Only werewolves can use the private negotiation channel.")
+    if not player.alive:
+        raise ActionError("Dead werewolves cannot take part in the private council.")
+    if state.phase != "night" or len(living_werewolves(state)) < 2:
+        raise ActionError("Werewolf negotiation is available only at night while both werewolves live.")
+
+    expected = expected_werewolf(state)
+    if expected is None or expected.seat_id != seat_id:
+        raise ActionError("It is not this werewolf's negotiation turn.")
+    if state.wolf_negotiation_commits.get(state.wolf_index) is not None:
+        raise ActionError("This werewolf council turn has already been committed.")
+
+    clean_text = " ".join(text.split())
+    if not clean_text:
+        raise ActionError("A private negotiation message cannot be empty.")
+    if len(clean_text) > WEREWOLF_NEGOTIATION_CHAR_BUDGET:
+        raise ActionError(
+            "Private negotiation messages must stay within the "
+            f"approximately {WEREWOLF_NEGOTIATION_TOKEN_BUDGET}-token budget."
+        )
+    legal = [candidate.name for candidate in state.alive_players() if candidate.role != "werewolf"]
+    if target not in legal:
+        raise ActionError(f"{target} is not a legal werewolf target.")
+
+    state.wolf_proposals[seat_id] = target
+    state.wolf_negotiation_commits[state.wolf_index] = seat_id
     await _append_log(
-        orch, type_="werewolf", seat_id=seat_id, name=player.name,
-        text=text, private=True,
+        orch,
+        type_="werewolf_negotiation",
+        seat_id=seat_id,
+        name=player.name,
+        text=clean_text,
+        target=target,
+        private=True,
     )
-    return {"ok": True}
+    return {"ok": True, "target": target, "turn": state.wolf_index + 1}

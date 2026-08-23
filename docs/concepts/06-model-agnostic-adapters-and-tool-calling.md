@@ -187,7 +187,7 @@ for _ in range(MAX_TOOL_ITERATIONS):
     if committed_result is not None:
         return committed_result, appended
 ```
-([agent_turn.py:131-166](../../backend/app/game/agent_turn.py#L131-L166))
+([agent_turn.py:168-272](../../backend/app/game/agent_turn.py#L168-L272))
 
 `history` is what this seat already remembers of the game and `appended` is
 what this turn adds — the loop reads the first and grows the second, then
@@ -260,7 +260,7 @@ def _extract_structured_result(tool_message) -> dict | None:
     # fall back to parsing the text content it always produces instead.
     ...
 ```
-([agent_turn.py:218-237](../../backend/app/game/agent_turn.py#L218-L237))
+([agent_turn.py:351-370](../../backend/app/game/agent_turn.py#L351-L370))
 
 A minor but real MCP quirk worth knowing: FastMCP's `structuredContent`
 field — the "typed" result of a tool call — only gets populated when a

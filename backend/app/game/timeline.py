@@ -80,6 +80,10 @@ def _describe_entry(entry: Any) -> str:
         return f"{who} voted for {entry.target}"
     if entry.type == "werewolf" and who:
         return f"{who} (werewolf) proposed attacking {entry.target}"
+    if entry.type == "werewolf_negotiation":
+        if who:
+            return f"{who} privately argued for attacking {entry.target}"
+        return entry.text or f"The werewolves committed to attacking {entry.target}"
     if entry.type == "doctor" and who:
         return f"{who} (doctor) protected {entry.target}"
     if entry.type == "seer" and who:
@@ -138,7 +142,7 @@ def _tool_status(tool: str, result: Any) -> str:
     """Classify calls without pretending every read tool is a game action."""
     writes = {
         "write_note", "record_private_note", "revise_private_note", "retire_private_note",
-        "update_belief",
+        "update_belief", "negotiate_message",
     }
     if not tool.startswith("submit_") and tool not in writes:
         return "read"
@@ -154,6 +158,8 @@ def _action_summary(tool: str, args: Any) -> str:
         return text if len(text) <= 110 else f"{text[:107]}..."
     if tool in {"submit_vote", "submit_night_action"}:
         return f"targeted {args.get('target') or 'no target'}"
+    if tool == "negotiate_message":
+        return f"privately proposed {args.get('target') or 'no target'}"
     if tool in {"write_note", "record_private_note"}:
         return f"recorded {args.get('kind') or 'theory'} note"
     if tool == "revise_private_note":
@@ -184,14 +190,24 @@ def _build_learning_debrief(
     public_events = [entry for entry in final.log if not entry.private]
     private_events = [entry for entry in final.log if entry.private]
     human = next((player for player in final.players if player.controller == "human"), None)
-    action_types = {"statement", "vote", "werewolf", "doctor", "seer"}
+    action_types = {
+        "statement", "vote", "werewolf", "werewolf_negotiation", "doctor", "seer", "hunter",
+    }
 
     human_interrupts: list[dict] = []
     if human is not None:
         for entry in final.log:
             if entry.seat_id != human.seat_id or entry.type not in action_types:
                 continue
-            kind = "statement" if entry.type == "statement" else "vote" if entry.type == "vote" else "night_action"
+            kind = (
+                "statement"
+                if entry.type == "statement"
+                else "vote"
+                if entry.type == "vote"
+                else "werewolf_negotiation"
+                if entry.type == "werewolf_negotiation"
+                else "night_action"
+            )
             human_interrupts.append({
                 "seq": entry.seq,
                 "round": entry.round,
@@ -283,6 +299,29 @@ def _build_learning_debrief(
         for event in belief_events
     ]
 
+    council_by_round: dict[int, dict] = {}
+    for entry in final.log:
+        if entry.type != "werewolf_negotiation":
+            continue
+        council = council_by_round.setdefault(entry.round, {
+            "round": entry.round,
+            "messages": [],
+            "final_target": None,
+            "resolution": None,
+        })
+        if entry.seat_id is not None:
+            council["messages"].append({
+                "seq": entry.seq,
+                "seat_id": entry.seat_id,
+                "name": entry.name or entry.seat_id,
+                "text": entry.text or "",
+                "target": entry.target,
+            })
+        else:
+            council["final_target"] = entry.target
+            council["resolution"] = entry.text
+    werewolf_negotiations = [council_by_round[key] for key in sorted(council_by_round)]
+
     concept_evidence = [
         {
             "concept": "Human in the loop",
@@ -322,6 +361,13 @@ def _build_learning_debrief(
                 f"The game produced {len(comparisons)} comparable multi-seat decision stage(s) across {final.round} round(s), ending with {final.winner}."
             ),
         },
+        {
+            "concept": "Cooperative agent planning",
+            "evidence": (
+                f"The private werewolf council produced {sum(len(item['messages']) for item in werewolf_negotiations)} "
+                f"bounded negotiation turn(s) across {len(werewolf_negotiations)} night(s), with deterministic resolution."
+            ),
+        },
     ]
 
     return {
@@ -345,6 +391,7 @@ def _build_learning_debrief(
         "memories": memory,
         "note_evolution": note_evolution,
         "belief_evolution": belief_evolution,
+        "werewolf_negotiations": werewolf_negotiations,
         "comparisons": comparisons,
         "concept_evidence": concept_evidence,
         "next_experiments": [
@@ -353,6 +400,7 @@ def _build_learning_debrief(
             "Replay with God Mode off, record your trust ranking, then compare it with the revealed private trace.",
             "Compare memory growth and tool choices between a short game and a game that survives more rounds.",
             "Track one observer-to-subject score across rounds and identify the exact evidence that moved it.",
+            "Replay the same wolf pairing with different personalities and compare whether they converge or trigger the pack-leader tie-break.",
         ],
     }
 
@@ -418,7 +466,9 @@ async def build_timeline(graph: Any, seat_mind: Any, session_id: str, conn: Any 
                 "text": _describe_entry(entry),
             })
 
-    ACTION_TYPES = {"statement", "vote", "werewolf", "doctor", "seer"}
+    ACTION_TYPES = {
+        "statement", "vote", "werewolf", "werewolf_negotiation", "doctor", "seer",
+    }
     seats: list[dict] = []
     if final is not None:
         for player in final.players:

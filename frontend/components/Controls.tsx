@@ -19,11 +19,15 @@ export function Controls({
   promptKey: string | null;
 }) {
   const [text, setText] = useState("");
+  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   // Lock against a logical turn key, not the parsed object's identity. An SSE
   // reconnect can deliver the same pending prompt as a fresh object; comparing
   // references treated that duplicate as a new turn and re-enabled voting.
   const [lockedPromptKey, setLockedPromptKey] = useState<string | null>(null);
   const locked = promptKey !== null && lockedPromptKey === promptKey;
+  const validSelectedTarget = awaiting?.options.includes(selectedTarget ?? "")
+    ? selectedTarget
+    : null;
 
   if (paused) {
     return (
@@ -63,6 +67,54 @@ export function Controls({
           Speak
         </button>
       </>
+    );
+  }
+
+  if (awaiting.kind === "werewolf_negotiation") {
+    return (
+      <div className="wolf-council-control">
+        <div className="wolf-council-eyebrow">PRIVATE WEREWOLF COUNCIL</div>
+        <div className="controls-hint">{awaiting.prompt}</div>
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="Persuade your teammate, explain the threat, or coordinate tomorrow’s deception..."
+          maxLength={320}
+          disabled={submitting || locked}
+        />
+        <div className="wolf-council-budget">Private message · {text.length}/320 characters</div>
+        <div className="vote-grid" aria-label="Proposed werewolf target">
+          {awaiting.options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`vote-btn${validSelectedTarget === option ? " is-selected" : ""}`}
+              aria-pressed={validSelectedTarget === option}
+              disabled={submitting || locked}
+              onClick={() => setSelectedTarget(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+        <button
+          className="btn wolf-council-submit"
+          disabled={submitting || locked || !validSelectedTarget || !text.trim()}
+          onClick={async () => {
+            if (!validSelectedTarget) return;
+            setLockedPromptKey(promptKey);
+            const accepted = await onSubmit({ target: validSelectedTarget, text: text.trim() });
+            if (accepted) {
+              setText("");
+              setSelectedTarget(null);
+            } else {
+              setLockedPromptKey(null);
+            }
+          }}
+        >
+          Send private plan
+        </button>
+      </div>
     );
   }
 

@@ -78,7 +78,7 @@ create, state) independently readable despite touching the same
 ```python
 app.mount("/mcp", mcp.streamable_http_app())
 ```
-([main.py:50](../../backend/app/main.py#L50))
+([main.py:54](../../backend/app/main.py#L54))
 
 The MCP tool server (see
 [05-mcp-tool-server-identity.md](05-mcp-tool-server-identity.md)) is a

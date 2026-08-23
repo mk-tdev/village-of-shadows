@@ -8,7 +8,7 @@
 [![MCP](https://img.shields.io/badge/MCP-agent%20tools-0f766e?style=flat-square)](https://modelcontextprotocol.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?style=flat-square)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
-[![Tests](https://img.shields.io/badge/backend%20tests-35%20passing-2e7d32?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/backend%20tests-66%20passing-2e7d32?style=flat-square)](#testing)
 [![Built with Codex](https://img.shields.io/badge/Built%20with-Codex-111827?style=flat-square&logo=openai&logoColor=white)](https://openai.com/codex/)
 
 <img src="assets/youtube-thumbnail-1280x720.jpg" alt="Village of Shadows — six AI agents versus one human" width="100%" />
@@ -35,6 +35,15 @@ The experience now begins at a cinematic, animated landing page that introduces 
 | **Persistent per-seat memory** | Each agent remembers its own previous turns without sharing a hidden global conversation. |
 | **Private belief notebooks** | Agents record, revise, and retire seat-isolated theories with evidence citations and immutable history. |
 | **Trust & suspicion ledger** | Every agent privately scores other players, cites evidence, and preserves each revision for live and post-game comparison. |
+| **Private werewolf council** | Living werewolves negotiate across bounded private turns, revise targets, and reach a server-resolved plan before the night proceeds. |
+| **Counterfactual branches** | Restore a real human interrupt from a LangGraph checkpoint, change one answer, and continue in a new immutable game. |
+| **Model tournaments** | Rotate roles across autonomous games and compare wins, deception, votes, survival, latency, tokens, and cost. |
+| **Configurable worlds** | Choose standard or expanded roles, deterministic village events, cross-game memory, and hard game budgets. |
+| **Agent laboratory** | Version custom behavior, memory/tool strategy, prompt additions, reasoning level, and resilience per seat. |
+| **Multiple human players** | Private cryptographic join links bind each browser to one seat and filter all role-private state server-side. |
+| **Provider resilience** | Generation-only retries, exponential backoff, fallback models, safe validated actions, pause policy, and hard token ceilings. |
+| **Voice Council** | Explicit opt-in lifelike neural narration gives each seat an ancient, human cadence; cached public audio and a refined device fallback keep visible captions authoritative. |
+| **Shareable replays** | Publish immutable public or secret God Mode chronicles with expiration and revocation. |
 | **MCP tool actions** | Agents act through validated game tools instead of returning loosely structured text. |
 | **Unscripted social behavior** | Werewolves can lie, seers can conceal evidence, doctors can make mistakes, and villagers can confidently accuse one another. |
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
@@ -68,6 +77,8 @@ The portraits belong to stable seats, while names, personalities, controllers, p
   </tr>
 </table>
 
+The optional expanded pack deals **2 Werewolves, Seer, Doctor, Hunter, Mayor, and Jester**. The Hunter retaliates when killed, the Mayor has a server-enforced double vote, and the Jester wins by being voted out.
+
 ## 🧠 Architecture
 
 ```mermaid
@@ -96,6 +107,8 @@ The graph provides orchestration, state boundaries, replay safety, and interrupt
 6. SQLite persists the outcome, the graph advances, and SSE streams the change to the browser.
 
 For the full engineering walkthrough, start with the [Concept Guide](docs/concepts/README.md).
+For step-by-step use and interpretation of every shipped enhancement, open the
+[Player and Experiment Guide](docs/player-guides/README.md).
 
 ## 🤖 Models and providers
 
@@ -138,6 +151,7 @@ API keys are optional because every AI seat defaults to the offline `mock` provi
 ```dotenv
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
+OPENAI_TTS_MODEL=gpt-4o-mini-tts
 GOOGLE_API_KEY=
 OLLAMA_API_KEY=
 ```
@@ -157,6 +171,8 @@ Open **http://localhost:4001**.
 5. Review the per-seat readiness results.
 6. On the connected game page, click **Start Game** to begin from the first LangGraph node.
 7. When the game ends, open **Learning Debrief** to compare your prediction with evidence from the run.
+
+For experiments beyond a single run, use `/tournament` for balanced autonomous comparisons, `/relationships` for the opt-in memory archive, and the post-game **Branch replay** or **Share replay** tabs.
 
 Stop both applications with:
 
@@ -197,6 +213,8 @@ The game page makes the agent system visible while it runs:
 - A live observer × subject trust/suspicion matrix with confidence, cited evidence, and immutable score history.
 - Private thoughts and secret actions when God Mode is enabled.
 - A focused, tabbed post-game report reconstructed from LangGraph checkpoint history, with expandable learning evidence and technical details.
+- A time-bounded perspective viewer, deception forensics, counterfactual branch creator, and immutable replay publisher.
+- Visible retry, fallback, budget, and memory signals rather than silent provider recovery.
 
 God Mode changes only presentation. It does not change what any AI agent or human player is legitimately allowed to know.
 
@@ -219,18 +237,18 @@ The post-game Learning Debrief identifies where execution suspended for the huma
 backend/app/
 ├── adapters.py              # Provider-neutral LangChain model construction
 ├── model_preflight.py       # Real message + required tool-call readiness gate
-├── game/                    # LangGraph nodes, orchestration, memory, views
+├── game/                    # Graph, minds, rules, branches, insights, tournaments, replay exports
 ├── mcp_server/              # MCP tools and connection-bound seat identity
 ├── persistence.py           # SQLite game records and decisions
 └── routers/                 # REST, SSE, game lifecycle, graph inspection
 
 frontend/
-├── app/                     # Cinematic landing, setup, game, and How to Play routes
+├── app/                     # Landing, setup, game, rooms, tournaments, relationships, replays
 ├── components/              # Cinematic 3D village, player UI, feed, controls, debug views
 ├── lib/                     # API client, SSE reducer, models, portrait mapping
 └── public/                  # Character portraits, role artifacts, and scene art
 
-docs/concepts/               # 15-part agentic engineering guide
+docs/concepts/               # Agentic engineering guide with source-linked implementation notes
 ```
 
 ## ✅ Testing
@@ -247,7 +265,7 @@ cd ..
 python3 docs/concepts/check_citations.py
 ```
 
-The backend suite covers information-boundary leakage, model preflight behavior, persistent seat memory, immutable private-note and trust/suspicion history, replay safety, pause/continue, human interrupt/resume, full mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
+The 66-test backend suite covers browser and agent information boundaries, model preflight, persistent seat memory, immutable notes and beliefs, negotiation, checkpoint branching, tournaments, expanded roles, village events, multi-human authorization, safe cached council speech, resilience, cross-game relationships, sealed replay exports, pause/resume safety, complete standard and expanded mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
 
 ## 📚 Learn from the implementation
 
@@ -268,20 +286,28 @@ The [Concept Guide](docs/concepts/README.md) explains the design and the failure
 13. LangGraph time travel and the post-game report
 14. Agent-authored private notes with immutable revision history
 15. Trust and suspicion as explicit, evidence-backed agent state
+16. Bounded multi-agent negotiation with deterministic resolution
+17. Counterfactual branches and time-bounded perspectives
+18. Configurable worlds and model tournaments
+19. Multi-human rooms and browser authorization
+20. Resilience, voice, and cross-game continuity
+21. Immutable, revocable replay exports
 
 Additional references:
 
+- [Player and Experiment Guide](docs/player-guides/README.md) — how to use,
+  play, and interpret every shipped enhancement
 - [Three-minute Codex meetup demo guide](docs/codex-meetup-demo-guide.md)
 - [Original implementation plan](village-of-shadows-plan.md)
 - [Deployment and user-supplied-key plan](docs/deployment-plan.md)
-- [Planned feature enhancements](docs/feature-enhancements.md)
+- [Shipped feature acceptance record](docs/feature-enhancements.md)
 - [`werewolf_game.html`](werewolf_game.html), the original single-file prototype
 
 ## ⚠️ Current limitations
 
-- Werewolf night coordination currently resolves independent proposals by tally rather than a multi-turn private negotiation.
 - The decisions API is available, but there is no dedicated standalone decisions-history page.
 - Hosted-model availability and aliases vary by account and change over time; the readiness gate is intentionally the final source of truth.
+- Voice Council uses OpenAI neural speech when `OPENAI_API_KEY` is configured. It voices only persisted public statements, caches each immutable line in SQLite, and automatically falls back to the best available browser voice. Neural speech consumes API credits; device speech does not.
 
 ---
 

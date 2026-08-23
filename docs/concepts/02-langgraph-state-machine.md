@@ -20,7 +20,8 @@ serialization, which nobody wants to hand-roll).
 ## The graph, read as a diagram
 
 ```
-assign_roles → start_night → night_wolves ⟲ → night_doctor → night_seer
+assign_roles → start_night → werewolf_negotiation ⟲ → resolve_wolf_plan
+  → night_doctor → night_seer
   → resolve_night → check_win_night → END | start_day
 start_day → day_discussion ⟲ → start_vote → voting ⟲ → resolve_vote
   → check_win_vote → END | start_night (next round)
@@ -34,23 +35,32 @@ compiled graph's structure to the frontend instead of a second hand-drawn
 copy — see [10-frontend-observability.md](10-frontend-observability.md)).
 
 The `⟲` marks are **conditional self-edges** — a node that routes back to
-itself. This is how "loop over all N werewolves, one per night" gets
+itself. This is how "run the bounded werewolf council one seat-turn at a time" gets
 expressed as graph structure:
 
 ```python
-def _route_night_wolves(state: GraphState) -> str:
+def _route_werewolf_negotiation(state: GraphState) -> str:
     game = state["game"]
-    wolves_alive = len([p for p in game.players if p.role == "werewolf" and p.alive])
-    return "night_wolves" if game.wolf_index < wolves_alive else "night_doctor"
+    return (
+        "werewolf_negotiation"
+        if game.wolf_index < werewolf_turn_limit(game)
+        else "resolve_wolf_plan"
+    )
 
-builder.add_conditional_edges("night_wolves", _route_night_wolves, ["night_wolves", "night_doctor"])
+builder.add_conditional_edges(
+    "werewolf_negotiation",
+    _route_werewolf_negotiation,
+    ["werewolf_negotiation", "resolve_wolf_plan"],
+)
 ```
-([graph.py:24-27, 68](../../backend/app/game/graph.py#L24-L27))
+([graph.py:26-32](../../backend/app/game/graph.py#L26-L32),
+[graph.py:73-79](../../backend/app/game/graph.py#L73-L79))
 
-Each time `night_wolves` finishes, LangGraph calls `_route_night_wolves` on
-the *returned* state to decide where to go next. If `wolf_index` hasn't
-reached the wolf count yet, it routes back to `night_wolves` itself — same
-node, next wolf. `day_discussion` and `voting` use the identical pattern for
+Each time `werewolf_negotiation` finishes, LangGraph calls
+`_route_werewolf_negotiation` on the *returned* state to decide where to go
+next. If `wolf_index` has not reached the bounded council-turn limit, it routes
+back to itself — same node, next wolf or revision. Otherwise it moves to the
+deterministic `resolve_wolf_plan` node. `day_discussion` and `voting` use the identical pattern for
 "one alive player per day/vote." This is the graph-native equivalent of a
 `for` loop, and it composes cleanly with suspension: the graph can be
 sitting on a self-edge, paused mid-loop, for an arbitrary amount of wall-clock
@@ -109,7 +119,7 @@ This is the single most important design constraint in the whole
 orchestration layer, and it's worth internalizing *before* reading
 [03-human-in-the-loop-interrupt.md](03-human-in-the-loop-interrupt.md):
 **a node that calls `interrupt()` gets re-executed from its first line every
-time it resumes.** If `night_wolves` were a `for wolf in wolves:` loop with
+time it resumes.** If `werewolf_negotiation` were a `for wolf in wolves:` loop with
 `interrupt()` inside it, then wolf #2's answer arriving would re-run the
 *entire loop* from wolf #1 — re-invoking wolf #1's already-completed AI call,
 re-writing its DB row, re-emitting its SSE events, a second time. Every node

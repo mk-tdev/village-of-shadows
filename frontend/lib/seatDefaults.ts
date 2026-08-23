@@ -1,5 +1,27 @@
 import type { SelectOption } from "@/components/Select";
 import type { AgentConfig, Provider } from "./types";
+import type { AgentBehavior, ResiliencePolicy } from "./types";
+
+export const DEFAULT_BEHAVIOR: AgentBehavior = {
+  version: 1,
+  system_prompt_addition: "",
+  risk_tolerance: 50,
+  honesty: 65,
+  aggressiveness: 50,
+  reasoning_level: "medium",
+  memory_strategy: "selective",
+  tool_strategy: "balanced",
+  turn_token_budget: 700,
+};
+
+export const DEFAULT_RESILIENCE: ResiliencePolicy = {
+  timeout_seconds: 45,
+  max_retries: 2,
+  retry_backoff_ms: 500,
+  fallback_provider: null,
+  fallback_model: null,
+  pause_after_exhaustion: true,
+};
 
 export const DEFAULT_NAMES = ["Mara", "Tomas", "Elin", "Bram", "Sable", "Corvin", "Petra"];
 export const DEFAULT_PERSONALITIES = [
@@ -86,5 +108,7 @@ export function defaultSeats(humanIndex: number): AgentConfig[] {
     provider: i === humanIndex ? null : "mock",
     model_name: i === humanIndex ? null : "mock-v1",
     endpoint: null,
+    behavior: { ...DEFAULT_BEHAVIOR },
+    resilience: { ...DEFAULT_RESILIENCE },
   }));
 }

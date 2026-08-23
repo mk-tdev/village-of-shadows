@@ -18,13 +18,15 @@ including other games, while this one waits).
 
 ```python
 if wolf.controller == "human":
-    answer = interrupt(
-        {"kind": "night_action", "seat_id": wolf.seat_id,
-         "prompt": "Choose which villager to attack.", "options": pool}
-    )
-    await actions.apply_night_action(orch, wolf.seat_id, answer["target"], answer.get("thought", ""))
+    answer = interrupt({
+        "kind": "werewolf_negotiation",
+        "seat_id": wolf.seat_id,
+        "prompt": "Privately persuade your fellow werewolf and propose tonight's target.",
+        "options": pool,
+    })
+    await actions.negotiate_message(orch, wolf.seat_id, answer["text"], answer["target"])
 ```
-([nodes.py:277-281](../../backend/app/game/nodes.py#L277-L281))
+([nodes.py:349-361](../../backend/app/game/nodes.py#L349-L361))
 
 `interrupt(payload)` does something that looks like a blocking call but
 isn't: it raises a special LangGraph exception that unwinds execution all
@@ -117,7 +119,7 @@ if awaiting is None:
 if awaiting.seat_id != body.seat_id or awaiting.kind != body.kind:
     raise HTTPException(409, f"Expected input from seat {awaiting.seat_id} of kind {awaiting.kind}.")
 ```
-([input.py:22-26](../../backend/app/routers/input.py#L22-L26))
+([input.py:36-40](../../backend/app/routers/input.py#L36-L40))
 
 LangGraph doesn't know or care *what* value you resume with — it just hands
 it back as the `interrupt()` return value, whatever type that is. The

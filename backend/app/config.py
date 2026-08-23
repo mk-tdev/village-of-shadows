@@ -13,6 +13,9 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    # Optional lifelike council narration. The browser always retains a
+    # no-cost device-voice fallback when this key/model is unavailable.
+    openai_tts_model: str = "gpt-4o-mini-tts"
     google_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
     # Ollama Cloud (ollama.com's hosted models, e.g. "gpt-oss:120b") --

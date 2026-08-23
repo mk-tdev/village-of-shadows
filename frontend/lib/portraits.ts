@@ -25,6 +25,9 @@ const ROLE_ARTIFACT_BY_ROLE: Record<Role, string> = {
   seer: "/roles/seer.webp",
   doctor: "/roles/doctor.webp",
   villager: "/roles/villager.webp",
+  hunter: "/roles/doctor.webp",
+  mayor: "/roles/villager.webp",
+  jester: "/roles/seer.webp",
 };
 
 /** Portrait identity belongs to the seat, not its editable display name.

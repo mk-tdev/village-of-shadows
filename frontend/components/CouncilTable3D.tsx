@@ -11,7 +11,7 @@ export interface CouncilPlayer {
   name: string;
   alive: boolean;
   role: Role | null;
-  human: boolean;
+  you: boolean;
 }
 
 export interface CouncilEvent {
@@ -246,7 +246,7 @@ function CinematicCast({
             aria-label={`${player.name}${active ? ", speaking" : ""}${!player.alive ? ", eliminated" : ""}`}
           >
             <span className="cinematic-name">
-              {player.human && <b>YOU</b>}
+              {player.you && <b>YOU</b>}
               {player.name}
             </span>
             <span className="cinematic-figure-wrap">

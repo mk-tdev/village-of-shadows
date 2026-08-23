@@ -3,13 +3,15 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createGame, preflightModels, waitForBackend } from "@/lib/api";
+import { createGame, IS_LOCAL_API, preflightModels, waitForBackend } from "@/lib/api";
 import type { BackendWakeProgress } from "@/lib/api";
 import { defaultSeats, PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
 import { SeatRow } from "@/components/SeatRow";
 import { Select } from "@/components/Select";
 import { Combobox } from "@/components/Combobox";
-import type { AgentConfig, ModelPreflightResult, Provider } from "@/lib/types";
+import { AgentLabPanel } from "@/components/AgentLabPanel";
+import { ThemedCheckbox } from "@/components/ThemedCheckbox";
+import type { AgentConfig, GameOptions, ModelPreflightResult, Provider } from "@/lib/types";
 
 type StartPhase = "idle" | "waking" | "checking" | "creating";
 type ProgressState = "pending" | "active" | "complete" | "failed";
@@ -41,6 +43,7 @@ function LaunchStep({
 export default function SetupPage() {
   const router = useRouter();
   const [humanIndex, setHumanIndex] = useState(0);
+  const [humanIndices, setHumanIndices] = useState<number[]>([0]);
   const [seats, setSeats] = useState<AgentConfig[]>(() => defaultSeats(0));
   const [startPhase, setStartPhase] = useState<StartPhase>("idle");
   const [failedPhase, setFailedPhase] = useState<Exclude<StartPhase, "idle"> | null>(null);
@@ -48,6 +51,14 @@ export default function SetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [preflightResults, setPreflightResults] = useState<ModelPreflightResult[]>([]);
   const [prediction, setPrediction] = useState("");
+  const [options, setOptions] = useState<GameOptions>({
+    version: 1,
+    role_pack: "standard",
+    village_events: false,
+    cross_game_memory: false,
+    room_name: "The Village",
+    max_game_tokens: 500_000,
+  });
   // The master picker's own selection -- kept separate from any one seat's
   // provider/model so it still has a sensible value to apply even after
   // per-seat edits have made the seats disagree with each other, and so a
@@ -95,14 +106,20 @@ export default function SetupPage() {
     setPreflightResults([]);
     setError(null);
     setHumanIndex(index);
-    setSeats((prev) =>
-      prev.map((s, i) => ({
-        ...s,
-        controller: i === index ? "human" : "ai",
-        provider: i === index ? null : s.provider ?? masterProvider,
-        model_name: i === index ? null : s.model_name ?? masterModel,
-      }))
-    );
+  }
+
+  function toggleHuman(index: number, enabled: boolean) {
+    if (!enabled && index === humanIndex) return;
+    const nextHumans = enabled
+      ? [...new Set([...humanIndices, index])].sort((a, b) => a - b)
+      : humanIndices.filter((item) => item !== index);
+    setHumanIndices(nextHumans);
+    setSeats((current) => current.map((seat, seatIndex) => seatIndex === index ? {
+      ...seat,
+      controller: enabled ? "human" : "ai",
+      provider: enabled ? null : seat.provider ?? masterProvider,
+      model_name: enabled ? null : seat.model_name ?? masterModel,
+    } : seat));
   }
 
   function updateSeat(index: number, next: AgentConfig) {
@@ -117,8 +134,8 @@ export default function SetupPage() {
     setPreflightResults([]);
     setError(null);
     setSeats((prev) =>
-      prev.map((s, i) =>
-        i === humanIndex
+      prev.map((s) =>
+        s.controller === "human"
           ? s
           : {
               ...s,
@@ -164,17 +181,35 @@ export default function SetupPage() {
       }
       activePhase = "creating";
       setStartPhase("creating");
-      const { session_id } = await createGame(seats);
+      const created = await createGame(seats, options);
+      const { session_id } = created;
+      const primary = created.human_seats.find((seat) => seat.seat_id === seats[humanIndex].seat_id) ?? created.human_seats[0];
+      const credentials = {
+        seatId: primary.seat_id,
+        accessToken: primary.access_token,
+        hostToken: created.host_token,
+      };
       try {
         window.localStorage.setItem(
           `village-learning:${session_id}`,
           JSON.stringify({ prediction: prediction.trim(), created_at: new Date().toISOString() })
         );
+        window.localStorage.setItem(`village-access:${session_id}`, JSON.stringify(credentials));
+        window.localStorage.setItem(`village-room:${session_id}`, JSON.stringify(created));
       } catch {
         // The experiment worksheet is a convenience, never a prerequisite
         // for creating a game (private browsing can disable localStorage).
       }
-      router.push(`/game/${session_id}`);
+      const query = new URLSearchParams({
+        seat_id: credentials.seatId,
+        access_token: credentials.accessToken,
+        host_token: credentials.hostToken,
+      });
+      router.push(
+        created.human_seats.length > 1
+          ? `/room/${session_id}?${query}`
+          : `/game/${session_id}?${query}`
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start game");
       setFailedPhase(activePhase);
@@ -193,6 +228,9 @@ export default function SetupPage() {
         <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/how-to-play">
           How to play
         </Link>
+        <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/relationships">
+          Relationship archive
+        </Link>
       </header>
 
       <div className="setup-card">
@@ -200,9 +238,14 @@ export default function SetupPage() {
         <div style={{ marginBottom: 16, maxWidth: 220 }}>
           <Select
             value={String(humanIndex)}
-            options={seats.map((s, i) => ({ value: String(i), label: s.display_name || s.seat_id }))}
+            options={humanIndices.map((i) => ({ value: String(i), label: seats[i].display_name || seats[i].seat_id }))}
             onChange={(value) => updateHumanIndex(Number(value))}
           />
+        </div>
+        <div className="multi-human-picker">
+          <span>HUMAN PLAYERS · SELECT ONE OR MORE</span>
+          <div>{seats.map((seat, index) => <ThemedCheckbox key={seat.seat_id} checked={humanIndices.includes(index)} disabled={index === humanIndex} onChange={(checked) => toggleHuman(index, checked)} ariaLabel={`${seat.display_name} is a human player`}>{seat.display_name}</ThemedCheckbox>)}</div>
+          <small>The primary human becomes room host. Every additional human receives a private, seat-bound join link.</small>
         </div>
 
         <label className="field-label">Set every AI seat to</label>
@@ -234,10 +277,19 @@ export default function SetupPage() {
           <SeatRow
             key={seat.seat_id}
             seat={seat}
-            isHuman={i === humanIndex}
+            isHuman={seat.controller === "human"}
             onChange={(next) => updateSeat(i, next)}
           />
         ))}
+
+        <section className="world-rules-config">
+          <div><span>WORLD RULES · VERSION 1</span><h2>Choose how strange this village becomes</h2></div>
+          <ThemedCheckbox checked={options.role_pack === "expanded"} onChange={(checked) => setOptions((current) => ({ ...current, role_pack: checked ? "expanded" : "standard" }))}><span><b>Expanded roles</b><small>Add Hunter, Mayor, and Jester with server-enforced rules.</small></span></ThemedCheckbox>
+          <ThemedCheckbox checked={options.village_events} onChange={(checked) => setOptions((current) => ({ ...current, village_events: checked }))}><span><b>Dynamic village events</b><small>Deterministic silence, sealed ballots, forced testimony, and discovered evidence.</small></span></ThemedCheckbox>
+          <ThemedCheckbox checked={options.cross_game_memory} onChange={(checked) => setOptions((current) => ({ ...current, cross_game_memory: checked }))}><span><b>Cross-game relationships</b><small>Opt in to inspectable memories from previous games. Roles are never carried forward.</small></span></ThemedCheckbox>
+        </section>
+
+        <AgentLabPanel seats={seats} onChange={updateSeat} />
 
         <section className="learning-prediction" aria-labelledby="learning-prediction-title">
           <span className="learning-kicker">LEARNING EXPERIMENT · OPTIONAL</span>
@@ -283,7 +335,9 @@ export default function SetupPage() {
               <LaunchStep
                 number="1"
                 title="Wake the game server"
-                detail={wakeStepState === "complete" ? "Render is online and healthy." : "Wait for the FastAPI service to become ready."}
+                detail={wakeStepState === "complete"
+                  ? (IS_LOCAL_API ? "Local FastAPI server is healthy." : "Render is online and healthy.")
+                  : (IS_LOCAL_API ? "Checking the Python API on port 8000." : "Wait for the FastAPI service to become ready.")}
                 state={wakeStepState}
               />
               <LaunchStep
@@ -304,11 +358,13 @@ export default function SetupPage() {
               <div className="server-wake-note">
                 <span className="server-wake-orb" aria-hidden="true" />
                 <span>
-                  <strong>
-                    {wakeProgress.status === "retrying" ? "The server is still waking up." : "Contacting the sleeping server..."}
+                  <strong>{IS_LOCAL_API
+                    ? (wakeProgress.status === "retrying" ? "The local Python server is not ready yet." : "Checking the local Python server...")
+                    : (wakeProgress.status === "retrying" ? "The server is still waking up." : "Contacting the sleeping server...")}
                   </strong>
-                  <small>
-                    Render&apos;s free service may take a minute or more on the first visit. Retrying automatically
+                  <small>{IS_LOCAL_API
+                    ? <>Local play always uses <code>http://localhost:8000</code>. Start <code>./start.sh</code> if needed</>
+                    : <>Render&apos;s free service may take a minute or more on the first visit. Retrying automatically</>}
                     {wakeProgress.attempt > 1 ? ` · attempt ${wakeProgress.attempt}` : ""}.
                   </small>
                 </span>

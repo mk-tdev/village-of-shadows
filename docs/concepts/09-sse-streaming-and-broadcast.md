@@ -95,7 +95,7 @@ if node_name:
     orch.current_node = node_name
     orch.publish("node", {"node": node_name, "phase": game.phase, "round": game.round})
 ```
-([nodes.py:65-68](../../backend/app/game/nodes.py#L65-L68))
+([nodes.py:73-76](../../backend/app/game/nodes.py#L73-L76))
 
 `_sync` (see [02](02-langgraph-state-machine.md)) already ran on every node
 execution to re-point `orch.state` — recording the node name there too was
@@ -146,7 +146,7 @@ eventually reconnect and re-fetch it:
 ```python
 orch.publish("roles_assigned", {"players": [p.model_dump() for p in game.players]})
 ```
-([nodes.py:220](../../backend/app/game/nodes.py#L220))
+([nodes.py:242](../../backend/app/game/nodes.py#L242))
 
 ```typescript
 source.addEventListener("roles_assigned", (e) => {

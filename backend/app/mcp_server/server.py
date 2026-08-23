@@ -41,6 +41,7 @@ MODEL_VISIBLE_TOOLS = {
     "submit_night_action",
     "submit_statement",
     "submit_vote",
+    "hunter_retaliate",
 }
 
 
@@ -187,11 +188,11 @@ async def update_belief(
 
 
 @mcp.tool()
-async def negotiate_message(text: str, ctx: Context) -> dict:
-    """Send a message in the private werewolf channel. Werewolves only."""
+async def negotiate_message(text: str, target: str, ctx: Context) -> dict:
+    """Privately persuade your werewolf teammate and propose or revise an attack target."""
     game_id, seat_id = identity.resolve(ctx.session)
     orch = registry.get(game_id)
-    return await actions.negotiate_message(orch, seat_id, text)
+    return await actions.negotiate_message(orch, seat_id, text, target)
 
 
 @mcp.tool()
@@ -216,3 +217,11 @@ async def submit_vote(target: str, thought: str = "", ctx: Context = None) -> di
     game_id, seat_id = identity.resolve(ctx.session)
     orch = registry.get(game_id)
     return await actions.apply_vote(orch, seat_id, target, thought)
+
+
+@mcp.tool()
+async def hunter_retaliate(target: str, thought: str = "", ctx: Context = None) -> dict:
+    """As the just-eliminated Hunter, commit your single final target."""
+    game_id, seat_id = identity.resolve(ctx.session)
+    orch = registry.get(game_id)
+    return await actions.hunter_retaliate(orch, seat_id, target, thought)

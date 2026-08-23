@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { beginGame, continueGame, pauseGame, stopGame, submitInput } from "@/lib/api";
+import { beginGame, continueGame, fetchLineage, pauseGame, stopGame, submitInput } from "@/lib/api";
+import type { GameAccessCredentials, GameBranch } from "@/lib/types";
 import { useGameStream } from "@/lib/useGameStream";
 import { PlayerCard } from "./PlayerCard";
 import { Feed } from "./Feed";
@@ -14,6 +15,7 @@ import { DebugPanel } from "./DebugPanel";
 import { GameSummary } from "./GameSummary";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 import type { CouncilCameraMode } from "./CouncilTable3D";
+import { VoiceCouncil } from "./VoiceCouncil";
 
 const CouncilTable3D = dynamic(
   () => import("./CouncilTable3D").then((module) => module.CouncilTable3D),
@@ -23,14 +25,30 @@ const CouncilTable3D = dynamic(
   }
 );
 
-export function GameView({ sessionId }: { sessionId: string }) {
+export function GameView({
+  sessionId,
+  initialAccess,
+}: {
+  sessionId: string;
+  initialAccess: GameAccessCredentials | null;
+}) {
   const router = useRouter();
+  const [access] = useState<GameAccessCredentials | null>(() => {
+    if (initialAccess) return initialAccess;
+    if (typeof window === "undefined") return null;
+    try {
+      return JSON.parse(window.localStorage.getItem(`village-access:${sessionId}`) ?? "null");
+    } catch {
+      return null;
+    }
+  });
   const {
     game, active, connected, errorMessage, currentNode, mindNode, mindNodeCounts,
     metrics, activity, privateNotes, beliefEvents,
   } =
-    useGameStream(sessionId);
-  const [godView, setGodView] = useState(true);
+    useGameStream(sessionId, access ?? undefined);
+  const canGodView = Boolean(access?.hostToken);
+  const [godView, setGodView] = useState(canGodView);
   const [submitting, setSubmitting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [beginning, setBeginning] = useState(false);
@@ -40,6 +58,8 @@ export function GameView({ sessionId }: { sessionId: string }) {
   // summary means dismissing it first rather than opening a second layer
   // on top of it.
   const [showSummary, setShowSummary] = useState(false);
+  const [lineage, setLineage] = useState<GameBranch | null>(null);
+  const [speakingSeatId, setSpeakingSeatId] = useState<string | null>(null);
 
   const isNight = !game || game.phase === "night" || game.phase === "lobby";
   // The "X is thinking" feed indicator only makes sense for an AI seat --
@@ -68,6 +88,14 @@ export function GameView({ sessionId }: { sessionId: string }) {
     };
   }, [showSummary]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchLineage(sessionId, access ?? undefined).then((value) => {
+      if (!cancelled) setLineage(value);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [sessionId, access]);
+
   if (errorMessage) {
     return (
       <div className="app">
@@ -84,18 +112,21 @@ export function GameView({ sessionId }: { sessionId: string }) {
     );
   }
 
-  const humanPlayer = game.players.find((player) => player.controller === "human");
+  const humanPlayer = game.players.find((player) => player.seat_id === access?.seatId);
   const humanSeerKnowledge =
     humanPlayer?.role === "seer"
       ? (game.seer_knowledge[humanPlayer.seat_id] ?? {})
       : {};
+  const humanCanSeeWerewolfCouncil = Boolean(
+    humanPlayer?.role === "werewolf" && humanPlayer.alive
+  );
   const councilPlayers = game.players.map((player) => ({
     seatId: player.seat_id,
     name: player.name,
     alive: player.alive,
-    human: player.controller === "human",
+    you: player.seat_id === access?.seatId,
     role:
-      player.controller === "human" || !player.alive || godView
+      player.seat_id === access?.seatId || !player.alive || godView
         ? (player.role ?? null)
         : (humanSeerKnowledge[player.name] ?? null),
   }));
@@ -111,7 +142,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
         seat_id: game.awaiting.seat_id,
         kind: game.awaiting.kind,
         value,
-      });
+      }, access ?? undefined);
       return true;
     } catch (err) {
       console.error(err);
@@ -124,21 +155,21 @@ export function GameView({ sessionId }: { sessionId: string }) {
   const handleBegin = async () => {
     setBeginning(true);
     try {
-      await beginGame(sessionId);
+      await beginGame(sessionId, access ?? undefined);
     } catch (err) {
       console.error(err);
       setBeginning(false);
     }
   };
 
-  const handlePause = () => pauseGame(sessionId).catch(console.error);
-  const handleContinue = () => continueGame(sessionId).catch(console.error);
+  const handlePause = () => pauseGame(sessionId, access ?? undefined).catch(console.error);
+  const handleContinue = () => continueGame(sessionId, access ?? undefined).catch(console.error);
 
   const handleStop = async () => {
     if (!window.confirm("Stop this game and start over? This abandons the current game.")) return;
     setStopping(true);
     try {
-      await stopGame(sessionId);
+      await stopGame(sessionId, access ?? undefined);
     } catch (err) {
       console.error(err);
     } finally {
@@ -174,8 +205,8 @@ export function GameView({ sessionId }: { sessionId: string }) {
             <EyeIcon />
             <span>Round {game.round}</span>
           </div>
-          <GodViewToggle on={godView} onToggle={() => setGodView((v) => !v)} />
-          {!game.winner && game.phase !== "lobby" && (
+          {canGodView ? <GodViewToggle on={godView} onToggle={() => setGodView((v) => !v)} /> : null}
+          {canGodView && !game.winner && game.phase !== "lobby" && (
             <button
               className="btn btn-secondary"
               style={{ padding: "7px 14px", fontSize: 12.5 }}
@@ -184,16 +215,32 @@ export function GameView({ sessionId }: { sessionId: string }) {
               {game.paused ? "▶ Continue" : "⏸ Pause"}
             </button>
           )}
-          <button
+          {canGodView ? <button
             className="btn btn-secondary"
             style={{ padding: "7px 14px", fontSize: 12.5 }}
             onClick={handleStop}
             disabled={stopping}
           >
             {stopping ? "Stopping..." : "⏹ New Game"}
-          </button>
+          </button> : <Link className="btn btn-secondary" href="/">Leave game</Link>}
         </div>
       </header>
+
+      {lineage ? (
+        <div className="branch-lineage-banner">
+          <span>COUNTERFACTUAL BRANCH</span>
+          <p>This world forked at event #{lineage.branch_log_seq}, replacing a {lineage.replaced_kind} decision. The original timeline remains unchanged.</p>
+          <Link href={`/game/${lineage.parent_game_id}`}>Open original ↗</Link>
+        </div>
+      ) : null}
+
+      <VoiceCouncil
+        sessionId={sessionId}
+        access={access ?? undefined}
+        entries={game.log}
+        players={game.players}
+        onSpeaking={setSpeakingSeatId}
+      />
 
       <section className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
         <div className="council-3d-caption">
@@ -246,7 +293,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
           {councilOpen && (
             <CouncilTable3D
               players={councilPlayers}
-              activeSeatId={active?.seat_id ?? null}
+              activeSeatId={speakingSeatId ?? active?.seat_id ?? null}
               phase={game.phase}
               event={latestSceneEvent ? {
                 type: latestSceneEvent.type,
@@ -268,6 +315,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
               active={active?.seat_id === p.seat_id}
               godView={godView}
               knownRole={humanSeerKnowledge[p.name]}
+              viewerSeatId={access?.seatId}
             />
           ))}
         </div>
@@ -276,7 +324,12 @@ export function GameView({ sessionId }: { sessionId: string }) {
             than the modal this replaced. Collapse it until there's something
             to show. */}
         <div className={`feed-wrap${game.phase === "lobby" ? " feed-wrap-lobby" : ""}`}>
-          <Feed entries={game.log} godView={godView} active={activeAiTurn} />
+          <Feed
+            entries={game.log}
+            godView={godView}
+            canSeeWerewolfCouncil={humanCanSeeWerewolfCouncil}
+            active={activeAiTurn}
+          />
           <div className="controls">
             {/* Start lives here rather than in a modal overlay. A centred
                 dialog covers the board, so pressing Start meant looking at a
@@ -285,7 +338,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
                 genuinely missed. Sitting in the controls panel, directly under
                 the feed and where every other player action already happens,
                 it starts the game with the board already in view. */}
-            {game.phase === "lobby" ? (
+            {game.phase === "lobby" && canGodView ? (
               <>
                 <div className="controls-hint">
                   Seats are configured and the event stream is already live. The graph hasn’t run
@@ -295,6 +348,8 @@ export function GameView({ sessionId }: { sessionId: string }) {
                   {beginning ? "Starting..." : "▶ Start Game"}
                 </button>
               </>
+            ) : game.phase === "lobby" ? (
+              <div className="controls-hint">Waiting for the room host to begin the game…</div>
             ) : (
               <Controls
                 awaiting={game.awaiting}
@@ -304,7 +359,7 @@ export function GameView({ sessionId }: { sessionId: string }) {
                 submitting={submitting}
                 promptKey={
                   game.awaiting
-                    ? `${game.round}:${game.phase}:${game.awaiting.seat_id}:${game.awaiting.kind}`
+                    ? game.awaiting.turn_id ?? `${game.round}:${game.phase}:${game.awaiting.seat_id}:${game.awaiting.kind}`
                     : null
                 }
               />
@@ -316,11 +371,13 @@ export function GameView({ sessionId }: { sessionId: string }) {
       {game.winner && !showSummary && (
         <div className="overlay">
           <div className="overlay-card">
-            <h2>{game.winner === "villagers" ? "Villagers win" : "Werewolves win"}</h2>
+            <h2>{game.winner === "villagers" ? "Villagers win" : game.winner === "jester" ? "The Jester wins" : "Werewolves win"}</h2>
             <p>
               {game.winner === "villagers"
                 ? "Every werewolf has been rooted out. The village is safe — for now."
-                : "The werewolves now equal or outnumber the villagers. The night has claimed the village."}
+                : game.winner === "jester"
+                  ? "The village cast out exactly the player who wanted the gallows. The final laugh belongs to the Jester."
+                  : "The werewolves now equal or outnumber the villagers. The night has claimed the village."}
             </p>
             <div className="overlay-actions">
               <Link className="btn" href="/">
@@ -367,13 +424,15 @@ export function GameView({ sessionId }: { sessionId: string }) {
               </button>
             </header>
             <div className="summary-modal-scroll">
-              <GameSummary sessionId={sessionId} />
+              <GameSummary sessionId={sessionId} access={access ?? undefined} />
             </div>
           </section>
         </div>
       ) : null}
 
-      <DebugPanel
+          <DebugPanel
+            sessionId={sessionId}
+            access={access ?? undefined}
         godView={godView}
         currentNode={currentNode}
         mindNode={mindNode}

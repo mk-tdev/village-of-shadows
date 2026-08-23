@@ -3,21 +3,27 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { fetchTimeline } from "@/lib/api";
-import type { LearningDebrief, Timeline, TimelineSeat } from "@/lib/types";
+import type { GameAccessCredentials, LearningDebrief, Timeline, TimelineSeat } from "@/lib/types";
 import { BeliefMatrix } from "./BeliefMatrix";
+import { DeceptionReportView } from "./DeceptionReportView";
+import { BranchingReplayView } from "./BranchingReplayView";
+import { ShareReplayPanel } from "./ShareReplayPanel";
 
-type SummaryTab = "overview" | "learning" | "technical";
+type SummaryTab = "overview" | "learning" | "forensics" | "branch" | "technical" | "share";
 
 const SUMMARY_TABS: { id: SummaryTab; label: string; hint: string }[] = [
   { id: "overview", label: "Overview", hint: "Outcome and takeaways" },
   { id: "learning", label: "Learning evidence", hint: "People, tools and beliefs" },
+  { id: "forensics", label: "Deception report", hint: "Claims, pivots and clues" },
+  { id: "branch", label: "Branch replay", hint: "Change one decision" },
   { id: "technical", label: "Technical trace", hint: "Graph and checkpoints" },
+  { id: "share", label: "Share replay", hint: "Publish a sealed chronicle" },
 ];
 
 /** A focused post-game workspace. The report is divided into three views and
  * long evidence is progressively disclosed, so opening the debrief no longer
  * turns the game page into one continuous technical document. */
-export function GameSummary({ sessionId }: { sessionId: string }) {
+export function GameSummary({ sessionId, access }: { sessionId: string; access?: GameAccessCredentials }) {
   const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<SummaryTab>("overview");
@@ -34,7 +40,7 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchTimeline(sessionId)
+    fetchTimeline(sessionId, access)
       .then((value) => {
         if (!cancelled) setTimeline(value);
       })
@@ -44,7 +50,7 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, access]);
 
   if (error) return <p className="metrics-empty">Could not load the technical summary: {error}</p>;
   if (!timeline) return <SummaryLoading />;
@@ -86,6 +92,12 @@ export function GameSummary({ sessionId }: { sessionId: string }) {
           ) : (
             <p className="metrics-empty">No learning evidence was recorded for this game.</p>
           )
+        ) : activeTab === "forensics" ? (
+          <DeceptionReportView sessionId={sessionId} access={access} />
+        ) : activeTab === "branch" ? (
+          <BranchingReplayView sessionId={sessionId} access={access} />
+        ) : activeTab === "share" ? (
+          <ShareReplayPanel sessionId={sessionId} access={access} />
         ) : (
           <TechnicalEvidence timeline={timeline} />
         )}
@@ -111,7 +123,11 @@ function SummaryOverview({ timeline, prediction }: { timeline: Timeline; predict
   const slowest = [...timeline.steps]
     .filter((step) => step.elapsed_ms !== null)
     .sort((left, right) => (right.elapsed_ms ?? 0) - (left.elapsed_ms ?? 0))[0];
-  const winnerLabel = timeline.winner === "villagers" ? "The village survived" : "The shadows prevailed";
+  const winnerLabel = timeline.winner === "villagers"
+    ? "The village survived"
+    : timeline.winner === "jester"
+      ? "The fool claimed the final laugh"
+      : "The shadows prevailed";
 
   return (
     <div className="summary-view summary-overview">
@@ -122,7 +138,9 @@ function SummaryOverview({ timeline, prediction }: { timeline: Timeline; predict
           <p>
             {timeline.winner === "villagers"
               ? "The agents and human eliminated every werewolf before the village fell."
-              : "The werewolves reached parity and took control of the village."}
+              : timeline.winner === "jester"
+                ? "The village executed the Jester, completing their hidden objective."
+                : "The werewolves reached parity and took control of the village."}
           </p>
         </div>
         <strong>{timeline.winner ?? "unknown"}</strong>
@@ -241,6 +259,38 @@ function LearningEvidence({
               <p className="summary-prose">{debrief.partial_observability.explanation}</p>
             </article>
           </div>
+        </Disclosure>
+
+        <Disclosure
+          title="Werewolf private council"
+          meta={`${debrief.werewolf_negotiations.reduce((total, round) => total + round.messages.length, 0)} bounded turns`}
+        >
+          <p className="summary-prose">
+            Each living werewolf received an opening proposal and one revision. Agreement wins; unresolved disagreement uses the earliest living wolf as pack leader, never another model call.
+          </p>
+          {debrief.werewolf_negotiations.length ? (
+            <div className="wolf-debrief-rounds">
+              {debrief.werewolf_negotiations.map((round) => (
+                <article className="wolf-debrief-round" key={round.round}>
+                  <header>
+                    <span>Night {round.round}</span>
+                    <strong>Final target · {round.final_target ?? "none"}</strong>
+                  </header>
+                  <ol>
+                    {round.messages.map((message) => (
+                      <li key={message.seq}>
+                        <span>{message.name} → {message.target}</span>
+                        <p>{message.text}</p>
+                      </li>
+                    ))}
+                  </ol>
+                  {round.resolution ? <small>{round.resolution}</small> : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="summary-prose">The two werewolves were never alive together long enough to open a council.</p>
+          )}
         </Disclosure>
 
         <Disclosure title="Tool calls and rule validation" meta={`${debrief.tool_totals.accepted} accepted · ${debrief.tool_totals.rejected} rejected`}>

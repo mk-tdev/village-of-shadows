@@ -11,11 +11,16 @@ Status legend:
 - **In progress** — actively being implemented.
 - **Complete** — shipped and verified.
 
-Features remain **Proposed** unless their section says otherwise. Completed
-features stay here as an implementation record and as dependencies for the
-enhancements that follow.
+All fifteen enhancements are now **Complete**. This document remains the
+acceptance record for the shipped experiment platform.
+
+For operational instructions, interpretation guidance, experiments, and
+common analytical mistakes, use the
+[Player and Experiment Guide](player-guides/README.md).
 
 ## FE-01: Real werewolf negotiation
+
+**Status: Complete — implemented and verified on `codex/fe-01-werewolf-negotiation`.**
 
 Allow the two werewolves to conduct a private, multi-turn conversation before
 committing the night's target. They should be able to disagree, persuade each
@@ -35,6 +40,26 @@ Initial acceptance criteria:
 - A deterministic rule resolves disagreement when the limit is reached.
 - Negotiation messages appear only in God Mode and the post-game report.
 - Pause, replay, and checkpoint restoration remain safe.
+
+Implemented behavior:
+
+- When both werewolves are alive, each receives an opening council turn and
+  one revision turn. A human werewolf uses the same LangGraph interrupt path.
+- `negotiate_message` is connection-bound through MCP and validates living
+  role, exact turn ownership, legal target, one commit per turn, and an
+  approximately 80-token provider-neutral message budget.
+- Every new proposal replaces that wolf's previous target. Agreement wins;
+  unresolved disagreement is resolved by the earliest living wolf in seating
+  order, with a first-legal-target fallback if a provider never commits.
+- Council messages and the final resolution are private log events. They are
+  visible only to a living human werewolf or God Mode during play, and are
+  reconstructed in the post-game Learning Debrief.
+- One graph node owns one council turn. The seat-mind turn stamp and
+  idempotent `(game_id, seq)` persistence path keep pause/resume replays from
+  duplicating conversation or decisions.
+- Backend coverage verifies identity, turn order, target and budget
+  validation, revisions, deterministic resolution, persistence, and a full
+  mock game.
 
 ## FE-02: Trust and suspicion system
 
@@ -82,6 +107,8 @@ Implemented behavior:
 
 ## FE-03: Branching replay
 
+**Status: Complete — shipped with checkpoint-backed lineage and tests.**
+
 Use LangGraph checkpoints to return to a previous decision, replace one human
 or agent action, and continue the game as a new branch.
 
@@ -100,7 +127,15 @@ Initial acceptance criteria:
 - Replayed tool calls do not duplicate persistence effects.
 - The UI clearly distinguishes original and branched timelines.
 
+Implemented behavior: the post-game branch tab lists only real human
+interrupt checkpoints. The server clones the shared world and every per-seat
+mind through that moment, creates a new protected room, reapplies the changed
+answer through normal resume validation, and preserves an immutable parent
+lineage banner.
+
 ## FE-04: Model tournament mode
+
+**Status: Complete — shipped with balanced role rotation and budget stops.**
 
 Run batches of games automatically and compare model performance across roles,
 providers, prompts, and personalities.
@@ -124,7 +159,14 @@ Initial acceptance criteria:
 - A summary compares quality, reliability, speed, and cost.
 - Rate limits and maximum spend can stop a tournament safely.
 
+Implemented behavior: `/tournament` runs 1–50 all-agent games with bounded
+concurrency, deterministic role rotation, persisted results, optional price
+cards, hard token/spend stops, and an aggregate quality/reliability/speed/cost
+table.
+
 ## FE-05: Post-game deception report
+
+**Status: Complete — shipped as a fact/interpretation-separated forensic view.**
 
 Generate a forensic account of how the social game unfolded rather than only
 showing the final transcript and graph timeline.
@@ -146,7 +188,15 @@ Initial acceptance criteria:
 - Private material is available only with appropriate God Mode permission.
 - The report can be exported or shared without exposing API keys.
 
+Implemented behavior: the report cites immutable event sequences for public
+claims, belief shifts, vote pivots, ignored Seer clues, redirection targets,
+and a turning point. Persisted facts and deterministic interpretations use
+separate fields; private analysis requires host authority and can be included
+only in a secret God Mode replay.
+
 ## FE-06: Agent perspective viewer
+
+**Status: Complete — shipped with event-bounded reconstruction and tests.**
 
 Let a God Mode observer choose a player and inspect the game exactly as that
 player saw it at a selected moment.
@@ -166,6 +216,12 @@ Initial acceptance criteria:
 - Future events and forbidden private information never leak into the view.
 - Users can move between turns without modifying the game.
 - The interface clearly identifies player, phase, round, and checkpoint.
+
+Implemented behavior: God Mode selects a seat and event position to reconstruct
+only the public transcript, role-private evidence, conversation, notes,
+beliefs, available tools, legal targets, and briefing that existed by then.
+Future-sourced records and other seats' private evidence are filtered on the
+server.
 
 ## FE-07: Agent-authored private notes
 
@@ -205,6 +261,8 @@ Implementation notes:
 
 ## FE-08: Additional roles
 
+**Status: Complete — shipped as the optional expanded pack.**
+
 Introduce optional roles that create new information patterns, objectives, and
 night actions.
 
@@ -226,7 +284,14 @@ Initial acceptance criteria:
 - New roles do not rely on prompt instructions for rule enforcement.
 - The How to Play page describes the active role deck.
 
+Implemented behavior: the expanded seven-seat deck adds Hunter, Mayor, and
+Jester. Hunter retaliation uses a validated tool/human interrupt, Mayor votes
+count twice in server state, and Jester has an independent vote-out win
+condition. The standard deck remains the default.
+
 ## FE-09: Multiple human players
+
+**Status: Complete — shipped with per-seat tokens, filtered SSE, and host recovery.**
 
 Allow two or more people to join the same game from separate browsers while AI
 agents fill the remaining seats.
@@ -240,7 +305,15 @@ Initial acceptance criteria:
 - The graph can wait for different humans at different turns.
 - Abandoned seats can be paused, replaced by AI, or ended by policy.
 
+Implemented behavior: setup accepts multiple human seats and creates one
+hash-stored access secret per browser plus a separate host secret. REST and SSE
+project permitted state server-side. Links are rotatable; an absent invitee can
+be released to the validated offline agent, including safe completion of a
+currently pending interrupt, or the host can pause/stop the room.
+
 ## FE-10: Voice council
+
+**Status: Complete — shipped as opt-in neural speech with a device fallback and authoritative captions.**
 
 Give every agent a distinct voice and play discussion as a dramatic council
 meeting. The active 3D portrait should react while its dialogue is spoken.
@@ -254,7 +327,18 @@ Initial acceptance criteria:
 - Users can mute, skip, replay, and control playback speed.
 - Costs and provider failures degrade cleanly back to text.
 
+Implemented behavior: lifelike mode resolves only persisted public statements
+and gives each seat a stable OpenAI voice with an ancient-village performance
+direction. Generated audio is cached by immutable event, model, and voice so
+multiple humans do not pay for the same line twice. If neural speech is not
+configured or fails, the browser ranks natural installed voices and applies
+restrained seat-specific pacing. Voice remains opt-in and AI-generated; mute,
+skip, replay, engine, and pace controls never affect the authoritative caption
+or game state.
+
 ## FE-11: Dynamic village events
+
+**Status: Complete — shipped as an optional deterministic four-event ruleset.**
 
 Introduce optional events that temporarily change the information or action
 space and force agents to adapt.
@@ -277,7 +361,14 @@ Initial acceptance criteria:
 - Events are deterministic under checkpoint replay.
 - The event system cannot bypass normal action validation.
 
+Implemented behavior: one replay-deterministic event per round can silence one
+speaker, seal votes until tally resolution, force testimony order, or publish
+ambiguous evidence. Each effect is checkpointed, time-bounded, described in
+permitted views, and implemented around the existing validated actions.
+
 ## FE-12: Custom agent laboratory
+
+**Status: Complete — shipped with versioned presets and exact God Mode configuration.**
 
 Expose controlled configuration for experimenting with different agent
 behaviors without editing source code.
@@ -301,7 +392,15 @@ Initial acceptance criteria:
 - A preset can be saved, duplicated, exported, and assigned to a seat.
 - God Mode shows the exact effective configuration used for each agent.
 
+Implemented behavior: per-seat controls cover prompt additions, risk, honesty,
+aggression, reasoning, memory/tool strategy, turn token budget, timeout,
+retries, and fallback policy. Presets are saveable, duplicable, exportable,
+and assignable. Configuration is persisted with the game while the base role,
+visibility, tool, and safety instructions remain immutable.
+
 ## FE-13: Persistent relationships across games
+
+**Status: Complete — shipped as an opt-in, editable relationship archive.**
 
 Allow recurring personas to remember selected experiences from earlier games,
 such as betrayals, reliable allies, successful strategies, and repeated model
@@ -315,7 +414,14 @@ Initial acceptance criteria:
 - Memories cite the source game and event.
 - A new game can disable cross-game influence completely.
 
+Implemented behavior: final high-confidence belief revisions become
+source-game/event-cited observations about communication behavior. Old reasons
+and roles are deliberately not copied. `/relationships` lets users inspect,
+edit, or erase entries; disabled games load and write none of them.
+
 ## FE-14: Failure and resilience controls
+
+**Status: Complete — shipped with bounded recovery and visible diagnostics.**
 
 Make long-running real-model games robust against transient provider errors,
 rate limits, unavailable models, and cost overruns.
@@ -338,7 +444,16 @@ Initial acceptance criteria:
 - A failed provider can pause the game without corrupting state.
 - Recovery behavior is covered by replay and persistence tests.
 
+Implemented behavior: each seat has server-enforced timeouts, generation-only
+retries with exponential backoff, an optional fallback model, a validated
+deterministic terminal action, and an optional pause-after-exhaustion policy.
+Turn and game token ceilings are enforced before further calls. Retry,
+fallback, and budget events are streamed and persisted without replaying an
+already committed tool action.
+
 ## FE-15: Shareable game replay
+
+**Status: Complete — shipped with immutable public and secret God Mode snapshots.**
 
 Create a read-only replay experience for completed games that can be shared
 without access to the live session.
@@ -361,13 +476,19 @@ Initial acceptance criteria:
 - A viewer can move by round, phase, event, or graph checkpoint.
 - Links can be revoked or assigned an expiration date.
 
+Implemented behavior: completed games can publish credential-free snapshots
+with public events, graph steps, sanitized tool names/metrics, and deception
+analysis. God Mode adds private evidence and requires a separately hashed URL
+secret. The cinematic read-only viewer scrubs by immutable event sequence;
+links can expire or be revoked without changing the source game.
+
 ## Suggested implementation order
 
 ### Phase 1 — Deeper agent behavior
 
 1. **FE-07 Agent-authored private notes** — complete; supplies structured belief data.
 2. **FE-02 Trust and suspicion system** — complete; adds scored relationship state.
-3. **FE-01 Real werewolf negotiation** — adds cooperative agent planning.
+3. **FE-01 Real werewolf negotiation** — complete; adds cooperative agent planning.
 
 ### Phase 2 — Understand and compare decisions
 
@@ -406,10 +527,9 @@ Every enhancement should preserve these project invariants:
 - Provider failures degrade safely and remain visible in diagnostics.
 - New behavior includes backend tests and synchronized concept documentation.
 
-## Recommended next feature
+## Completion note
 
-With **FE-07 Agent-authored private notes** and **FE-02 Trust and suspicion
-system** complete, proceed to **FE-01 Real werewolf negotiation**. The two
-completed belief layers provide structured, inspectable context for coordinated
-planning and later power perspective viewing, deception analysis, branching
-comparisons, and model tournaments.
+The original backlog is fully implemented. Further work should now be driven
+by play-test evidence, provider telemetry, accessibility review, and focused
+improvements to the experiment design rather than by unimplemented items in
+this list.

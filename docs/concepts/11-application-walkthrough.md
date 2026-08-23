@@ -2,7 +2,7 @@
 
 This traces a single concrete sequence of events through every layer
 described in this guide — starting a game, connecting to it, and one AI
-seat taking its night action — followed by shorter walkthroughs of the
+seat taking a private negotiation turn — followed by shorter walkthroughs of the
 human-turn path and the pause/continue path, since those diverge partway
 through. Read this after the other files; it's meant to show how the pieces
 click together, not to introduce anything new.
@@ -29,7 +29,7 @@ registry.register(orch)
 # docstring.
 return {"session_id": session_id}
 ```
-([routers/games.py:13-48](../../backend/app/routers/games.py#L13-L48))
+([routers/games.py:72-118](../../backend/app/routers/games.py#L72-L118))
 
 The orchestrator exists and is registered — `GET /state` and `GET /stream`
 both work against it immediately — but its background task never gets
@@ -38,7 +38,7 @@ This wasn't always the design: `create_game` used to call `orch.start()`
 immediately, and the graph would begin running **in the background**
 before the HTTP response even returned. In practice that meant a fast game
 (especially with mock-provider seats) could race ahead several nodes —
-`assign_roles`, a few `night_wolves` turns — before the frontend's browser
+`assign_roles`, a few `werewolf_negotiation` turns — before the frontend's browser
 had even navigated to the game page and opened its SSE connection, so a
 player would land on a game already a few steps deep with no idea what
 they'd missed. See [07](07-pausing-with-interrupt.md) for the
@@ -76,7 +76,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:51-66](../../backend/app/routers/games.py#L51-L66))
+([routers/games.py:130-146](../../backend/app/routers/games.py#L130-L146))
 
 *Now* `orch.start()` calls `asyncio.create_task(self._run({"game":
 self.state}))` — but this time, the browser's SSE connection has already
@@ -85,33 +85,35 @@ been open and receiving events since step 3, so every node transition from
 window left where the graph can run ahead of a connection that hasn't
 opened yet, because the human is the one who opens that door.
 
-## Part B: one AI werewolf's night action
+## Part B: one AI werewolf's private negotiation turn
 
-Say the graph has reached the `night_wolves` node, and it's an AI seat's
-(not the human's) turn to choose an attack target.
+Say the graph has reached the `werewolf_negotiation` node, and it's an AI
+seat's (not the human's) turn to answer its teammate and revise an attack
+plan.
 
 **4. `_sync` re-points the orchestrator's state and announces the node.**
 ```python
-orch = _sync(config, game)   # orch.state = game; publish("node", {"node": "night_wolves"})
+orch = _sync(config, game)   # orch.state = game; publish("node", {"node": "werewolf_negotiation"})
 ```
 The debug panel's graph diagram (see
 [10-frontend-observability.md](10-frontend-observability.md)) highlights
-`night_wolves` the moment this SSE event arrives — before the wolf's turn
+`werewolf_negotiation` the moment this SSE event arrives — before the wolf's turn
 has even started.
 
-**5. `night_wolves` picks the current wolf and invokes that seat's mind.**
+**5. `werewolf_negotiation` picks the current wolf and invokes that seat's mind.**
 ```python
-wolf = wolves[game.wolf_index]
+wolf = expected_werewolf(game)
 pool = [p.name for p in game.alive_players() if p.role != "werewolf"]
 _emit_turn(orch, wolf.seat_id, wolf.name)          # "turn" SSE event -- feed shows "X is thinking"
 await run_seat_turn(
-    orch, wolf, phase="night",
-    briefing=_briefing(game, wolf, "It is night 1. Choose which villager..."),
-    turn_stamp=_turn_stamp(game, "night-wolves", game.wolf_index),
-    commit_tool="submit_night_action", fallback={"pool": pool},
+    orch, wolf, phase="night-negotiation",
+    briefing=_werewolf_negotiation_briefing(game, wolf, pool),
+    turn_stamp=_turn_stamp(game, "werewolf-negotiation", game.wolf_index),
+    commit_tool="negotiate_message",
+    fallback={"pool": pool, "text": "I favor this target..."},
 )
 ```
-([nodes.py:262-297](../../backend/app/game/nodes.py#L262-L297))
+([nodes.py:321-374](../../backend/app/game/nodes.py#L321-L374))
 
 This used to be a call to `run_agent_turn`, which built a fresh two-message
 conversation and threw it away when the turn ended. It now goes through this
@@ -140,7 +142,7 @@ async with create_session({"transport": "streamable_http", "url": settings.mcp_u
     model_tools = [t for t in all_tools if t.name in MODEL_VISIBLE_TOOLS]   # bind_seat filtered out here
     bound_model = chat_model.bind_tools(model_tools)
 ```
-([agent_turn.py:108-129](../../backend/app/game/agent_turn.py#L108-L129))
+([agent_turn.py:75-173](../../backend/app/game/agent_turn.py#L75-L173))
 
 This is the moment identity gets bound to a real MCP connection — see
 [05-mcp-tool-server-identity.md](05-mcp-tool-server-identity.md), including
@@ -163,8 +165,8 @@ for _ in range(MAX_TOOL_ITERATIONS):
     appended.append(ai_msg)
     ...
     for tc in ai_msg.tool_calls:
-        tool_message = await tool.ainvoke(tc)          # -> MCP call -> submit_night_action handler
-        orch.publish("mcp", {"action": "call", "tool": tc["name"], ...})  # activity feed: "Bob called submit_night_action"
+        tool_message = await tool.ainvoke(tc)          # -> MCP call -> negotiate_message handler
+        orch.publish("mcp", {"action": "call", "tool": tc["name"], ...})  # activity feed: "Bob called negotiate_message"
         appended.append(tool_message)
         ...
         if tc["name"] == commit_tool_name and result is not None:
@@ -172,7 +174,7 @@ for _ in range(MAX_TOOL_ITERATIONS):
     if committed_result is not None:
         return committed_result, appended
 ```
-([agent_turn.py:131-166](../../backend/app/game/agent_turn.py#L131-L166))
+([agent_turn.py:168-272](../../backend/app/game/agent_turn.py#L168-L272))
 
 `history` is everything this wolf already remembers — restored from its own
 checkpoint thread before the turn began — and `appended` is what this turn
@@ -190,33 +192,33 @@ this turn came through `build_agent_view`
 the partial-observability boundary is now the thing feeding the agent rather
 than a rule the prompt-builder has to remember to respect.
 
-**8. The model calls `submit_night_action`, which reaches the MCP handler.**
+**8. The model calls `negotiate_message`, which reaches the MCP handler.**
 ```python
 @mcp.tool()
-async def submit_night_action(target: str, thought: str = "", ctx: Context = None) -> dict:
+async def negotiate_message(text: str, target: str, ctx: Context) -> dict:
     game_id, seat_id = identity.resolve(ctx.session)   # -- resolved from the connection, not an argument
     orch = registry.get(game_id)
-    return await actions.apply_night_action(orch, seat_id, target, thought)
+    return await actions.negotiate_message(orch, seat_id, text, target)
 ```
-([mcp_server/server.py:90-95](../../backend/app/mcp_server/server.py#L90-L95))
+([mcp_server/server.py:189-195](../../backend/app/mcp_server/server.py#L189-L195))
 
-**9. `actions.apply_night_action` enforces the rules and writes the log.**
+**9. `actions.negotiate_message` enforces the rules and writes the private channel.**
 ```python
-if player.role == "werewolf":
-    pool = [p.name for p in state.alive_players() if p.role != "werewolf"]
-    if target_name not in pool:
-        raise ActionError(...)
-    state.night_proposals.append(target_name)
-    await _append_log(orch, type_="werewolf", ..., private=True)   # writes log_entries row + publishes "log"
-    return {"ok": True, "target": target_name}
+if player.role != "werewolf":
+    raise ActionError("Only werewolves can use the private negotiation channel.")
+expected = expected_werewolf(state)
+if expected is None or expected.seat_id != seat_id:
+    raise ActionError("It is not this werewolf's negotiation turn.")
+state.wolf_proposals[seat_id] = target
+await _append_log(orch, type_="werewolf_negotiation", ..., private=True)
 ```
-([actions.py:56-74](../../backend/app/game/actions.py#L56-L74))
+([actions.py:473-515](../../backend/app/game/actions.py#L473-L515))
 
-The target gets validated against the *current* legal pool (not trusted
-from the model), appended to `game.night_proposals` for tonight's tally,
-and logged as `private=True` — meaning `build_agent_view` and
-`get_public_transcript` will both filter it out of what any other seat ever
-sees (see [04](04-partial-observability-agent-view.md)).
+The action validates living role, phase, exact turn ownership, one commit per
+turn, message budget, and the *current* legal pool. The target replaces that
+wolf's earlier proposal and is logged as `private=True` — meaning
+`build_agent_view` and `get_public_transcript` filter it out of what ordinary
+seats see (see [04](04-partial-observability-agent-view.md)).
 
 **10. The turn's `finally` block records the decision, and the mind saves what it learned.**
 ```python
@@ -231,7 +233,7 @@ and publishes a `"decision"` SSE event — the row the debug panel's metrics
 table grows by one ([10](10-frontend-observability.md)).
 
 Then, as `deliberate` returns, LangGraph checkpoints the mind's updated state
-— so this wolf's night action, and the reasoning it produced getting there,
+— so this wolf's negotiation turn, and the reasoning it produced getting there,
 are now part of what it remembers on every future turn this game
 ([12](12-per-seat-agent-memory-subgraphs.md)). The `agent_decisions` row and
 the mind's conversation are recording the same turn for two different
@@ -245,8 +247,9 @@ _emit_turn(orch, None, None)     # clears "X is thinking" in the feed
 _maybe_pause(orch, game)         # no-op unless a pause was requested (see doc 07)
 return {"game": game}
 ```
-`_route_night_wolves` then decides whether to loop back to `night_wolves`
-for the next wolf, or move on to `night_doctor` — all inside the same
+`_route_werewolf_negotiation` then decides whether to loop back for the next
+council turn or move to `resolve_wolf_plan`. That deterministic node commits
+agreement or applies the pack-leader rule before moving to `night_doctor` — all inside the same
 `graph.astream(...)` call from step 2, with **no HTTP request involved at
 any point in this whole sequence** except the original MCP tool calls. The
 graph just keeps running through nodes until it either finishes the round
@@ -269,7 +272,7 @@ stuck showing something stale.
 
 ## Part C: the human seat's turn (where it diverges)
 
-When `_route_night_wolves`/`day_discussion`/`voting` eventually reaches the
+When `_route_werewolf_negotiation`/`day_discussion`/`voting` eventually reaches the
 human seat, the node takes the other branch:
 
 ```python

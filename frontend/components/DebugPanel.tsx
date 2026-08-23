@@ -8,12 +8,15 @@ import type {
   GraphStructure,
   MindNodeEvent,
   Player,
+  GameAccessCredentials,
   PrivateNoteEvent,
   SeatMetrics,
 } from "@/lib/types";
 import { BeliefMatrix } from "./BeliefMatrix";
 import { GraphFlow } from "./GraphFlow";
 import { SeatMindFlow } from "./SeatMindFlow";
+import { PerspectiveViewer } from "./PerspectiveViewer";
+import { AgentConfigurationPanel } from "./AgentConfigurationPanel";
 
 const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
   node: "⚙",
@@ -23,6 +26,7 @@ const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
   memory: "🧠",
   note: "✎",
   belief: "◉",
+  resilience: "⚠",
 };
 
 /** Engineering debug panel, embedded directly in the page (not a sliding
@@ -35,6 +39,8 @@ const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
  * part of the project meant to showcase the agentic-engineering internals,
  * not just play the game. */
 export function DebugPanel({
+  sessionId,
+  access,
   godView,
   currentNode,
   mindNode,
@@ -45,6 +51,8 @@ export function DebugPanel({
   beliefEvents,
   players,
 }: {
+  sessionId: string;
+  access?: GameAccessCredentials;
   godView: boolean;
   currentNode: string | null;
   mindNode: MindNodeEvent | null;
@@ -172,6 +180,8 @@ export function DebugPanel({
 
       {godView ? (
         <>
+          <AgentConfigurationPanel players={players} />
+          <PerspectiveViewer sessionId={sessionId} players={players} access={access} />
           <div className="belief-panel">
             <div className="private-notes-heading">
               <div>

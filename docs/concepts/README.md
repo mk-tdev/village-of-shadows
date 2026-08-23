@@ -90,3 +90,22 @@ all general lessons that happened to surface here.
 15. [Trust and suspicion as explicit agent state](15-trust-and-suspicion.md) —
     how private observer-to-subject scores evolve through validated tools,
     stream into God Mode, and become replayable learning evidence.
+16. [Real werewolf negotiation](16-real-werewolf-negotiation.md) — how two
+    agents share a bounded private planning channel, revise proposals, suspend
+    for a human teammate, and hand unresolved disagreement back to a
+    deterministic server-side rule.
+17. [Counterfactual branches and agent perspectives](17-branches-and-perspectives.md) —
+    clone real interrupt checkpoints, restore per-seat minds, and reconstruct
+    one agent's time-bounded information boundary.
+18. [Configurable worlds and model tournaments](18-configurable-worlds-and-tournaments.md) —
+    separate experimental behavior from enforced rules and compare repeated,
+    role-balanced model runs under hard budgets.
+19. [Multiple humans and browser authorization](19-multi-human-authorization.md) —
+    cryptographically bind browsers to seats and project every state/event at
+    the server boundary.
+20. [Resilience, voice, and cross-game continuity](20-resilience-voice-and-continuity.md) —
+    recover before committed actions, keep captions authoritative, and carry
+    behavior—not old secret roles—between games.
+21. [Immutable, revocable replay exports](21-shareable-replays.md) — publish
+    sanitized evidence snapshots with separate public/God authorization,
+    expiration, and revocation.

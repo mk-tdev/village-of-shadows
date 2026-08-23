@@ -1,6 +1,6 @@
 // Mirrors backend/app/models.py -- keep these in sync by hand for now.
 
-export type Role = "werewolf" | "seer" | "doctor" | "villager";
+export type Role = "werewolf" | "seer" | "doctor" | "villager" | "hunter" | "mayor" | "jester";
 export type Controller = "ai" | "human";
 export type Provider = "claude" | "openai" | "gemini" | "ollama" | "ollama_cloud" | "mock";
 
@@ -12,6 +12,51 @@ export interface AgentConfig {
   provider?: Provider | null;
   model_name?: string | null;
   endpoint?: string | null;
+  behavior?: AgentBehavior;
+  resilience?: ResiliencePolicy;
+}
+
+export interface ResiliencePolicy {
+  timeout_seconds: number;
+  max_retries: number;
+  retry_backoff_ms: number;
+  fallback_provider?: Provider | null;
+  fallback_model?: string | null;
+  pause_after_exhaustion: boolean;
+}
+
+export interface AgentBehavior {
+  version: number;
+  system_prompt_addition: string;
+  risk_tolerance: number;
+  honesty: number;
+  aggressiveness: number;
+  reasoning_level: "low" | "medium" | "high";
+  memory_strategy: "recency" | "selective" | "exhaustive";
+  tool_strategy: "cautious" | "balanced" | "decisive";
+  turn_token_budget: number;
+}
+
+export interface GameOptions {
+  version: number;
+  role_pack: "standard" | "expanded";
+  village_events: boolean;
+  cross_game_memory: boolean;
+  room_name: string;
+  max_game_tokens: number;
+}
+
+export interface GameAccessCredentials {
+  seatId: string;
+  accessToken: string;
+  hostToken?: string | null;
+}
+
+export interface CreatedGame {
+  session_id: string;
+  room_code: string;
+  host_token: string;
+  human_seats: { seat_id: string; name: string; access_token: string }[];
 }
 
 export interface ModelPreflightResult {
@@ -37,6 +82,8 @@ export interface Player {
   provider?: Provider | null;
   model_name?: string | null;
   endpoint?: string | null;
+  behavior?: AgentBehavior;
+  resilience?: ResiliencePolicy;
   role?: Role | null;
   alive: boolean;
 }
@@ -48,9 +95,12 @@ export type LogType =
   | "death"
   | "winner"
   | "werewolf"
+  | "werewolf_negotiation"
   | "seer"
   | "doctor"
-  | "thinking";
+  | "thinking"
+  | "hunter"
+  | "village_event";
 
 export interface LogEntry {
   seq: number;
@@ -66,10 +116,11 @@ export interface LogEntry {
 }
 
 export interface AwaitingInput {
-  kind: "statement" | "vote" | "night_action";
+  kind: "statement" | "vote" | "night_action" | "werewolf_negotiation" | "hunter_action";
   seat_id: string;
   prompt: string;
   options: string[];
+  turn_id?: string | null;
 }
 
 export interface InputAcceptedEvent {
@@ -84,9 +135,17 @@ export interface GameState {
   phase: string;
   log: LogEntry[];
   seer_knowledge: Record<string, Record<string, Role>>;
-  winner: "villagers" | "werewolves" | null;
+  winner: "villagers" | "werewolves" | "jester" | null;
   awaiting: AwaitingInput | null;
   paused: boolean;
+  options?: GameOptions;
+  village_event?: {
+    kind: "silence" | "secret_vote" | "forced_testimony" | "discovered_evidence";
+    round: number;
+    target_seat_id?: string | null;
+    description: string;
+  } | null;
+  access?: { seat_id: string | null; god_mode: boolean; protected: boolean };
 }
 
 export interface TurnEvent {
@@ -248,6 +307,18 @@ export interface LearningDebrief {
   }[];
   note_evolution: PrivateNoteEvent[];
   belief_evolution: BeliefEvent[];
+  werewolf_negotiations: {
+    round: number;
+    messages: {
+      seq: number;
+      seat_id: string;
+      name: string;
+      text: string;
+      target: string | null;
+    }[];
+    final_target: string | null;
+    resolution: string | null;
+  }[];
   comparisons: {
     round: number;
     phase: string;
@@ -262,7 +333,7 @@ export interface Timeline {
   session_id: string;
   available: boolean;
   caveat?: string;
-  winner?: "villagers" | "werewolves" | null;
+  winner?: "villagers" | "werewolves" | "jester" | null;
   rounds?: number | null;
   phase?: string | null;
   total_steps?: number;
@@ -277,6 +348,124 @@ export interface Timeline {
   private_notes?: PrivateNoteEvent[];
   belief_events?: BeliefEvent[];
   learning_debrief?: LearningDebrief | null;
+}
+
+export interface PerspectiveSnapshot {
+  session_id: string;
+  seat_id: string;
+  name: string;
+  role: Role | null;
+  alive: boolean;
+  round: number;
+  phase: string;
+  through_seq: number;
+  max_seq: number;
+  moments: { seq: number; round: number; phase: string; label: string }[];
+  public_transcript: LogEntry[];
+  visible_events: LogEntry[];
+  private_knowledge: Record<string, unknown>;
+  conversation_history: {
+    role: "briefing" | "agent";
+    content: string;
+    round: number;
+    phase: string;
+  }[];
+  current_briefing: string | null;
+  private_notes: PrivateNoteEvent[];
+  beliefs: BeliefEvent[];
+  available_tools: string[];
+  legal_targets: string[];
+}
+
+export interface DeceptionReport {
+  session_id: string;
+  winner: "villagers" | "werewolves" | "jester" | null;
+  scope: "public" | "god";
+  method: string;
+  claims: {
+    seq: number;
+    round: number;
+    speaker: string;
+    text: string;
+    fact: string;
+    interpretation: string;
+    classification: "wolf-framing" | "uncertain";
+  }[];
+  vote_pivots: {
+    seq: number;
+    round: number;
+    player: string;
+    from: string;
+    to: string;
+    fact: string;
+    interpretation: string;
+  }[];
+  belief_shifts: {
+    observer: string;
+    subject: string;
+    from: number;
+    to: number;
+    reason: string;
+    source_seq: number | null;
+  }[];
+  ignored_clues: {
+    seq: number;
+    seer: string;
+    target: string;
+    fact: string;
+    interpretation: string;
+  }[];
+  turning_point: { seq: number; fact: string; interpretation: string } | null;
+  wolf_redirection_targets: { target: string; votes: number }[];
+}
+
+export interface BranchPoint {
+  checkpoint_id: string;
+  created_at: string;
+  round: number;
+  phase: string;
+  log_seq: number;
+  log_count: number;
+  seat_id: string;
+  kind: AwaitingInput["kind"];
+  prompt: string;
+  options: string[];
+}
+
+export interface GameBranch {
+  child_game_id: string;
+  parent_game_id: string;
+  checkpoint_id: string;
+  branch_log_seq: number;
+  replaced_seat_id: string;
+  replaced_kind: string;
+  replacement: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface TournamentReport {
+  id: string;
+  status: "queued" | "running" | "completed" | "stopped_budget" | "failed" | "cancelled";
+  games_requested: number;
+  games_completed: number;
+  stop_reason: string | null;
+  totals: { tokens: number; estimated_cost_usd: number };
+  summary: {
+    provider: string;
+    model_name: string;
+    games: number;
+    wins: number;
+    werewolf_games: number;
+    werewolf_wins: number;
+    correct_votes: number;
+    false_votes: number;
+    input_tokens: number;
+    output_tokens: number;
+    win_rate: number;
+    deception_success: number;
+    average_survival: number;
+    average_latency_ms: number;
+  }[];
 }
 
 /** Published as each node of a seat's mind subgraph executes, so the debug
@@ -338,6 +527,72 @@ export interface McpEvent {
  * -- see agent_turn.py's orch.publish("mcp", ...) calls. */
 export interface ActivityEntry {
   id: number;
-  kind: "node" | "turn" | "mcp" | "decision" | "memory" | "note" | "belief";
+  kind: "node" | "turn" | "mcp" | "decision" | "memory" | "note" | "belief" | "resilience";
   text: string;
+}
+
+export interface ResilienceEvent {
+  seat_id: string;
+  name: string;
+  status: "retrying" | "fallback_model" | "deterministic_fallback" | "game_token_budget";
+  candidate: string;
+  attempt: number;
+  message: string;
+}
+
+export interface RelationshipMemory {
+  id: number;
+  owner_name: string;
+  subject_name: string;
+  memory: string;
+  source_game_id: string;
+  source_seq: number | null;
+  active: boolean;
+  created_at: string;
+  edited_at: string | null;
+}
+
+export interface ReplayShareRecord {
+  id: string;
+  game_id: string;
+  scope: "public" | "god";
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface ReplaySnapshot {
+  version: number;
+  game_id: string;
+  scope: "public" | "god";
+  winner: "villagers" | "werewolves" | "jester" | null;
+  rounds: number;
+  players: Player[];
+  events: LogEntry[];
+  graph: {
+    steps: { step: number; next_node: string | null; phase: string; round: number; elapsed_ms: number | null }[];
+    node_counts: { node: string; count: number }[];
+  };
+  metrics: {
+    seat_id: string;
+    round: number;
+    phase: string;
+    provider: string | null;
+    model_name: string | null;
+    latency_ms: number;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    tools: string[];
+  }[];
+  deception_report: DeceptionReport;
+  private_notes?: PrivateNoteEvent[];
+  belief_events?: BeliefEvent[];
+}
+
+export interface ResolvedReplay {
+  id: string;
+  scope: "public" | "god";
+  created_at: string;
+  expires_at: string | null;
+  snapshot: ReplaySnapshot;
 }

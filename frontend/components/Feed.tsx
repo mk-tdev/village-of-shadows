@@ -8,10 +8,12 @@ import { CharacterPortrait } from "./CharacterPortrait";
 export function Feed({
   entries,
   godView,
+  canSeeWerewolfCouncil,
   active,
 }: {
   entries: LogEntry[];
   godView: boolean;
+  canSeeWerewolfCouncil: boolean;
   active: TurnEvent | null;
 }) {
   const feedRef = useRef<HTMLDivElement>(null);
@@ -24,7 +26,12 @@ export function Feed({
   return (
     <div className="feed" ref={feedRef}>
       {entries.map((entry) => (
-        <FeedEntry key={entry.seq} entry={entry} godView={godView} />
+        <FeedEntry
+          key={entry.seq}
+          entry={entry}
+          godView={godView}
+          canSeeWerewolfCouncil={canSeeWerewolfCouncil}
+        />
       ))}
       {active && (
         <div className="entry entry-thinking">

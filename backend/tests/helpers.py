@@ -52,4 +52,9 @@ async def make_orchestrator(tmp_path, controllers: list[str]) -> GameOrchestrato
 def answer_for(awaiting) -> dict:
     if awaiting.kind == "statement":
         return {"text": "I have my suspicions.", "thought": "test thought"}
+    if awaiting.kind == "werewolf_negotiation":
+        return {
+            "target": awaiting.options[0],
+            "text": "This player is our strongest threat; we can redirect suspicion tomorrow.",
+        }
     return {"target": awaiting.options[0], "thought": "test thought"}

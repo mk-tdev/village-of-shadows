@@ -5,17 +5,53 @@ from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app import persistence
-from app.game import registry
+from app.game import access, registry
+from app.game.views import build_human_state_view, log_visible_to_human
+from app.models import LogEntry
 
 router = APIRouter(prefix="/games", tags=["stream"])
 
 
 @router.get("/{session_id}/stream")
-async def stream(session_id: str, request: Request) -> EventSourceResponse:
+async def stream(
+    session_id: str,
+    request: Request,
+    seat_id: str | None = None,
+    access_token: str | None = None,
+    host_token: str | None = None,
+) -> EventSourceResponse:
     try:
         orch = registry.get(session_id)
     except KeyError:
         raise HTTPException(404, "No such game.")
+    viewer = await access.authorize(
+        request.app.state.db_conn,
+        session_id,
+        seat_id=seat_id,
+        access_token=access_token,
+        host_token=host_token,
+    )
+    if viewer is None:
+        raise HTTPException(403, "A valid room or seat credential is required.")
+    if viewer.seat_id:
+        await access.mark_claimed(request.app.state.db_conn, session_id, viewer.seat_id)
+
+    def visible_event(event: str, data: dict) -> dict | None:
+        if event == "log":
+            entry = LogEntry(**data)
+            return data if log_visible_to_human(orch.state, entry, viewer.seat_id, viewer.host) else None
+        if event == "roles_assigned":
+            projected = build_human_state_view(
+                orch.state, seat_id=viewer.seat_id, host=viewer.host,
+            )
+            return {"players": projected["players"]}
+        if event in {"private_note", "belief_update"}:
+            return data if viewer.host else None
+        if event == "seer_result":
+            return data if viewer.host or data.get("seat_id") == viewer.seat_id else None
+        if event in {"awaiting_input", "input_accepted"}:
+            return data if data.get("seat_id") == viewer.seat_id else None
+        return data
 
     async def event_generator():
         # Each connection gets its own queue via subscribe() -- see
@@ -25,13 +61,19 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
         # the connection that actually survives).
         queue = orch.subscribe()
         try:
-            yield {"event": "state", "data": json.dumps(orch.state.model_dump())}
+            yield {
+                "event": "state",
+                "data": json.dumps(build_human_state_view(
+                    orch.state, seat_id=viewer.seat_id, host=viewer.host,
+                )),
+            }
             # Notebook rows are deliberately persisted outside GameState so a
             # pause/replay cannot duplicate or roll them back. Send their
             # immutable history as a separate observer snapshot; the frontend
             # renders it only while God Mode is enabled.
-            note_events = await persistence.get_note_events(
-                orch.conn, orch.session_id,
+            note_events = (
+                await persistence.get_note_events(orch.conn, orch.session_id)
+                if viewer.host else []
             )
             player_names = {player.seat_id: player.name for player in orch.state.players}
             yield {
@@ -43,8 +85,9 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
                     ],
                 }),
             }
-            belief_events = await persistence.get_belief_events(
-                orch.conn, orch.session_id,
+            belief_events = (
+                await persistence.get_belief_events(orch.conn, orch.session_id)
+                if viewer.host else []
             )
             alive = {player.seat_id: player.alive for player in orch.state.players}
             yield {
@@ -65,7 +108,7 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
                     ],
                 }),
             }
-            if orch.state.awaiting is not None:
+            if orch.state.awaiting is not None and orch.state.awaiting.seat_id == viewer.seat_id:
                 yield {"event": "awaiting_input", "data": json.dumps(orch.state.awaiting.model_dump())}
             if orch.current_node is not None:
                 yield {"event": "node", "data": json.dumps({"node": orch.current_node})}
@@ -77,7 +120,9 @@ async def stream(session_id: str, request: Request) -> EventSourceResponse:
                     event = await asyncio.wait_for(queue.get(), timeout=15)
                 except asyncio.TimeoutError:
                     continue
-                yield {"event": event["event"], "data": json.dumps(event["data"])}
+                filtered = visible_event(event["event"], event["data"])
+                if filtered is not None:
+                    yield {"event": event["event"], "data": json.dumps(filtered)}
         finally:
             orch.unsubscribe(queue)
 
