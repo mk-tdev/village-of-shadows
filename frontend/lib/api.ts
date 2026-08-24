@@ -210,6 +210,14 @@ export async function stopGame(sessionId: string, access?: GameAccessCredentials
   if (!res.ok) throw new Error(`Failed to stop game (${res.status})`);
 }
 
+export async function deleteGameData(sessionId: string, access?: GameAccessCredentials): Promise<void> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/data${hostParams(access)}`, { method: "DELETE" });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Failed to erase game data (${res.status})`);
+  }
+}
+
 export async function beginGame(sessionId: string, access?: GameAccessCredentials): Promise<void> {
   const res = await fetch(`${API_BASE}/games/${sessionId}/begin${hostParams(access)}`, { method: "POST" });
   if (!res.ok) throw new Error(`Failed to begin game (${res.status})`);

@@ -8,7 +8,7 @@
 [![MCP](https://img.shields.io/badge/MCP-agent%20tools-0f766e?style=flat-square)](https://modelcontextprotocol.io/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?style=flat-square)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
-[![Tests](https://img.shields.io/badge/backend%20tests-66%20passing-2e7d32?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/backend%20tests-70%20passing-2e7d32?style=flat-square)](#testing)
 [![Built with Codex](https://img.shields.io/badge/Built%20with-Codex-111827?style=flat-square&logo=openai&logoColor=white)](https://openai.com/codex/)
 
 <img src="assets/youtube-thumbnail-1280x720.jpg" alt="Village of Shadows — six AI agents versus one human" width="100%" />
@@ -48,7 +48,7 @@ The experience now begins at a cinematic, animated landing page that introduces 
 | **Unscripted social behavior** | Werewolves can lie, seers can conceal evidence, doctors can make mistakes, and villagers can confidently accuse one another. |
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
 | **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth, with a full-screen live execution inspector. |
-| **Closed-loop Learning Debrief** | Predict before play, then connect human interrupts, information boundaries, tool validation, memory growth, and divergent decisions to agentic-AI concepts. |
+| **Measured Learning Debrief** | Predict before play, inspect run evidence, complete a scored concept check, and download a portable learning report with the next experiments. |
 | **Living cinematic village** | A full-body, identity-matched cast inhabits a moonlit 3D village, with automatic camera direction, speaker staging, voting trails, memorials, and phase-aware atmosphere. |
 | **Cinematic agentic landing** | An animated introduction presents the seven seats, shared LangGraph world, private agent minds, validated actions, and human participation before configuration begins. |
 
@@ -235,7 +235,19 @@ Village of Shadows now makes its educational outcome explicit instead of leaving
 5. **Debrief** against durable evidence reconstructed from LangGraph checkpoints, game logs, and model-decision records.
 6. **Compare** by replaying with one changed model or personality.
 
-The post-game Learning Debrief identifies where execution suspended for the human, counts public versus role-private events, lists model tool calls with accepted or rejected validation results, visualizes each seat's memory growth, replays evidence-backed trust and suspicion changes, compares decisions made during the same public round, maps observations to core agentic-AI concepts, and suggests controlled experiments for the next run. It reports stated rationale and observable actions, not hidden chain-of-thought.
+The post-game Learning Debrief identifies where execution suspended for the human, counts public versus role-private events, lists model tool calls with accepted or rejected validation results, visualizes each seat's memory growth, replays evidence-backed trust and suspicion changes, compares decisions made during the same public round, maps observations to core agentic-AI concepts, and suggests controlled experiments for the next run. A five-question concept check is scored locally in the browser, can be revised, and exports the learner's prediction, responses, run evidence, and next experiments as Markdown. It reports stated rationale and observable actions, not hidden chain-of-thought.
+
+## 🔐 Data, compliance, and deletion
+
+Read the standalone [Data Sources and Compliance Statement](docs/data-sources-and-compliance.md) for the complete data inventory, provider flows, educational boundaries, retention model, access controls, and known limitations. The [Third-party Notices](THIRD_PARTY_NOTICES.md) disclose optional model/speech services, principal dependencies, and asset provenance.
+
+Assessment answers and pre-game predictions stay in browser local storage. Game records are stored in the backend's SQLite database so sessions can reconnect, replay, and produce evidence. Stopping preserves the audit record; a host can permanently remove one game's database rows, private agent artifacts, replay snapshots, cached audio, derived memories, and LangGraph checkpoint threads with:
+
+```bash
+curl -X DELETE "http://127.0.0.1:8000/games/SESSION_ID/data?host_token=HOST_TOKEN"
+```
+
+Do not enter personal, confidential, educational-record, or sensitive data into a public demo. Self-hosters are responsible for TLS, database access, provider terms, backups, retention policy, and jurisdiction-specific requirements.
 
 ## 📁 Project map
 
@@ -255,6 +267,8 @@ frontend/
 └── public/                  # Character portraits, role artifacts, and scene art
 
 docs/concepts/               # Agentic engineering guide with source-linked implementation notes
+docs/data-sources-and-compliance.md  # Standalone data, safety, and compliance statement
+docs/runtime-evidence.md             # Reproducible semi-final verification record
 ```
 
 ## ✅ Testing
@@ -271,7 +285,7 @@ cd ..
 python3 docs/concepts/check_citations.py
 ```
 
-The 67-test backend suite covers browser and agent information boundaries, model preflight, persistent seat memory, immutable notes and beliefs, negotiation and pass safety, checkpoint branching, tournaments, expanded roles, village events, multi-human authorization, safe cached council speech, resilience, cross-game relationships, sealed replay exports, pause/resume safety, complete standard and expanded mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
+The 70-test backend suite covers browser and agent information boundaries, model preflight, persistent seat memory, immutable notes and beliefs, negotiation and pass safety, checkpoint branching, tournaments, expanded roles, village events, multi-human authorization, safe cached council speech, resilience, cross-game relationships, sealed replay exports, pause/resume safety, complete standard and expanded mock games, Learning Debrief evidence, host-authorized game-data deletion, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
 
 ## 📚 Learn from the implementation
 

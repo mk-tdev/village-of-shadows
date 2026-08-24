@@ -8,6 +8,7 @@ import { BeliefMatrix } from "./BeliefMatrix";
 import { DeceptionReportView } from "./DeceptionReportView";
 import { BranchingReplayView } from "./BranchingReplayView";
 import { ShareReplayPanel } from "./ShareReplayPanel";
+import { LearningAssessment } from "./LearningAssessment";
 
 type SummaryTab = "overview" | "learning" | "forensics" | "branch" | "technical" | "share";
 
@@ -81,7 +82,7 @@ export function GameSummary({ sessionId, access }: { sessionId: string; access?:
 
       <div className="summary-tab-panel">
         {activeTab === "overview" ? (
-          <SummaryOverview timeline={timeline} prediction={prediction} />
+          <SummaryOverview sessionId={sessionId} timeline={timeline} prediction={prediction} />
         ) : activeTab === "learning" ? (
           timeline.learning_debrief ? (
             <LearningEvidence
@@ -118,7 +119,15 @@ function SummaryLoading() {
   );
 }
 
-function SummaryOverview({ timeline, prediction }: { timeline: Timeline; prediction: string }) {
+function SummaryOverview({
+  sessionId,
+  timeline,
+  prediction,
+}: {
+  sessionId: string;
+  timeline: Timeline;
+  prediction: string;
+}) {
   const debrief = timeline.learning_debrief;
   const slowest = [...timeline.steps]
     .filter((step) => step.elapsed_ms !== null)
@@ -185,6 +194,8 @@ function SummaryOverview({ timeline, prediction }: { timeline: Timeline; predict
               ))}
             </div>
           </section>
+
+          <LearningAssessment sessionId={sessionId} timeline={timeline} prediction={prediction} />
 
           <section className="summary-next-move">
             <div>

@@ -349,6 +349,53 @@ async def stop_game(session_id: str, request: Request, host_token: str | None = 
     return {"ok": True}
 
 
+async def _discard_threads(request: Request, session_id: str, seat_ids: list[str]) -> None:
+    thread_ids = [session_id, *(f"{session_id}:{seat_id}" for seat_id in seat_ids)]
+    seen: set[int] = set()
+    for compiled in (request.app.state.graph, getattr(request.app.state, "seat_mind", None)):
+        checkpointer = getattr(compiled, "checkpointer", None)
+        if checkpointer is None or id(checkpointer) in seen or not hasattr(checkpointer, "adelete_thread"):
+            continue
+        seen.add(id(checkpointer))
+        for thread_id in thread_ids:
+            try:
+                await checkpointer.adelete_thread(thread_id)
+            except Exception:  # noqa: BLE001 - deletion continues for remaining persisted data
+                pass
+
+
+@router.delete("/{session_id}/data")
+async def delete_game_data(session_id: str, request: Request, host_token: str | None = None) -> dict:
+    """Permanently erase a game, its checkpoints, logs, private agent data,
+    cached voice, room credentials, replay snapshots, and derived memories.
+
+    This is intentionally separate from Stop Game: stopping preserves an
+    auditable played-out record, while this endpoint is an explicit host-only
+    privacy action and cannot be undone.
+    """
+    conn = request.app.state.db_conn
+    cursor = await conn.execute("SELECT 1 FROM games WHERE id = ?", (session_id,))
+    if await cursor.fetchone() is None:
+        raise HTTPException(404, "No such game.")
+    await _viewer(request, session_id, host_token=host_token, require_host=True)
+
+    seat_cursor = await conn.execute("SELECT seat_id FROM seats WHERE game_id = ?", (session_id,))
+    seat_ids = [row[0] for row in await seat_cursor.fetchall()]
+    try:
+        orch = registry.get(session_id)
+    except KeyError:
+        orch = None
+    if orch is not None:
+        orch.stop()
+    await _discard_threads(request, session_id, seat_ids)
+    try:
+        deleted = await persistence.delete_game_data(conn, session_id)
+    except KeyError:
+        raise HTTPException(404, "No such game.") from None
+    registry.unregister(session_id)
+    return {"ok": True, "deleted": deleted}
+
+
 @router.get("/{session_id}/room")
 async def get_room(session_id: str, request: Request, host_token: str | None = None) -> dict:
     await _viewer(request, session_id, host_token=host_token, require_host=True)

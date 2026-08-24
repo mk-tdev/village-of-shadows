@@ -3725,6 +3725,103 @@ input:focus {
 }
 .summary-divider span { color: var(--amber); font-size: 10px; letter-spacing: 0.1em; font-weight: 700; }
 .summary-divider p { margin: 0; color: var(--ink-faint); font-size: 11px; }
+.learning-assessment {
+  overflow: hidden;
+  border: 1px solid rgba(232, 163, 61, 0.28);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(49, 99, 122, 0.15), transparent 38%),
+    rgba(4, 10, 15, 0.58);
+}
+.learning-assessment > header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--card-border);
+}
+.learning-assessment h3 {
+  margin: 4px 0 3px;
+  color: var(--ink);
+  font: 500 21px/1.1 "Spectral", serif;
+}
+.learning-assessment header p,
+.learning-assessment > footer p {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+.learning-score {
+  min-width: 92px;
+  padding: 11px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  text-align: center;
+}
+.learning-score strong,
+.learning-score span { display: block; }
+.learning-score strong { color: var(--amber); font: 500 25px/1 "Spectral", serif; }
+.learning-score span { margin-top: 4px; color: var(--ink-faint); font-size: 8.5px; text-transform: uppercase; letter-spacing: .08em; }
+.learning-score.is-scored { border-color: rgba(105, 178, 136, .32); }
+.learning-score.is-scored strong { color: #8bc5a6; }
+.learning-question-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.learning-question-list > li { padding: 16px 20px; border-bottom: 1px solid var(--card-border); }
+.learning-question-list > li.is-correct { background: rgba(53, 119, 81, .055); }
+.learning-question-list > li.is-review { background: rgba(153, 70, 55, .055); }
+.learning-question-title { display: flex; align-items: baseline; gap: 10px; }
+.learning-question-title > span { color: var(--amber); font: 700 8px/1 "Inter", sans-serif; letter-spacing: .12em; }
+.learning-question-title h4 { margin: 0; color: var(--ink); font-size: 12.5px; font-weight: 600; }
+.learning-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 11px; }
+.learning-options button {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 15px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .018);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.learning-options button:hover:not(:disabled),
+.learning-options button:focus-visible { border-color: rgba(232, 163, 61, .5); color: var(--ink); outline: none; }
+.learning-options button i {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #43545b;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px #091118;
+}
+.learning-options button.is-selected { border-color: rgba(232, 163, 61, .58); background: rgba(232, 163, 61, .09); color: var(--ink); }
+.learning-options button.is-selected i { background: var(--amber); border-color: var(--amber); }
+.learning-options button.is-answer { border-color: rgba(105, 178, 136, .5); }
+.learning-options button.is-answer i { background: #74b68f; border-color: #74b68f; }
+.learning-options button:disabled { cursor: default; opacity: .78; }
+.learning-explanation { margin: 9px 0 0 25px; color: #8faaa4; font-size: 10px; line-height: 1.5; }
+.learning-assessment > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 14px 20px;
+}
+.learning-assessment > footer > div { display: flex; gap: 8px; }
+.learning-assessment-action:disabled { opacity: .38; cursor: not-allowed; }
 @media (max-width: 760px) {
   .learning-debrief-hero,
   .learning-evidence-grid { grid-template-columns: 1fr; }
@@ -3733,6 +3830,11 @@ input:focus {
   .memory-growth-row { grid-template-columns: 105px 1fr 58px; }
   .next-experiments ol { columns: 1; }
   .summary-divider { flex-direction: column; gap: 4px; }
+  .learning-assessment > header { grid-template-columns: 1fr; }
+  .learning-score { width: fit-content; }
+  .learning-options { grid-template-columns: 1fr; }
+  .learning-assessment > footer { align-items: flex-start; flex-direction: column; }
+  .learning-assessment > footer > div { width: 100%; flex-wrap: wrap; }
 }
 .summary-stats {
   display: grid;

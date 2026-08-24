@@ -74,6 +74,73 @@ async def stop_game(conn: aiosqlite.Connection, session_id: str) -> None:
     await conn.commit()
 
 
+async def delete_game_data(conn: aiosqlite.Connection, session_id: str) -> dict[str, int]:
+    """Permanently remove one game's persisted data and derived exports.
+
+    The host-facing API calls this only after credential validation and after
+    checkpoint threads have been reclaimed. Cross-game memories and replay
+    snapshots are derived from the source game, so they are erased with it
+    instead of leaving private or decontextualized fragments behind.
+    """
+    cursor = await conn.execute("SELECT 1 FROM games WHERE id = ?", (session_id,))
+    if await cursor.fetchone() is None:
+        raise KeyError(session_id)
+
+    tournament_cursor = await conn.execute(
+        "SELECT DISTINCT tournament_id FROM tournament_games WHERE game_id = ?",
+        (session_id,),
+    )
+    tournament_ids = [row[0] for row in await tournament_cursor.fetchall()]
+    tables = [
+        "voice_audio_cache",
+        "replay_shares",
+        "cross_game_memories",
+        "seat_access_tokens",
+        "game_hosts",
+        "game_configs",
+        "tournament_games",
+        "game_branches",
+        "agent_belief_events",
+        "agent_note_events",
+        "agent_notes",
+        "agent_decisions",
+        "log_entries",
+        "seats",
+    ]
+    counts: dict[str, int] = {}
+    try:
+        await conn.execute("BEGIN")
+        for table in tables:
+            if table == "cross_game_memories":
+                result = await conn.execute(
+                    "DELETE FROM cross_game_memories WHERE source_game_id = ?", (session_id,),
+                )
+            elif table == "game_branches":
+                result = await conn.execute(
+                    "DELETE FROM game_branches WHERE child_game_id = ? OR parent_game_id = ?",
+                    (session_id, session_id),
+                )
+            else:
+                result = await conn.execute(f"DELETE FROM {table} WHERE game_id = ?", (session_id,))
+            counts[table] = max(result.rowcount, 0)
+        result = await conn.execute("DELETE FROM games WHERE id = ?", (session_id,))
+        counts["games"] = max(result.rowcount, 0)
+        for tournament_id in tournament_ids:
+            await conn.execute(
+                """UPDATE tournaments
+                   SET games_completed = (
+                       SELECT COUNT(*) FROM tournament_games WHERE tournament_id = ?
+                   )
+                   WHERE id = ?""",
+                (tournament_id, tournament_id),
+            )
+        await conn.commit()
+    except Exception:
+        await conn.rollback()
+        raise
+    return counts
+
+
 async def record_log_entry(conn: aiosqlite.Connection, session_id: str, entry: LogEntry) -> None:
     """Idempotent on `(game_id, seq)`.
 
