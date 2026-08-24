@@ -362,12 +362,15 @@ async def werewolf_negotiation(state: dict, config: RunnableConfig) -> dict:
                 "options": pool,
                 "turn_id": _turn_stamp(game, "werewolf-negotiation", game.wolf_index),
             })
-            await actions.negotiate_message(
-                orch,
-                wolf.seat_id,
-                answer.get("text", "I favor this target."),
-                answer["target"],
-            )
+            if answer.get("skip"):
+                await actions.skip_werewolf_negotiation(orch, wolf.seat_id)
+            else:
+                await actions.negotiate_message(
+                    orch,
+                    wolf.seat_id,
+                    answer.get("text", "I favor this target."),
+                    answer["target"],
+                )
         else:
             await run_seat_turn(
                 orch,

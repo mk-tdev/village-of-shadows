@@ -4,6 +4,17 @@ This guide covers expanded roles, the Custom Agent Laboratory, persistent
 relationships, and provider resilience. These options decide what kind of
 experiment enters the village.
 
+## Choose your own seat
+
+The primary seat picker always shows all seven characters. Selecting one moves
+the current browser's human identity to that seat; every other seat remains AI
+unless it was deliberately invited as an additional human.
+
+Open **Invite more human players** only for a shared room. Those checks create
+extra private join links; they do not change which character the host plays.
+This separation lets a solo player choose any character without first adding
+or removing human controllers from the individual seat forms.
+
 ## Establish a baseline first
 
 For a clean first comparison:

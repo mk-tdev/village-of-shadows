@@ -97,23 +97,42 @@ export function Controls({
             </button>
           ))}
         </div>
-        <button
-          className="btn wolf-council-submit"
-          disabled={submitting || locked || !validSelectedTarget || !text.trim()}
-          onClick={async () => {
-            if (!validSelectedTarget) return;
-            setLockedPromptKey(promptKey);
-            const accepted = await onSubmit({ target: validSelectedTarget, text: text.trim() });
-            if (accepted) {
-              setText("");
-              setSelectedTarget(null);
-            } else {
-              setLockedPromptKey(null);
-            }
-          }}
-        >
-          Send private plan
-        </button>
+        <div className="wolf-council-actions">
+          <button
+            className="btn btn-secondary"
+            disabled={submitting || locked}
+            onClick={async () => {
+              setLockedPromptKey(promptKey);
+              const accepted = await onSubmit({ skip: true });
+              if (accepted) {
+                setText("");
+                setSelectedTarget(null);
+              } else {
+                setLockedPromptKey(null);
+              }
+            }}
+          >
+            Pass this council turn
+          </button>
+          <button
+            className="btn wolf-council-submit"
+            disabled={submitting || locked || !validSelectedTarget || !text.trim()}
+            onClick={async () => {
+              if (!validSelectedTarget) return;
+              setLockedPromptKey(promptKey);
+              const accepted = await onSubmit({ target: validSelectedTarget, text: text.trim() });
+              if (accepted) {
+                setText("");
+                setSelectedTarget(null);
+              } else {
+                setLockedPromptKey(null);
+              }
+            }}
+          >
+            Send private plan
+          </button>
+        </div>
+        <small className="wolf-council-pass-note">Passing keeps your earlier target, if any, and lets the next werewolf act.</small>
       </div>
     );
   }

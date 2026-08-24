@@ -40,6 +40,11 @@ villagers never see them. A living human werewolf sees the channel because it
 is their role-authorized information; God Mode reveals it for teaching, and
 the completed-game report reconstructs the whole exchange.
 
+A human may also pass a council turn. `skip_werewolf_negotiation` applies the
+same role, phase, ordering, and replay-commit checks without inventing dialogue
+or a target. It keeps that wolf's earlier proposal intact; an opening pass adds
+no proposal. The graph still advances exactly one bounded turn.
+
 ## Bounded autonomy
 
 The council allows persuasion without allowing an unbounded agent loop. Each
@@ -68,9 +73,10 @@ conversation to hold the game forever.
 ## Human and replay safety
 
 A human werewolf receives a `werewolf_negotiation` interrupt with the same
-legal target list. The UI collects a private message and target, then resumes
-the graph through the existing input endpoint. The answer reaches the same
-`actions.negotiate_message` validation used by an AI's MCP call.
+legal target list. The UI either collects a private message and target or a
+deliberate pass, then resumes the graph through the existing input endpoint.
+The answer reaches `actions.negotiate_message` or the corresponding validated
+pass action; neither path trusts browser state to advance the council directly.
 
 If a pause lands after an AI council turn, LangGraph re-runs that one node on
 resume. The per-seat mind recognizes its stable turn stamp and re-applies the

@@ -51,8 +51,8 @@ export function VoiceCouncil({
   const [muted, setMuted] = useState(false);
   const [rate, setRate] = useState(0.95);
   const [engine, setEngine] = useState<VoiceEngine>(() => {
-    if (typeof window === "undefined") return "neural";
-    return window.localStorage.getItem("village-voice-engine") === "device" ? "device" : "neural";
+    if (typeof window === "undefined") return "device";
+    return window.localStorage.getItem("village-voice-engine") === "neural" ? "neural" : "device";
   });
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const rankedVoices = useMemo(
@@ -64,7 +64,7 @@ export function VoiceCouncil({
     try { return JSON.parse(window.localStorage.getItem("village-voice-assignments") ?? "{}"); }
     catch { return {}; }
   });
-  const [status, setStatus] = useState("AI-generated voice · text captions remain authoritative.");
+  const [status, setStatus] = useState("Voices are off · text captions remain authoritative.");
   const spoken = useRef(new Set<number>());
   const pending = useRef(new Set<number>());
   const neuralUnavailable = useRef(false);
@@ -217,12 +217,44 @@ export function VoiceCouncil({
     const entry = seq === null ? null : entries.find((item) => item.seq === seq);
     if (entry) speak(entry, true);
   };
+  const speakPreview = () => {
+    if (!("speechSynthesis" in window)) {
+      setStatus("This browser has no speech engine; captions remain available.");
+      return;
+    }
+    stopPlayback();
+    window.speechSynthesis.resume();
+    const utterance = new SpeechSynthesisUtterance("The council has found its voice. The village is listening.");
+    utterance.voice = rankedVoices[0] ?? null;
+    utterance.rate = rate;
+    utterance.pitch = .94;
+    utterance.onstart = () => setStatus("Voice test playing · synthetic ancient performance.");
+    utterance.onend = () => setStatus(engine === "neural"
+      ? "Lifelike voice ready · device fallback is automatic."
+      : "Device voice ready · the next public statement will play automatically.");
+    utterance.onerror = () => setStatus("This browser blocked speech. Check the tab's audio permission, then press Test voice.");
+    window.speechSynthesis.speak(utterance);
+  };
+  const testVoice = () => {
+    const latest = [...entries].reverse().find((entry) => entry.type === "statement" && entry.seat_id && entry.text);
+    if (latest) speak(latest, true);
+    else speakPreview();
+  };
+  const enableVoices = () => {
+    mutedRef.current = false;
+    setMuted(false);
+    setEnabled(true);
+    // This call deliberately remains inside the user's click event. Browsers
+    // commonly block speech started only later by an SSE effect; an immediate
+    // test both unlocks playback and proves that the selected engine works.
+    testVoice();
+  };
 
   return (
     <section className={`voice-council${enabled ? " is-enabled" : ""}`} aria-label="Voice council controls">
       <div><span>VOICE COUNCIL · ANCIENT CADENCE</span><strong>{status}</strong></div>
       {!enabled ? (
-        <button type="button" onClick={() => setEnabled(true)}>Enable council voices</button>
+        <button type="button" onClick={enableVoices}>Enable &amp; test voices</button>
       ) : <>
         <label>Voice
           <Select className="is-compact" value={engine} onChange={(value) => chooseEngine(value as VoiceEngine)} ariaLabel="Voice engine" options={[
@@ -238,6 +270,7 @@ export function VoiceCouncil({
         }}>{muted ? "Unmute" : "Mute"}</button>
         <button type="button" onClick={skip}>Skip</button>
         <button type="button" onClick={replay}>Replay</button>
+        <button type="button" onClick={testVoice}>Test voice</button>
         <label>Pace
           <Select className="is-compact" value={String(rate)} onChange={(value) => setRate(Number(value))} ariaLabel="Voice pace" options={[
             { value: "0.82", label: "Ceremonial" },

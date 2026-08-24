@@ -86,6 +86,29 @@ async def test_each_wolf_can_revise_and_disagreement_uses_pack_leader(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_werewolf_can_pass_without_creating_or_replacing_a_proposal(tmp_path):
+    orch = await make_orchestrator(tmp_path, ["ai"] * 7)
+    first, second, villagers = _deal_two_wolves(orch)
+
+    opening = await actions.skip_werewolf_negotiation(orch, first.seat_id)
+    assert opening == {"ok": True, "skipped": True, "target": None, "turn": 1}
+    assert first.seat_id not in orch.state.wolf_proposals
+    assert orch.state.log[-1].private is True
+    assert orch.state.log[-1].target is None
+
+    orch.state.wolf_index = 1
+    await actions.negotiate_message(orch, second.seat_id, "I favor Elin.", villagers[0].name)
+    orch.state.wolf_index = 2
+    await actions.negotiate_message(orch, first.seat_id, "Agreed for now.", villagers[1].name)
+    orch.state.wolf_index = 3
+    passed = await actions.skip_werewolf_negotiation(orch, second.seat_id)
+
+    assert passed["target"] == villagers[0].name
+    assert orch.state.wolf_proposals[second.seat_id] == villagers[0].name
+    assert orch.state.log[-1].target == villagers[0].name
+
+
+@pytest.mark.asyncio
 async def test_mock_game_persists_bounded_negotiation_and_final_plan(tmp_path):
     orch = await make_orchestrator(tmp_path, ["ai"] * 7)
     orch.start()

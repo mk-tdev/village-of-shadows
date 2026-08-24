@@ -26,7 +26,10 @@ If you are a human werewolf:
 3. Write a concise message to your teammate.
 4. On the revision turn, keep your target or change it after reading the other
    wolf's proposal.
-5. During the day, remember that the council itself is secret. You may use the
+5. Choose **Pass this council turn** whenever you have nothing useful to add.
+   Passing preserves your most recent proposal, if one exists; an opening pass
+   proposes no target.
+6. During the day, remember that the council itself is secret. You may use the
    plan, but revealing private knowledge can expose you.
 
 If you are not a werewolf, you do not see this exchange. Infer coordination
@@ -193,15 +196,17 @@ advance until the correct credential submits the permitted action.
 
 ### Enable and choose an engine
 
-Voice playback is disabled until each viewer chooses **Enable council voices**.
-After enabling it:
+Voice playback is disabled until each viewer chooses **Enable & test voices**.
+That click immediately plays a short local test inside the browser's required
+user gesture, so blocked autoplay does not make the control appear silently
+broken. After enabling it:
 
+- **Local · device** is the dependable default. It ranks installed voices,
+  avoids known novelty/robotic voices, and makes no speech API request.
 - **Lifelike · neural** requests a natural, ancient-village performance from
   the configured OpenAI speech model.
-- **Local · device** uses the best available installed browser voice and makes
-  no speech API request.
 - **Ceremonial**, **Measured**, and **Urgent** adjust delivery pace.
-- **Mute**, **Skip**, and **Replay** affect only local playback.
+- **Mute**, **Skip**, **Replay**, and **Test voice** affect only local playback.
 
 Neural audio is explicitly AI-generated. The backend resolves the requested
 event sequence to a persisted public statement, so private thoughts and

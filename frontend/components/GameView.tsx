@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,7 @@ import { GameSummary } from "./GameSummary";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 import type { CouncilCameraMode } from "./CouncilTable3D";
 import { VoiceCouncil } from "./VoiceCouncil";
+import { RitualConfirmModal } from "./RitualConfirmModal";
 
 const CouncilTable3D = dynamic(
   () => import("./CouncilTable3D").then((module) => module.CouncilTable3D),
@@ -51,15 +52,20 @@ export function GameView({
   const [godView, setGodView] = useState(canGodView);
   const [submitting, setSubmitting] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const [confirmingStop, setConfirmingStop] = useState(false);
+  const [stopError, setStopError] = useState<string | null>(null);
   const [beginning, setBeginning] = useState(false);
   const [councilOpen, setCouncilOpen] = useState(true);
-  const [councilCamera, setCouncilCamera] = useState<CouncilCameraMode>("cinematic");
+  const [councilCamera, setCouncilCamera] = useState<CouncilCameraMode>("immersive");
   // The game-over overlay covers the board, so reading the technical
   // summary means dismissing it first rather than opening a second layer
   // on top of it.
   const [showSummary, setShowSummary] = useState(false);
   const [lineage, setLineage] = useState<GameBranch | null>(null);
   const [speakingSeatId, setSpeakingSeatId] = useState<string | null>(null);
+  const closeStopConfirmation = useCallback(() => {
+    if (!stopping) setConfirmingStop(false);
+  }, [stopping]);
 
   const isNight = !game || game.phase === "night" || game.phase === "lobby";
   // The "X is thinking" feed indicator only makes sense for an AI seat --
@@ -166,14 +172,15 @@ export function GameView({
   const handleContinue = () => continueGame(sessionId, access ?? undefined).catch(console.error);
 
   const handleStop = async () => {
-    if (!window.confirm("Stop this game and start over? This abandons the current game.")) return;
     setStopping(true);
+    setStopError(null);
     try {
       await stopGame(sessionId, access ?? undefined);
+      router.push("/");
     } catch (err) {
       console.error(err);
-    } finally {
-      router.push("/");
+      setStopError(err instanceof Error ? err.message : "The village could not be stopped. Try again.");
+      setStopping(false);
     }
   };
 
@@ -218,13 +225,24 @@ export function GameView({
           {canGodView ? <button
             className="btn btn-secondary"
             style={{ padding: "7px 14px", fontSize: 12.5 }}
-            onClick={handleStop}
+            onClick={() => {
+              setStopError(null);
+              setConfirmingStop(true);
+            }}
             disabled={stopping}
           >
             {stopping ? "Stopping..." : "⏹ New Game"}
           </button> : <Link className="btn btn-secondary" href="/">Leave game</Link>}
         </div>
       </header>
+
+      <RitualConfirmModal
+        open={confirmingStop}
+        busy={stopping}
+        error={stopError}
+        onCancel={closeStopConfirmation}
+        onConfirm={handleStop}
+      />
 
       {lineage ? (
         <div className="branch-lineage-banner">
@@ -245,15 +263,17 @@ export function GameView({
       <section className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
         <div className="council-3d-caption">
           <div>
-            <span>THE LIVING VILLAGE</span>
+            <span>THE JUNGLE COUNCIL · LIVE</span>
             <small>
-              {active?.name
-                ? `${active.name} holds the floor · camera following`
+              {speakingSeatId
+                ? `${game.players.find((player) => player.seat_id === speakingSeatId)?.name ?? "An agent"} speaks across the fire`
+                : active?.name
+                  ? `${active.name} is deciding what to do`
                 : game.phase === "lobby"
-                  ? "The cast waits for nightfall"
+                  ? "You have entered a village inhabited by six independent AI agents"
                   : latestSceneEvent?.type === "death"
-                    ? "The village remembers its fallen"
-                    : "The village is listening"}
+                    ? "The jungle has claimed one of the villagers"
+                    : "Every agent is present in the clearing"}
             </small>
           </div>
           <div className="council-view-controls">
@@ -261,11 +281,19 @@ export function GameView({
               <div className="council-camera-switch" aria-label="Village camera mode">
                 <button
                   type="button"
+                  className={councilCamera === "immersive" ? "is-active" : ""}
+                  aria-pressed={councilCamera === "immersive"}
+                  onClick={() => setCouncilCamera("immersive")}
+                >
+                  ◉ My place
+                </button>
+                <button
+                  type="button"
                   className={councilCamera === "cinematic" ? "is-active" : ""}
                   aria-pressed={councilCamera === "cinematic"}
                   onClick={() => setCouncilCamera("cinematic")}
                 >
-                  ◉ Cinema
+                  ◇ Close-up
                 </button>
                 <button
                   type="button"
@@ -273,7 +301,7 @@ export function GameView({
                   aria-pressed={councilCamera === "map"}
                   onClick={() => setCouncilCamera("map")}
                 >
-                  ◇ Map
+                  ⟐ Wide view
                 </button>
               </div>
             )}
@@ -285,7 +313,7 @@ export function GameView({
               onClick={() => setCouncilOpen((open) => !open)}
             >
               <span aria-hidden="true">{councilOpen ? "▴" : "▾"}</span>
-              {councilOpen ? "Collapse" : "Open village"}
+              {councilOpen ? "Collapse" : "Enter clearing"}
             </button>
           </div>
         </div>
