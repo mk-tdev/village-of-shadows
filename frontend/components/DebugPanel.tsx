@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchGraphStructure } from "@/lib/api";
 import type {
   ActivityEntry,
@@ -17,6 +17,7 @@ import { GraphFlow } from "./GraphFlow";
 import { SeatMindFlow } from "./SeatMindFlow";
 import { PerspectiveViewer } from "./PerspectiveViewer";
 import { AgentConfigurationPanel } from "./AgentConfigurationPanel";
+import { GraphInspectorModal } from "./GraphInspectorModal";
 
 const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
   node: "⚙",
@@ -64,6 +65,8 @@ export function DebugPanel({
   players: Player[];
 }) {
   const [graph, setGraph] = useState<GraphStructure | null>(null);
+  const [graphExpanded, setGraphExpanded] = useState(false);
+  const closeGraphInspector = useCallback(() => setGraphExpanded(false), []);
 
   useEffect(() => {
     fetchGraphStructure().then(setGraph).catch(() => {});
@@ -84,7 +87,10 @@ export function DebugPanel({
 
       <div className="debug-panel-body">
         <div>
-          <p className="debug-section-title">LangGraph orchestration flow — drag to pan, scroll to zoom</p>
+          <div className="graph-section-heading">
+            <p className="debug-section-title">LangGraph orchestration flow — drag to pan, scroll to zoom</p>
+            <button type="button" onClick={() => setGraphExpanded(true)}>⛶ Expand graph</button>
+          </div>
           <div className="graph-flow-wrap">
             <GraphFlow nodes={graph?.nodes ?? []} edges={graph?.edges ?? []} currentNode={currentNode} />
           </div>
@@ -234,6 +240,15 @@ export function DebugPanel({
           Enable God Mode to inspect private trust scores and notebook evolution.
         </div>
       )}
+      <GraphInspectorModal
+        open={graphExpanded}
+        graph={graph}
+        currentNode={currentNode}
+        mindNode={mindNode}
+        mindNodeCounts={mindNodeCounts}
+        activity={activity}
+        onClose={closeGraphInspector}
+      />
     </section>
   );
 }

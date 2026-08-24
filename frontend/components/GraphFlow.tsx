@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 
 const MAIN_X = 250;
@@ -76,6 +76,7 @@ export function GraphFlow({
   currentNode: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const markerId = `graph-arrow-${useId().replaceAll(":", "")}`;
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{ startClientX: number; startClientY: number; startX: number; startY: number } | null>(
@@ -191,7 +192,7 @@ export function GraphFlow({
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`, transformOrigin: "0 0" }}
         >
           <defs>
-            <marker id="graph-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <marker id={markerId} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="var(--card-border-strong)" />
             </marker>
           </defs>
@@ -209,7 +210,7 @@ export function GraphFlow({
                   y1={from.y + BOX_H / 2}
                   x2={to.x}
                   y2={to.y - BOX_H / 2}
-                  markerEnd="url(#graph-arrow)"
+                  markerEnd={`url(#${markerId})`}
                 />
               );
             })}

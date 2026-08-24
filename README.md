@@ -35,7 +35,7 @@ The experience now begins at a cinematic, animated landing page that introduces 
 | **Persistent per-seat memory** | Each agent remembers its own previous turns without sharing a hidden global conversation. |
 | **Private belief notebooks** | Agents record, revise, and retire seat-isolated theories with evidence citations and immutable history. |
 | **Trust & suspicion ledger** | Every agent privately scores other players, cites evidence, and preserves each revision for live and post-game comparison. |
-| **Private werewolf council** | Living werewolves negotiate across bounded private turns, revise targets, and reach a server-resolved plan before the night proceeds. |
+| **Private werewolf council** | Living werewolves negotiate across bounded private turns, revise targets, pass when they have nothing to add, and reach a server-resolved plan before the night proceeds. |
 | **Counterfactual branches** | Restore a real human interrupt from a LangGraph checkpoint, change one answer, and continue in a new immutable game. |
 | **Model tournaments** | Rotate roles across autonomous games and compare wins, deception, votes, survival, latency, tokens, and cost. |
 | **Configurable worlds** | Choose standard or expanded roles, deterministic village events, cross-game memory, and hard game budgets. |
@@ -47,7 +47,7 @@ The experience now begins at a cinematic, animated landing page that introduces 
 | **MCP tool actions** | Agents act through validated game tools instead of returning loosely structured text. |
 | **Unscripted social behavior** | Werewolves can lie, seers can conceal evidence, doctors can make mistakes, and villagers can confidently accuse one another. |
 | **Model readiness gate** | Every configured model must answer a real message and call a test tool before the game page opens. |
-| **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth. |
+| **God Mode observability** | Reveal roles, private rationale, tool calls, decisions, graph activity, latency, tokens, and memory growth, with a full-screen live execution inspector. |
 | **Closed-loop Learning Debrief** | Predict before play, then connect human interrupts, information boundaries, tool validation, memory growth, and divergent decisions to agentic-AI concepts. |
 | **Living cinematic village** | A full-body, identity-matched cast inhabits a moonlit 3D village, with automatic camera direction, speaker staging, voting trails, memorials, and phase-aware atmosphere. |
 | **Cinematic agentic landing** | An animated introduction presents the seven seats, shared LangGraph world, private agent minds, validated actions, and human participation before configuration begins. |
@@ -165,7 +165,7 @@ OLLAMA_API_KEY=
 Open **http://localhost:4001**.
 
 1. Enter the cinematic village from the landing page.
-2. Choose your human seat on `/setup`.
+2. Choose any of the seven characters from the always-visible human-seat grid on `/setup`. Inviting more human players is optional.
 3. Give the AI seats models and personalities.
 4. Click **Test Models & Start Game**.
 5. Review the per-seat readiness results.
@@ -179,6 +179,11 @@ Stop both applications with:
 ```bash
 ./stop.sh
 ```
+
+`stop.sh` also clears project-scoped reload workers and test runners—including
+Pytest, Playwright, Vitest, and Jest—plus any process holding the configured
+development ports. This keeps repeated local runs from leaving hidden services
+behind.
 
 <details>
 <summary><b>Run the backend and frontend separately</b></summary>
@@ -206,6 +211,7 @@ Ports `4001` and `3000` are included in the backend's default CORS origins. Add 
 The game page makes the agent system visible while it runs:
 
 - The actual compiled **LangGraph orchestration graph**, introspected rather than hand-drawn.
+- A full-screen **live graph inspector** with pan/zoom, current-node emphasis, a chronological execution rail, and the active per-seat mind subgraph.
 - The active node and active per-seat mind node.
 - A chronological feed of turns, MCP sessions, tool calls, memory updates, and decisions.
 - Per-agent provider, model, latency, calls, tokens, and remembered-message count.
@@ -265,7 +271,7 @@ cd ..
 python3 docs/concepts/check_citations.py
 ```
 
-The 66-test backend suite covers browser and agent information boundaries, model preflight, persistent seat memory, immutable notes and beliefs, negotiation, checkpoint branching, tournaments, expanded roles, village events, multi-human authorization, safe cached council speech, resilience, cross-game relationships, sealed replay exports, pause/resume safety, complete standard and expanded mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
+The 67-test backend suite covers browser and agent information boundaries, model preflight, persistent seat memory, immutable notes and beliefs, negotiation and pass safety, checkpoint branching, tournaments, expanded roles, village events, multi-human authorization, safe cached council speech, resilience, cross-game relationships, sealed replay exports, pause/resume safety, complete standard and expanded mock games, Learning Debrief evidence, and a real MCP protocol round-trip. The citation checker verifies that code excerpts in the concept guide still point to the code they explain.
 
 ## 📚 Learn from the implementation
 

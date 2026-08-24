@@ -118,7 +118,7 @@ never a dependency of play.
  * part of the project meant to showcase the agentic-engineering internals,
  * not just play the game. */
 ```
-([DebugPanel.tsx:24-32](../../frontend/components/DebugPanel.tsx#L24-L32))
+([DebugPanel.tsx:33-41](../../frontend/components/DebugPanel.tsx#L33-L41))
 
 This panel exists for a different audience than the rest of the UI: not
 "someone playing Werewolf," but "someone who wants to see how the

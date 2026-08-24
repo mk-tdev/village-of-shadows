@@ -101,15 +101,33 @@ export default function SetupPage() {
     setWakeProgress(null);
   }
 
-  function updateHumanIndex(index: number) {
+  function selectPrimaryHuman(index: number) {
     clearLaunchFeedback();
     setPreflightResults([]);
     setError(null);
+    const nextHumanIndices = [
+      index,
+      ...humanIndices.filter((item) => item !== humanIndex && item !== index),
+    ].sort((a, b) => a - b);
     setHumanIndex(index);
+    setHumanIndices(nextHumanIndices);
+    setSeats((current) => current.map((seat, seatIndex) => {
+      const isHuman = nextHumanIndices.includes(seatIndex);
+      return {
+        ...seat,
+        controller: isHuman ? "human" : "ai",
+        provider: isHuman ? null : seat.provider ?? masterProvider,
+        model_name: isHuman ? null : seat.model_name ?? masterModel,
+        endpoint: isHuman ? null : seat.endpoint,
+      };
+    }));
   }
 
   function toggleHuman(index: number, enabled: boolean) {
     if (!enabled && index === humanIndex) return;
+    clearLaunchFeedback();
+    setPreflightResults([]);
+    setError(null);
     const nextHumans = enabled
       ? [...new Set([...humanIndices, index])].sort((a, b) => a - b)
       : humanIndices.filter((item) => item !== index);
@@ -234,19 +252,44 @@ export default function SetupPage() {
       </header>
 
       <div className="setup-card">
-        <label className="field-label">Which seat do you want to play?</label>
-        <div style={{ marginBottom: 16, maxWidth: 220 }}>
-          <Select
-            value={String(humanIndex)}
-            options={humanIndices.map((i) => ({ value: String(i), label: seats[i].display_name || seats[i].seat_id }))}
-            onChange={(value) => updateHumanIndex(Number(value))}
-          />
-        </div>
-        <div className="multi-human-picker">
-          <span>HUMAN PLAYERS · SELECT ONE OR MORE</span>
-          <div>{seats.map((seat, index) => <ThemedCheckbox key={seat.seat_id} checked={humanIndices.includes(index)} disabled={index === humanIndex} onChange={(checked) => toggleHuman(index, checked)} ariaLabel={`${seat.display_name} is a human player`}>{seat.display_name}</ThemedCheckbox>)}</div>
-          <small>The primary human becomes room host. Every additional human receives a private, seat-bound join link.</small>
-        </div>
+        <section className="primary-seat-picker" aria-labelledby="primary-seat-title">
+          <div className="primary-seat-heading">
+            <div>
+              <span>YOUR PLACE IN THE VILLAGE</span>
+              <h2 id="primary-seat-title">Which character do you want to play?</h2>
+            </div>
+            <small>Choose any of the seven seats. The other six remain AI unless you invite more people below.</small>
+          </div>
+          <div className="primary-seat-grid" role="radiogroup" aria-label="Choose your character">
+            {seats.map((seat, index) => {
+              const selected = index === humanIndex;
+              return (
+                <button
+                  key={seat.seat_id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  className={selected ? "is-selected" : ""}
+                  onClick={() => selectPrimaryHuman(index)}
+                >
+                  <span className="primary-seat-number">{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{seat.display_name || seat.seat_id}</strong>
+                  <small>{seat.personality || "unwritten personality"}</small>
+                  <b>{selected ? "YOU PLAY HERE" : humanIndices.includes(index) ? "INVITED HUMAN" : "CHOOSE"}</b>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <details className="multi-human-picker">
+          <summary>
+            <span>Invite more human players <b>optional</b></span>
+            <small>{humanIndices.length === 1 ? "Solo human game" : `${humanIndices.length} human seats selected`}</small>
+          </summary>
+          <div>{seats.map((seat, index) => <ThemedCheckbox key={seat.seat_id} checked={humanIndices.includes(index)} disabled={index === humanIndex} onChange={(checked) => toggleHuman(index, checked)} ariaLabel={`${seat.display_name} is a human player`}>{seat.display_name}{index === humanIndex ? " · you" : ""}</ThemedCheckbox>)}</div>
+          <p>Your seat is always human. Each additional selection receives a private, seat-bound join link; every unselected seat stays AI.</p>
+        </details>
 
         <label className="field-label">Set every AI seat to</label>
         <div

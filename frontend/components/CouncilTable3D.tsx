@@ -1,7 +1,8 @@
 "use client";
 
-import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Suspense, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import Image from "next/image";
+import { type CSSProperties, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { fullCharacterForSeat, roleArtifactFor } from "@/lib/portraits";
 import type { LogType, Role } from "@/lib/types";
@@ -20,250 +21,203 @@ export interface CouncilEvent {
   target: string | null;
 }
 
-export type CouncilCameraMode = "cinematic" | "map";
+export type CouncilCameraMode = "immersive" | "cinematic" | "map";
 
-const CINEMATIC_POSITIONS: [number, number, number][] = [
-  [-3.45, 0, -0.2],
-  [-2.35, 0, 0.2],
-  [-1.18, 0, 0.43],
-  [0, 0, 0.52],
-  [1.18, 0, 0.43],
-  [2.35, 0, 0.2],
-  [3.45, 0, -0.2],
+type SceneStyle = CSSProperties & {
+  "--seat-x": string;
+  "--seat-bottom": string;
+  "--seat-scale": string;
+  "--seat-depth": string;
+  "--seat-delay": string;
+};
+
+type ParticleStyle = CSSProperties & {
+  "--particle-x": string;
+  "--particle-y": string;
+  "--particle-delay": string;
+  "--particle-size": string;
+};
+
+const SEAT_LAYOUT = [
+  { x: 50, bottom: -13, scale: 1.52, depth: 8 },
+  { x: 7, bottom: -9, scale: 1.3, depth: 6 },
+  { x: 21, bottom: -1, scale: 1.1, depth: 4 },
+  { x: 37, bottom: 4, scale: .96, depth: 2 },
+  { x: 63, bottom: 4, scale: .96, depth: 2 },
+  { x: 79, bottom: -1, scale: 1.1, depth: 4 },
+  { x: 93, bottom: -9, scale: 1.3, depth: 6 },
 ];
 
-function seatPosition(index: number, count: number, mode: CouncilCameraMode): THREE.Vector3 {
-  if (mode === "cinematic") {
-    const position = CINEMATIC_POSITIONS[index] ?? [((index - (count - 1) / 2) * 1.1), 0, 0];
-    return new THREE.Vector3(...position);
-  }
-  const angle = (index / count) * Math.PI * 2 + Math.PI;
-  return new THREE.Vector3(Math.sin(angle) * 2.65, 0, Math.cos(angle) * 2.65);
+function seededValue(index: number, salt: number): number {
+  return Math.abs(Math.sin(index * 91.17 + salt * 47.31) * 43758.5453) % 1;
 }
 
-function CameraDirector({
-  players,
-  focusSeatId,
-  mode,
-  reduceMotion,
-}: {
-  players: CouncilPlayer[];
-  focusSeatId: string | null;
-  mode: CouncilCameraMode;
-  reduceMotion: boolean;
-}) {
-  const { camera } = useThree();
-  const targetPosition = useMemo(() => new THREE.Vector3(), []);
-  const lookTarget = useMemo(() => new THREE.Vector3(), []);
+function Fireflies({ reduceMotion }: { reduceMotion: boolean }) {
+  const points = useRef<THREE.Points>(null);
+  const positions = useMemo(() => {
+    const values = new Float32Array(54 * 3);
+    for (let index = 0; index < 54; index += 1) {
+      values[index * 3] = (seededValue(index, 1) - .5) * 12;
+      values[index * 3 + 1] = (seededValue(index, 2) - .2) * 6;
+      values[index * 3 + 2] = seededValue(index, 3) * 3;
+    }
+    return values;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!points.current || reduceMotion) return;
+    points.current.rotation.z = Math.sin(clock.elapsedTime * .08) * .045;
+    points.current.position.y = Math.sin(clock.elapsedTime * .32) * .12;
+  });
+
+  return (
+    <points ref={points} position={[0, 0, 0]}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial color="#ffc66d" size={.055} transparent opacity={.76} sizeAttenuation />
+    </points>
+  );
+}
+
+function EmberCloud({ reduceMotion }: { reduceMotion: boolean }) {
+  const points = useRef<THREE.Points>(null);
+  const positions = useMemo(() => {
+    const values = new Float32Array(36 * 3);
+    for (let index = 0; index < 36; index += 1) {
+      values[index * 3] = (seededValue(index, 4) - .5) * 2.4;
+      values[index * 3 + 1] = seededValue(index, 5) * 2.1 - 1.8;
+      values[index * 3 + 2] = seededValue(index, 6) * 1.4;
+    }
+    return values;
+  }, []);
 
   useFrame((_, delta) => {
-    const focusIndex = players.findIndex((player) => player.seatId === focusSeatId);
-    if (mode === "map") {
-      targetPosition.set(0, 8.7, 5.2);
-      lookTarget.set(0, 0, 0);
-    } else if (focusIndex >= 0) {
-      const focus = seatPosition(focusIndex, players.length, mode);
-      targetPosition.set(focus.x * 0.18, 3.15, 7.25);
-      lookTarget.set(focus.x * 0.28, 1.25, focus.z);
-    } else {
-      targetPosition.set(0, 3.35, 8.25);
-      lookTarget.set(0, 1.05, 0);
-    }
-
-    const ease = reduceMotion ? 1 : 1 - Math.exp(-delta * 2.2);
-    camera.position.lerp(targetPosition, ease);
-    camera.lookAt(lookTarget);
-  });
-
-  return null;
-}
-
-function Backdrop() {
-  const texture = useLoader(THREE.TextureLoader, "/scenes/moonlit-village.png");
-  const prepared = useMemo(() => {
-    const clone = texture.clone();
-    clone.colorSpace = THREE.SRGBColorSpace;
-    clone.anisotropy = 4;
-    clone.needsUpdate = true;
-    return clone;
-  }, [texture]);
-
-  return (
-    <mesh position={[0, 3.1, -4.9]}>
-      <planeGeometry args={[13.4, 7.54]} />
-      <meshBasicMaterial map={prepared} toneMapped={false} fog={false} />
-    </mesh>
-  );
-}
-
-function Bonfire({ phase, active, reduceMotion }: { phase: string; active: boolean; reduceMotion: boolean }) {
-  const fire = useRef<THREE.Group>(null);
-  const isNight = phase === "night" || phase === "lobby";
-
-  useFrame(({ clock }) => {
-    if (!fire.current || reduceMotion) return;
-    const pulse = 1 + Math.sin(clock.elapsedTime * 7.3) * 0.11 + Math.sin(clock.elapsedTime * 12.1) * 0.05;
-    fire.current.scale.set(pulse, 0.9 + pulse * 0.1, pulse);
+    if (!points.current || reduceMotion) return;
+    points.current.position.y += delta * .22;
+    points.current.rotation.y += delta * .05;
+    if (points.current.position.y > 1.2) points.current.position.y = -1;
   });
 
   return (
-    <group position={[0, 0, 1.05]}>
-      {[0, 1, 2].map((log) => (
-        <mesh key={log} position={[0, 0.12, 0]} rotation={[Math.PI / 2, (Math.PI / 3) * log, 0]}>
-          <cylinderGeometry args={[0.07, 0.09, 0.78, 8]} />
-          <meshStandardMaterial color="#39211b" roughness={1} />
-        </mesh>
-      ))}
-      <group ref={fire} position={[0, 0.44, 0]}>
-        <mesh>
-          <coneGeometry args={[0.26, 0.72, 12]} />
-          <meshBasicMaterial color={active ? "#ff7350" : "#ef9b48"} transparent opacity={0.86} />
-        </mesh>
-        <mesh position={[0, -0.12, 0.05]}>
-          <coneGeometry args={[0.17, 0.42, 12]} />
-          <meshBasicMaterial color="#fff1a8" transparent opacity={0.92} />
-        </mesh>
-      </group>
-      <pointLight position={[0, 0.75, 0.15]} intensity={isNight ? 6.2 : 3.2} distance={6.5} color="#e66d38" />
-    </group>
+    <points ref={points} position={[0, -1, .4]}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial color="#ff8b3d" size={.075} transparent opacity={.82} sizeAttenuation />
+    </points>
   );
 }
 
-function FogVeil({ reduceMotion }: { reduceMotion: boolean }) {
-  const group = useRef<THREE.Group>(null);
-  const wisps = useMemo(
-    () => Array.from({ length: 9 }, (_, index) => ({
-      x: -4.7 + ((index * 31) % 90) / 10,
-      z: -0.8 + ((index * 47) % 42) / 10,
-      scale: 1.4 + ((index * 13) % 20) / 10,
-    })),
-    []
-  );
-
-  useFrame(({ clock }) => {
-    if (!group.current || reduceMotion) return;
-    group.current.position.x = Math.sin(clock.elapsedTime * 0.09) * 1.2;
-  });
-
+function JungleAtmosphere({ reduceMotion }: { reduceMotion: boolean }) {
   return (
-    <group ref={group}>
-      {wisps.map((wisp, index) => (
-        <mesh key={index} position={[wisp.x, 0.11, wisp.z]} rotation={[-Math.PI / 2, 0, index * 0.31]} scale={[wisp.scale, 0.35, 1]}>
-          <circleGeometry args={[1, 32]} />
-          <meshBasicMaterial color="#a8afc3" transparent opacity={0.035} depthWrite={false} />
-        </mesh>
-      ))}
-    </group>
+    <Canvas
+      className="jungle-atmosphere-canvas"
+      camera={{ position: [0, 0, 7], fov: 48 }}
+      dpr={[1, 1.35]}
+      frameloop={reduceMotion ? "demand" : "always"}
+      gl={{ antialias: false, alpha: true, powerPreference: "high-performance" }}
+    >
+      <Fireflies reduceMotion={reduceMotion} />
+      <EmberCloud reduceMotion={reduceMotion} />
+    </Canvas>
   );
 }
 
-function Scene({
-  players,
-  activeSeatId,
-  phase,
-  mode,
-  reduceMotion,
-}: {
-  players: CouncilPlayer[];
-  activeSeatId: string | null;
-  phase: string;
-  mode: CouncilCameraMode;
-  reduceMotion: boolean;
-}) {
-  const isNight = phase === "night" || phase === "lobby";
-
+function CssAtmosphere() {
   return (
-    <>
-      <CameraDirector players={players} focusSeatId={activeSeatId} mode={mode} reduceMotion={reduceMotion} />
-      <fog attach="fog" args={[isNight ? "#080d18" : "#21140c", 8, 18]} />
-      <ambientLight intensity={isNight ? 0.32 : 0.66} color={isNight ? "#8096c8" : "#ffd7a0"} />
-      <directionalLight position={[-4, 8, 3]} intensity={isNight ? 1.55 : 2.3} color={isNight ? "#aebfe8" : "#ffc47a"} />
-      <Backdrop />
-
-      <mesh receiveShadow position={[0, -0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[8, 64]} />
-        <meshStandardMaterial color={isNight ? "#11151b" : "#2d2117"} roughness={0.96} metalness={0.04} />
-      </mesh>
-      <mesh position={[0, -0.065, 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[1.15, 3.9, 64]} />
-        <meshStandardMaterial color="#252127" roughness={1} transparent opacity={0.72} />
-      </mesh>
-      <Bonfire phase={phase} active={activeSeatId !== null} reduceMotion={reduceMotion} />
-      <FogVeil reduceMotion={reduceMotion} />
-
-    </>
+    <div className="jungle-css-atmosphere" aria-hidden="true">
+      {Array.from({ length: 24 }, (_, index) => {
+        const style: ParticleStyle = {
+          "--particle-x": `${8 + seededValue(index, 7) * 84}%`,
+          "--particle-y": `${22 + seededValue(index, 8) * 64}%`,
+          "--particle-delay": `${seededValue(index, 9) * -8}s`,
+          "--particle-size": `${2 + seededValue(index, 10) * 3}px`,
+        };
+        return <span key={index} style={style} />;
+      })}
+    </div>
   );
 }
 
-function castPosition(index: number, count: number, mode: CouncilCameraMode) {
-  if (mode === "cinematic") {
-    return { left: `${10 + (index / Math.max(1, count - 1)) * 80}%`, bottom: "2.5%" };
-  }
-  const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
+function sceneStyle(index: number): SceneStyle {
+  const seat = SEAT_LAYOUT[index % SEAT_LAYOUT.length];
   return {
-    left: `${50 + Math.cos(angle) * 34}%`,
-    bottom: `${31 - Math.sin(angle) * 19}%`,
+    "--seat-x": `${seat.x}%`,
+    "--seat-bottom": `${seat.bottom}%`,
+    "--seat-scale": `${seat.scale}`,
+    "--seat-depth": `${seat.depth}`,
+    "--seat-delay": `${index * -.73}s`,
   };
 }
 
-function CinematicCast({
-  players,
-  activeSeatId,
-  event,
-  mode,
+function agentStateLabel(player: CouncilPlayer, active: boolean, targeted: boolean): string {
+  if (!player.alive) return "Fallen";
+  if (active) return "Speaking now";
+  if (targeted) return "Under accusation";
+  if (player.you) return "Your place in the circle";
+  return "Listening";
+}
+
+function VillageCharacter({
+  player,
+  index,
+  active,
+  targeted,
+  selected,
+  hiddenFromSeat,
+  onSelect,
 }: {
-  players: CouncilPlayer[];
-  activeSeatId: string | null;
-  event: CouncilEvent | null;
-  mode: CouncilCameraMode;
+  player: CouncilPlayer;
+  index: number;
+  active: boolean;
+  targeted: boolean;
+  selected: boolean;
+  hiddenFromSeat: boolean;
+  onSelect: () => void;
 }) {
-  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
-  const focusedSeatId = activeSeatId ?? selectedSeatId;
-  const voterIndex = event?.seatId ? players.findIndex((player) => player.seatId === event.seatId) : -1;
-  const targetIndex = event?.target ? players.findIndex((player) => player.name === event.target) : -1;
-  const voter = voterIndex >= 0 ? castPosition(voterIndex, players.length, mode) : null;
-  const target = targetIndex >= 0 ? castPosition(targetIndex, players.length, mode) : null;
+  const character = fullCharacterForSeat(player.seatId);
+  if (!character) return null;
 
   return (
-    <div className={`cinematic-cast cinematic-cast-${mode}`} aria-label="Village characters">
-      {event?.type === "vote" && voter && target && (
-        <svg className="cast-vote-line" aria-hidden="true">
-          <line x1={voter.left} y1={`calc(100% - ${voter.bottom})`} x2={target.left} y2={`calc(100% - ${target.bottom})`} />
-        </svg>
-      )}
-      {players.map((player, index) => {
-        const active = activeSeatId === player.seatId;
-        const selected = selectedSeatId === player.seatId && !activeSeatId;
-        const dimmed = Boolean(focusedSeatId && focusedSeatId !== player.seatId);
-        const position = castPosition(index, players.length, mode);
-        return (
-          <button
-            key={player.seatId}
-            type="button"
-            className={`cinematic-person${active ? " is-speaking" : ""}${selected ? " is-selected" : ""}${!player.alive ? " is-dead" : ""}${dimmed ? " is-dimmed" : ""}`}
-            style={{ left: position.left, bottom: position.bottom, zIndex: mode === "map" ? 20 + index : 20 + Math.abs(3 - index) }}
-            onClick={() => setSelectedSeatId((current) => current === player.seatId ? null : player.seatId)}
-            aria-label={`${player.name}${active ? ", speaking" : ""}${!player.alive ? ", eliminated" : ""}`}
-          >
-            <span className="cinematic-name">
-              {player.you && <b>YOU</b>}
-              {player.name}
-            </span>
-            <span className="cinematic-figure-wrap">
-              {/* Generated as one coherent full-body portrait rather than a face
-                  pasted onto procedural geometry. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={fullCharacterForSeat(player.seatId) ?? "/characters/full/mara.webp"} alt="" draggable={false} />
-            </span>
-            {player.role && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="cinematic-role" src={roleArtifactFor(player.role)} alt={player.role} />
-            )}
-            {!player.alive && <span className="cinematic-memorial">IN MEMORY</span>}
-          </button>
-        );
-      })}
-    </div>
+    <button
+      type="button"
+      className={[
+        "jungle-character",
+        active ? "is-speaking" : "",
+        targeted ? "is-targeted" : "",
+        selected ? "is-selected" : "",
+        player.alive ? "" : "is-fallen",
+        player.you ? "is-human" : "is-agent",
+        hiddenFromSeat ? "is-seat-hidden" : "",
+      ].filter(Boolean).join(" ")}
+      style={sceneStyle(index)}
+      aria-label={`${player.name}. ${agentStateLabel(player, active, targeted)}`}
+      aria-pressed={selected}
+      onClick={onSelect}
+    >
+      <span className="jungle-character-name">
+        <strong>{player.name}</strong>
+        <small>{agentStateLabel(player, active, targeted)}</small>
+      </span>
+      <span className="jungle-character-aura" aria-hidden="true" />
+      <span className="jungle-character-figure">
+        <Image
+          src={character}
+          alt=""
+          fill
+          priority={index < 4}
+          sizes="(max-width: 720px) 40vw, 20vw"
+        />
+      </span>
+      {player.role ? (
+        <span className={`jungle-role-reveal role-${player.role}`}>
+          <Image src={roleArtifactFor(player.role)} width={30} height={30} alt="" />
+          <span>{player.role}</span>
+        </span>
+      ) : null}
+      {targeted ? <span className="jungle-accusation-mark" aria-hidden="true">!</span> : null}
+    </button>
   );
 }
 
@@ -280,38 +234,108 @@ export function CouncilTable3D({
   event: CouncilEvent | null;
   cameraMode: CouncilCameraMode;
 }) {
+  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
   const [webglSupported] = useState(() => {
-    if (typeof document === "undefined") return true;
-    const canvas = document.createElement("canvas");
-    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    if (typeof document === "undefined") return false;
+    try {
+      const canvas = document.createElement("canvas");
+      return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    } catch {
+      return false;
+    }
   });
   const reduceMotion = useMemo(
     () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     []
   );
+  const human = players.find((player) => player.you);
+  const target = event?.target ?? null;
+  const focusSeatId = selectedSeatId ?? activeSeatId;
+  const focusPlayer = players.find((player) => player.seatId === focusSeatId) ?? null;
+  const isNight = phase === "night" || phase === "lobby";
 
-  if (!webglSupported) {
-    return (
-      <div className="living-village-renderer">
-        <CinematicCast players={players} activeSeatId={activeSeatId} event={event} mode={cameraMode} />
-      </div>
-    );
-  }
+  const handlePointerMove = (pointerEvent: React.PointerEvent<HTMLDivElement>) => {
+    if (reduceMotion) return;
+    const bounds = pointerEvent.currentTarget.getBoundingClientRect();
+    const x = (pointerEvent.clientX - bounds.left) / bounds.width - .5;
+    const y = (pointerEvent.clientY - bounds.top) / bounds.height - .5;
+    pointerEvent.currentTarget.style.setProperty("--look-x", `${x * -14}px`);
+    pointerEvent.currentTarget.style.setProperty("--look-y", `${y * -8}px`);
+    pointerEvent.currentTarget.style.setProperty("--cast-look-x", `${x * 4}px`);
+    pointerEvent.currentTarget.style.setProperty("--cast-look-y", `${y * 2}px`);
+  };
 
   return (
-    <div className="living-village-renderer">
-      <Canvas
-        shadows
-        dpr={[1, 1.45]}
-        frameloop={reduceMotion ? "demand" : "always"}
-        camera={{ position: [0, 3.35, 8.25], fov: 42, near: 0.1, far: 32 }}
-        gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}
-      >
-        <Suspense fallback={null}>
-          <Scene players={players} activeSeatId={activeSeatId} phase={phase} mode={cameraMode} reduceMotion={reduceMotion} />
-        </Suspense>
-      </Canvas>
-      <CinematicCast players={players} activeSeatId={activeSeatId} event={event} mode={cameraMode} />
+    <div
+      className={`living-village-renderer is-jungle-village ${isNight ? "is-night" : "is-day"}`}
+      data-camera={cameraMode}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={(pointerEvent) => {
+        pointerEvent.currentTarget.style.setProperty("--look-x", "0px");
+        pointerEvent.currentTarget.style.setProperty("--look-y", "0px");
+        pointerEvent.currentTarget.style.setProperty("--cast-look-x", "0px");
+        pointerEvent.currentTarget.style.setProperty("--cast-look-y", "0px");
+      }}
+    >
+      <div className="jungle-scene-background" aria-hidden="true">
+        <Image
+          src="/scenes/jungle-council.webp"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+        />
+      </div>
+      <div className="jungle-canopy-shadow" aria-hidden="true" />
+      <div className="jungle-ground-mist mist-one" aria-hidden="true" />
+      <div className="jungle-ground-mist mist-two" aria-hidden="true" />
+      {webglSupported ? <JungleAtmosphere reduceMotion={reduceMotion} /> : <CssAtmosphere />}
+
+      <div className="jungle-cast" aria-label="The villagers gathered in the jungle clearing">
+        {players.map((player, index) => (
+          <VillageCharacter
+            key={player.seatId}
+            player={player}
+            index={index}
+            active={player.seatId === activeSeatId}
+            targeted={Boolean(target && (target === player.seatId || target === player.name))}
+            selected={player.seatId === selectedSeatId}
+            hiddenFromSeat={player.you}
+            onSelect={() => setSelectedSeatId((current) => current === player.seatId ? null : player.seatId)}
+          />
+        ))}
+      </div>
+
+      <div className="jungle-fire-glow" aria-hidden="true" />
+      <div className="jungle-foreground" aria-hidden="true" />
+
+      <div className="council-presence-hud" aria-live="polite">
+        <span>
+          {cameraMode === "immersive" && human
+            ? `IN THE CLEARING · ${human.name.toUpperCase()}`
+            : cameraMode === "cinematic"
+              ? "AGENT FOCUS"
+              : "THE WHOLE VILLAGE"}
+        </span>
+        <small>
+          {focusPlayer
+            ? `${focusPlayer.name} ${focusPlayer.seatId === activeSeatId ? "is speaking" : "is in focus"}`
+            : "Six AI villagers wait for someone to break the silence"}
+        </small>
+      </div>
+
+      <div className="council-accessible-cast" aria-label="Choose a villager to focus">
+        {players.map((player) => (
+          <button
+            key={player.seatId}
+            type="button"
+            className={player.seatId === focusSeatId ? "is-active" : ""}
+            onClick={() => setSelectedSeatId((current) => current === player.seatId ? null : player.seatId)}
+          >
+            {player.name}{player.you ? " · you" : ""}{!player.alive ? " · fallen" : ""}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

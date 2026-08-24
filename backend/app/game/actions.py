@@ -539,3 +539,39 @@ async def negotiate_message(
         private=True,
     )
     return {"ok": True, "target": target, "turn": state.wolf_index + 1}
+
+
+async def skip_werewolf_negotiation(orch: "GameOrchestrator", seat_id: str) -> dict[str, Any]:
+    """Pass one private council turn without inventing a target or message.
+
+    A pass is still committed against the deterministic negotiation index so a
+    resumed LangGraph node cannot replay it. Any proposal this wolf made on an
+    earlier turn remains intact; a first-turn pass contributes no proposal.
+    """
+    state = orch.state
+    player = state.find_seat(seat_id)
+    if player.role != "werewolf":
+        raise ActionError("Only werewolves can pass a private negotiation turn.")
+    if not player.alive:
+        raise ActionError("Dead werewolves cannot take part in the private council.")
+    if state.phase != "night" or len(living_werewolves(state)) < 2:
+        raise ActionError("Werewolf negotiation is available only at night while both werewolves live.")
+
+    expected = expected_werewolf(state)
+    if expected is None or expected.seat_id != seat_id:
+        raise ActionError("It is not this werewolf's negotiation turn.")
+    if state.wolf_negotiation_commits.get(state.wolf_index) is not None:
+        raise ActionError("This werewolf council turn has already been committed.")
+
+    existing_target = state.wolf_proposals.get(seat_id)
+    state.wolf_negotiation_commits[state.wolf_index] = seat_id
+    await _append_log(
+        orch,
+        type_="werewolf_negotiation",
+        seat_id=seat_id,
+        name=player.name,
+        text="Passes without changing the pack's plan.",
+        target=existing_target,
+        private=True,
+    )
+    return {"ok": True, "skipped": True, "target": existing_target, "turn": state.wolf_index + 1}

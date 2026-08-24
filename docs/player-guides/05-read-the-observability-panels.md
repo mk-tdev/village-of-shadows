@@ -45,6 +45,26 @@ discussion, voting, resolution, win checks, and human suspension.
 The highlighted node is the world step currently executing or most recently
 reported. A node may repeat for different players or rounds.
 
+### Full-screen execution inspector
+
+Choose **Expand graph** to open the unobstructed live view. The main canvas can
+be panned, zoomed, and fitted to the viewport. Its execution rail lists recent
+node transitions newest-first, while the active-agent panel shows the separate
+per-seat mind subgraph and its loop counts.
+
+Read these references together:
+
+- the glowing node is the current world step;
+- solid boxes are compiled nodes, not generated screenshots;
+- dashed routes are conditional possibilities;
+- the execution rail is the observed path through those possibilities; and
+- the active-agent mind is a nested decision process invoked by the world
+  graph, not another shared global agent.
+
+The presentation borrows the useful graph-plus-trace reading pattern familiar
+from LangSmith, but all data comes from this application's compiled graph and
+live SSE activity. Closing the inspector does not pause or alter execution.
+
 ### Edges
 
 An edge means the compiled graph permits a transition. It is not a transcript
