@@ -11,8 +11,7 @@ frontend/node_modules/
 frontend/.next/
 frontend/.env.local
 
-submission
-submission/*
+/submission/
 tmp
 output
 
