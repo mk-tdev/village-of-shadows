@@ -104,7 +104,7 @@ export async function waitForBackend(
 
   throw new Error(IS_LOCAL_API
     ? `The local Python server is not responding at ${API_BASE}. Start it with ./start.sh and try again.`
-    : "The game server did not wake within 3 minutes. Render may still be restarting; wait a moment and try again."
+    : "The game server did not wake within 3 minutes. The remote game server may still be starting; wait a moment and try again."
   );
 }
 
@@ -140,11 +140,15 @@ function hostParams(access?: GameAccessCredentials): string {
 }
 
 export async function preflightModels(configs: AgentConfig[]): Promise<ModelPreflightResponse> {
-  const res = await fetch(`${API_BASE}/games/preflight`, {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error("Model readiness checks took longer than 75 seconds. Check the selected model and provider key, then try again.")), 75_000);
+  });
+  const request = fetch(`${API_BASE}/games/preflight`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(configs),
   });
+  const res = await Promise.race([request, timeout]);
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
     throw new Error(detail?.detail ?? `Failed to check models (${res.status})`);

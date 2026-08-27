@@ -379,7 +379,7 @@ export default function SetupPage() {
                 number="1"
                 title="Wake the game server"
                 detail={wakeStepState === "complete"
-                  ? (IS_LOCAL_API ? "Local FastAPI server is healthy." : "Render is online and healthy.")
+                  ? (IS_LOCAL_API ? "Local FastAPI server is healthy." : "The remote game server is online and healthy.")
                   : (IS_LOCAL_API ? "Checking the Python API on port 8000." : "Wait for the FastAPI service to become ready.")}
                 state={wakeStepState}
               />
@@ -407,7 +407,7 @@ export default function SetupPage() {
                   </strong>
                   <small>{IS_LOCAL_API
                     ? <>Local play always uses <code>http://localhost:8000</code>. Start <code>./start.sh</code> if needed</>
-                    : <>Render&apos;s free service may take a minute or more on the first visit. Retrying automatically</>}
+                    : <>The remote game server may take a minute or more on its first visit. Retrying automatically</>}
                     {wakeProgress.attempt > 1 ? ` · attempt ${wakeProgress.attempt}` : ""}.
                   </small>
                 </span>

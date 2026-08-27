@@ -85,7 +85,7 @@ Initial acceptance criteria:
 
 Implemented behavior:
 
-- SQLite stores an immutable `agent_belief_events` ledger per observer and
+- PostgreSQL stores an immutable `agent_belief_events` ledger per observer and
   subject. Suspicion and confidence use bounded 0–100 scores; trust is the
   derived inverse rather than a second source of truth.
 - `update_belief`, `get_my_beliefs`, and `get_my_belief_history` are
@@ -249,7 +249,7 @@ Initial acceptance criteria:
 
 Implementation notes:
 
-- SQLite stores an immutable `agent_note_events` ledger with deterministic
+- PostgreSQL stores an immutable `agent_note_events` ledger with deterministic
   event keys, so pause/resume replays cannot duplicate side effects.
 - A source may be a public log event or the calling seat's own private event;
   another seat's private evidence is rejected by the validation layer.

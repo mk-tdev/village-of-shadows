@@ -64,7 +64,7 @@ does not collect model API keys from visitors.
 
 ## 4. Stored information and retention
 
-SQLite stores the minimum state needed to run, reconnect, inspect, and replay
+PostgreSQL stores the minimum state needed to run, reconnect, inspect, and replay
 a session:
 
 - game status, configured seats, provider/model identifiers, and secret roles;
@@ -87,7 +87,7 @@ memories, branch links, tournament linkage, and checkpoint threads.
 The reference self-hosted deployment does not impose a universal automatic
 retention period because storage belongs to the deployer. Operators must set a
 retention schedule appropriate to their audience and jurisdiction, secure or
-encrypt their SQLite volume as needed, and provide a contact route for deletion
+encrypt their PostgreSQL service and backups as needed, and provide a contact route for deletion
 requests. The public demo should be treated as an ephemeral demonstration: do
 not enter real personal, confidential, educational-record, or sensitive data.
 
@@ -158,8 +158,9 @@ content use, and distribution method are permitted.
 - Model prompts and responses may contain personal information if a user puts
   it into a name, persona, or message; the UI therefore warns against entering
   sensitive data and this statement requires operators to communicate the same.
-- SQLite is suitable for a prototype and single-service deployment, not a
-  substitute for production tenancy controls and managed secret/storage policy.
+- PostgreSQL provides durable state for the reference deployment, but it is not
+  a substitute for production tenancy controls, managed secrets, backups, and
+  retention policy.
 - External model and hosting availability can fail or change independently of
   this repository.
 - Replay sharing is an intentional disclosure action. Hosts must inspect the

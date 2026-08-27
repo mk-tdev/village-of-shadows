@@ -51,7 +51,7 @@ the post-game report even though a pause can roll the main graph back to the
 start of a node.
 
 Every notebook operation derives a deterministic `event_key` from the game,
-seat, round, phase, operation, note, content, and source. SQLite enforces that
+seat, round, phase, operation, note, content, and source. PostgreSQL enforces that
 key as unique. Reapplying the same operation returns the existing row and emits
 no second SSE update. Conversation replay protection in the seat-mind subgraph
 normally prevents the model call from happening twice; the database key is the

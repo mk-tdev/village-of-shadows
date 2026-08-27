@@ -1,12 +1,12 @@
 import json
 
-import aiosqlite
+from app.postgres_adapter import DatabaseConnection
 
 from app.models import AgentConfig, GameOptions, LogEntry
 
 
 async def create_game(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     session_id: str,
     seats: list[AgentConfig],
     options: GameOptions | None = None,
@@ -36,7 +36,7 @@ async def create_game(
     await conn.commit()
 
 
-async def get_game_config(conn: aiosqlite.Connection, session_id: str) -> dict | None:
+async def get_game_config(conn: DatabaseConnection, session_id: str) -> dict | None:
     cursor = await conn.execute(
         "SELECT options_json, seats_json FROM game_configs WHERE game_id = ?",
         (session_id,),
@@ -47,7 +47,7 @@ async def get_game_config(conn: aiosqlite.Connection, session_id: str) -> dict |
     return {"options": json.loads(row[0]), "seats": json.loads(row[1])}
 
 
-async def set_seat_role(conn: aiosqlite.Connection, session_id: str, seat_id: str, role: str) -> None:
+async def set_seat_role(conn: DatabaseConnection, session_id: str, seat_id: str, role: str) -> None:
     await conn.execute(
         "UPDATE seats SET role = ? WHERE game_id = ? AND seat_id = ?",
         (role, session_id, seat_id),
@@ -55,7 +55,7 @@ async def set_seat_role(conn: aiosqlite.Connection, session_id: str, seat_id: st
     await conn.commit()
 
 
-async def finish_game(conn: aiosqlite.Connection, session_id: str, winner: str) -> None:
+async def finish_game(conn: DatabaseConnection, session_id: str, winner: str) -> None:
     await conn.execute(
         "UPDATE games SET status = 'finished', winner = ? WHERE id = ?",
         (winner, session_id),
@@ -63,7 +63,7 @@ async def finish_game(conn: aiosqlite.Connection, session_id: str, winner: str) 
     await conn.commit()
 
 
-async def stop_game(conn: aiosqlite.Connection, session_id: str) -> None:
+async def stop_game(conn: DatabaseConnection, session_id: str) -> None:
     """A user-initiated abandon, distinct from finish_game's natural
     win/loss conclusion -- 'stopped' rather than 'finished', with no
     winner, so a later look at the games table can tell the two apart."""
@@ -74,7 +74,7 @@ async def stop_game(conn: aiosqlite.Connection, session_id: str) -> None:
     await conn.commit()
 
 
-async def delete_game_data(conn: aiosqlite.Connection, session_id: str) -> dict[str, int]:
+async def delete_game_data(conn: DatabaseConnection, session_id: str) -> dict[str, int]:
     """Permanently remove one game's persisted data and derived exports.
 
     The host-facing API calls this only after credential validation and after
@@ -141,7 +141,7 @@ async def delete_game_data(conn: aiosqlite.Connection, session_id: str) -> dict[
     return counts
 
 
-async def record_log_entry(conn: aiosqlite.Connection, session_id: str, entry: LogEntry) -> None:
+async def record_log_entry(conn: DatabaseConnection, session_id: str, entry: LogEntry) -> None:
     """Idempotent on `(game_id, seq)`.
 
     A node re-runs from the top when the graph resumes after a pause (see
@@ -179,7 +179,7 @@ async def record_log_entry(conn: aiosqlite.Connection, session_id: str, entry: L
 
 
 async def record_agent_decision(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     *,
     session_id: str,
     seat_id: str,
@@ -217,7 +217,7 @@ async def record_agent_decision(
     await conn.commit()
 
 
-async def record_note(conn: aiosqlite.Connection, session_id: str, seat_id: str, round: int, note: str) -> None:
+async def record_note(conn: DatabaseConnection, session_id: str, seat_id: str, round: int, note: str) -> None:
     await conn.execute(
         "INSERT INTO agent_notes (game_id, seat_id, round, note) VALUES (?, ?, ?, ?)",
         (session_id, seat_id, round, note),
@@ -225,7 +225,7 @@ async def record_note(conn: aiosqlite.Connection, session_id: str, seat_id: str,
     await conn.commit()
 
 
-async def get_notes(conn: aiosqlite.Connection, session_id: str, seat_id: str) -> list[str]:
+async def get_notes(conn: DatabaseConnection, session_id: str, seat_id: str) -> list[str]:
     """Compatibility view of the active structured notes as plain strings."""
     events = await get_note_events(conn, session_id, seat_id, latest_only=True)
     return [event["content"] for event in events if event["status"] == "active"]
@@ -249,7 +249,7 @@ def _note_event(row: tuple | None) -> dict | None:
 
 
 async def record_note_event(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     *,
     session_id: str,
     seat_id: str,
@@ -288,7 +288,7 @@ async def record_note_event(
 
 
 async def get_note_event_by_key(
-    conn: aiosqlite.Connection, event_key: str,
+    conn: DatabaseConnection, event_key: str,
 ) -> dict | None:
     cursor = await conn.execute(
         f"SELECT {', '.join(NOTE_EVENT_COLUMNS)} FROM agent_note_events WHERE event_key = ?",
@@ -298,7 +298,7 @@ async def get_note_event_by_key(
 
 
 async def get_latest_note_event(
-    conn: aiosqlite.Connection, session_id: str, seat_id: str, note_id: str,
+    conn: DatabaseConnection, session_id: str, seat_id: str, note_id: str,
 ) -> dict | None:
     cursor = await conn.execute(
         f"""SELECT {', '.join(NOTE_EVENT_COLUMNS)} FROM agent_note_events
@@ -310,7 +310,7 @@ async def get_latest_note_event(
 
 
 async def get_note_events(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     session_id: str,
     seat_id: str | None = None,
     *,
@@ -357,7 +357,7 @@ def _belief_event(row: tuple | None) -> dict | None:
 
 
 async def record_belief_event(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     *,
     session_id: str,
     observer_seat_id: str,
@@ -394,7 +394,7 @@ async def record_belief_event(
 
 
 async def get_belief_event_by_key(
-    conn: aiosqlite.Connection, event_key: str,
+    conn: DatabaseConnection, event_key: str,
 ) -> dict | None:
     cursor = await conn.execute(
         f"SELECT {', '.join(BELIEF_EVENT_COLUMNS)} FROM agent_belief_events WHERE event_key = ?",
@@ -404,7 +404,7 @@ async def get_belief_event_by_key(
 
 
 async def get_latest_belief_event(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     session_id: str,
     observer_seat_id: str,
     subject_seat_id: str,
@@ -419,7 +419,7 @@ async def get_latest_belief_event(
 
 
 async def get_belief_events(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     session_id: str,
     observer_seat_id: str | None = None,
     *,
@@ -447,7 +447,7 @@ async def get_belief_events(
     return list(latest.values())
 
 
-async def get_vote_history(conn: aiosqlite.Connection, session_id: str) -> list[dict]:
+async def get_vote_history(conn: DatabaseConnection, session_id: str) -> list[dict]:
     cursor = await conn.execute(
         "SELECT round, seat_id, text FROM log_entries WHERE game_id = ? AND type = 'vote' ORDER BY seq",
         (session_id,),
@@ -456,7 +456,7 @@ async def get_vote_history(conn: aiosqlite.Connection, session_id: str) -> list[
     return [{"round": r[0], "seat_id": r[1], "text": r[2]} for r in rows]
 
 
-async def get_decisions(conn: aiosqlite.Connection, session_id: str) -> list[dict]:
+async def get_decisions(conn: DatabaseConnection, session_id: str) -> list[dict]:
     cursor = await conn.execute(
         """SELECT seat_id, round, phase, provider, model_name, prompt, raw_response, tool_calls,
                   latency_ms, input_tokens, output_tokens, created_at
@@ -472,7 +472,7 @@ async def get_decisions(conn: aiosqlite.Connection, session_id: str) -> list[dic
 
 
 async def create_branch_record(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     *,
     child_game_id: str,
     parent_game_id: str,
@@ -495,7 +495,7 @@ async def create_branch_record(
     await conn.commit()
 
 
-async def get_branch_lineage(conn: aiosqlite.Connection, session_id: str) -> dict | None:
+async def get_branch_lineage(conn: DatabaseConnection, session_id: str) -> dict | None:
     cursor = await conn.execute(
         """SELECT child_game_id, parent_game_id, checkpoint_id, branch_log_seq,
                   replaced_seat_id, replaced_kind, replacement_json, created_at
@@ -516,7 +516,7 @@ async def get_branch_lineage(conn: aiosqlite.Connection, session_id: str) -> dic
 
 
 async def clone_history_prefix(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     *,
     parent_game_id: str,
     child_game_id: str,
@@ -556,7 +556,7 @@ async def clone_history_prefix(
 
 
 async def create_tournament(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     tournament_id: str,
     config: dict,
     games_requested: int,
@@ -570,7 +570,7 @@ async def create_tournament(
 
 
 async def set_tournament_status(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     tournament_id: str,
     status: str,
     *,
@@ -587,7 +587,7 @@ async def set_tournament_status(
 
 
 async def record_tournament_game(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     tournament_id: str,
     game_id: str,
     game_index: int,
@@ -605,7 +605,7 @@ async def record_tournament_game(
     await conn.commit()
 
 
-async def get_tournament(conn: aiosqlite.Connection, tournament_id: str) -> dict | None:
+async def get_tournament(conn: DatabaseConnection, tournament_id: str) -> dict | None:
     cursor = await conn.execute(
         """SELECT id, status, config_json, games_requested, games_completed,
                   stop_reason, created_at, finished_at
@@ -641,7 +641,7 @@ RELATIONSHIP_COLUMNS = [
 
 
 async def record_relationship_memory(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     *,
     owner_name: str,
     subject_name: str,
@@ -660,7 +660,7 @@ async def record_relationship_memory(
 
 
 async def get_relationship_memories(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     owner_name: str | None = None,
     *,
     include_inactive: bool = False,
@@ -680,7 +680,7 @@ async def get_relationship_memories(
     return [dict(zip(RELATIONSHIP_COLUMNS, row)) for row in await cursor.fetchall()]
 
 
-async def edit_relationship_memory(conn: aiosqlite.Connection, memory_id: int, memory: str) -> bool:
+async def edit_relationship_memory(conn: DatabaseConnection, memory_id: int, memory: str) -> bool:
     cursor = await conn.execute(
         "UPDATE cross_game_memories SET memory = ?, edited_at = CURRENT_TIMESTAMP WHERE id = ?",
         (memory, memory_id),
@@ -689,14 +689,14 @@ async def edit_relationship_memory(conn: aiosqlite.Connection, memory_id: int, m
     return cursor.rowcount == 1
 
 
-async def delete_relationship_memory(conn: aiosqlite.Connection, memory_id: int) -> bool:
+async def delete_relationship_memory(conn: DatabaseConnection, memory_id: int) -> bool:
     cursor = await conn.execute("DELETE FROM cross_game_memories WHERE id = ?", (memory_id,))
     await conn.commit()
     return cursor.rowcount == 1
 
 
 async def create_replay_share(
-    conn: aiosqlite.Connection,
+    conn: DatabaseConnection,
     *,
     share_id: str,
     game_id: str,
@@ -714,7 +714,7 @@ async def create_replay_share(
     await conn.commit()
 
 
-async def get_replay_share(conn: aiosqlite.Connection, share_id: str) -> dict | None:
+async def get_replay_share(conn: DatabaseConnection, share_id: str) -> dict | None:
     cursor = await conn.execute(
         """SELECT id, game_id, scope, secret_hash, snapshot_json, expires_at,
                   revoked_at, created_at
@@ -735,7 +735,7 @@ async def get_replay_share(conn: aiosqlite.Connection, share_id: str) -> dict | 
     return result
 
 
-async def list_replay_shares(conn: aiosqlite.Connection, game_id: str) -> list[dict]:
+async def list_replay_shares(conn: DatabaseConnection, game_id: str) -> list[dict]:
     cursor = await conn.execute(
         """SELECT id, scope, expires_at, revoked_at, created_at
            FROM replay_shares WHERE game_id = ? ORDER BY created_at DESC""",
@@ -752,7 +752,7 @@ async def list_replay_shares(conn: aiosqlite.Connection, game_id: str) -> list[d
     ]
 
 
-async def revoke_replay_share(conn: aiosqlite.Connection, game_id: str, share_id: str) -> bool:
+async def revoke_replay_share(conn: DatabaseConnection, game_id: str, share_id: str) -> bool:
     cursor = await conn.execute(
         """UPDATE replay_shares SET revoked_at = CURRENT_TIMESTAMP
            WHERE id = ? AND game_id = ? AND revoked_at IS NULL""",

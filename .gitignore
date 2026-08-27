@@ -12,6 +12,7 @@ frontend/.next/
 frontend/.env.local
 
 /submission/
+/frontend/.pnpm-store/
 tmp
 output
 

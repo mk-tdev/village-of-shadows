@@ -5,7 +5,7 @@ LangChain chat model to fake convincingly enough to be worth the effort here.
 Instead, callers (see game/agent_turn.py) special-case `provider == "mock"`
 and skip straight to a scripted decision, then make the *same* MCP tool call
 a real model's tool-calling loop would make. That exercises the full
-MCP/SQLite/graph path identically to a real provider, with no network calls
+MCP/PostgreSQL/graph path identically to a real provider, with no network calls
 and no API key required.
 """
 

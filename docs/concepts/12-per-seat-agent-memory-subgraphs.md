@@ -71,7 +71,7 @@ return {
 ([seat_mind.py:266-272](../../backend/app/game/seat_mind.py#L266-L272))
 
 The mind is compiled **once** at startup, sharing the very same
-`AsyncSqliteSaver` the main game graph already uses for interrupt/resume:
+`AsyncPostgresSaver` the main game graph already uses for interrupt/resume:
 
 ```python
 app.state.graph = build_graph(checkpointer)

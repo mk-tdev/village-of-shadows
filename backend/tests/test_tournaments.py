@@ -1,11 +1,12 @@
 import asyncio
 
-import aiosqlite
 import pytest
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app import persistence
-from app.db import init_schema
+from app.postgres_adapter import DatabaseConnection
+from app.postgres_migrations import init_schema
+from tests.helpers import database_url_for_tests
 from app.game.graph import build_graph
 from app.game.seat_mind import build_seat_mind
 from app.game.tournaments import TournamentRequest, _rotated_roles, prepare, summarize
@@ -28,9 +29,11 @@ def _lineup():
 
 @pytest.mark.asyncio
 async def test_tournament_balances_roles_and_persists_aggregate(tmp_path):
-    conn = await aiosqlite.connect(tmp_path / "tournament.db")
+    database_url = database_url_for_tests()
+    conn = await DatabaseConnection.connect(database_url)
     await init_schema(conn)
-    saver = AsyncSqliteSaver(conn)
+    saver_context = AsyncPostgresSaver.from_conn_string(database_url)
+    saver = await saver_context.__aenter__()
     await saver.setup()
     state = AppState()
     state.db_conn = conn
@@ -52,6 +55,8 @@ async def test_tournament_balances_roles_and_persists_aggregate(tmp_path):
     assert report["totals"]["tokens"] > 0
     assert _rotated_roles(0)[0] == "werewolf"
     assert _rotated_roles(1)[-1] == "werewolf"
+    await saver_context.__aexit__(None, None, None)
+    await conn.close()
 
 
 def test_tournament_rejects_humans_and_requires_seven_seats():

@@ -1,6 +1,4 @@
-import aiosqlite
-
-SCHEMA = """
+POSTGRES_SCHEMA = """
 CREATE TABLE IF NOT EXISTS games (
     id            TEXT PRIMARY KEY,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -9,7 +7,7 @@ CREATE TABLE IF NOT EXISTS games (
 );
 
 CREATE TABLE IF NOT EXISTS seats (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     game_id       TEXT NOT NULL REFERENCES games(id),
     seat_id       TEXT NOT NULL,
     display_name  TEXT NOT NULL,
@@ -21,7 +19,7 @@ CREATE TABLE IF NOT EXISTS seats (
 );
 
 CREATE TABLE IF NOT EXISTS log_entries (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     game_id       TEXT NOT NULL REFERENCES games(id),
     seq           INTEGER NOT NULL,
     round         INTEGER NOT NULL,
@@ -35,7 +33,7 @@ CREATE TABLE IF NOT EXISTS log_entries (
 );
 
 CREATE TABLE IF NOT EXISTS agent_decisions (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     game_id       TEXT NOT NULL REFERENCES games(id),
     seat_id       TEXT NOT NULL,
     round         INTEGER NOT NULL,
@@ -52,7 +50,7 @@ CREATE TABLE IF NOT EXISTS agent_decisions (
 );
 
 CREATE TABLE IF NOT EXISTS agent_notes (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     game_id       TEXT NOT NULL REFERENCES games(id),
     seat_id       TEXT NOT NULL,
     round         INTEGER NOT NULL,
@@ -65,7 +63,7 @@ CREATE TABLE IF NOT EXISTS agent_notes (
 -- tools write here. A revision or retirement is another row, never an
 -- UPDATE, which lets God Mode reconstruct how a theory changed over time.
 CREATE TABLE IF NOT EXISTS agent_note_events (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     game_id       TEXT NOT NULL REFERENCES games(id),
     seat_id       TEXT NOT NULL,
     note_id       TEXT NOT NULL,
@@ -91,7 +89,7 @@ ON agent_note_events(game_id, seat_id, note_id, revision);
 -- replay exactly when and why trust changed. Suspicion is 0 (trusted) to
 -- 100 (certain threat); trust is the derived inverse shown by the UI.
 CREATE TABLE IF NOT EXISTS agent_belief_events (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     game_id         TEXT NOT NULL REFERENCES games(id),
     observer_seat_id TEXT NOT NULL,
     subject_seat_id  TEXT NOT NULL,
@@ -139,7 +137,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
 );
 
 CREATE TABLE IF NOT EXISTS tournament_games (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     tournament_id   TEXT NOT NULL REFERENCES tournaments(id),
     game_id         TEXT NOT NULL REFERENCES games(id),
     game_index      INTEGER NOT NULL,
@@ -183,14 +181,14 @@ CREATE TABLE IF NOT EXISTS seat_access_tokens (
 -- FE-13: opt-in continuity. Memories describe observed behaviour and always
 -- cite a source game/event; current secret roles are never stored here.
 CREATE TABLE IF NOT EXISTS cross_game_memories (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     owner_name      TEXT NOT NULL,
     subject_name    TEXT NOT NULL,
     memory          TEXT NOT NULL,
     source_game_id  TEXT NOT NULL REFERENCES games(id),
     source_seq      INTEGER,
     event_key       TEXT NOT NULL UNIQUE,
-    active          BOOLEAN NOT NULL DEFAULT 1,
+    active          BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     edited_at       TIMESTAMP
 );
@@ -222,7 +220,7 @@ CREATE TABLE IF NOT EXISTS voice_audio_cache (
     log_seq       INTEGER NOT NULL,
     model         TEXT NOT NULL,
     voice         TEXT NOT NULL,
-    audio         BLOB NOT NULL,
+    audio         BYTEA NOT NULL,
     content_type  TEXT NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY(game_id, log_seq, model, voice)
@@ -232,7 +230,3 @@ CREATE INDEX IF NOT EXISTS idx_voice_audio_cache_game
 ON voice_audio_cache(game_id, log_seq);
 """
 
-
-async def init_schema(conn: aiosqlite.Connection) -> None:
-    await conn.executescript(SCHEMA)
-    await conn.commit()

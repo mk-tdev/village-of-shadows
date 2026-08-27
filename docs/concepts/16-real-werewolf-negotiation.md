@@ -81,7 +81,7 @@ pass action; neither path trusts browser state to advance the council directly.
 If a pause lands after an AI council turn, LangGraph re-runs that one node on
 resume. The per-seat mind recognizes its stable turn stamp and re-applies the
 stored tool arguments without calling the model again. The rolled-back game
-state recreates the same log sequence number, and SQLite's existing
+state recreates the same log sequence number, and PostgreSQL's existing
 `(game_id, seq)` guard prevents a duplicate persisted event. The result is one
 remembered message, one game effect, and one visible council turn.
 

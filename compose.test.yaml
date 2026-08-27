@@ -1,0 +1,19 @@
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: village_test
+      POSTGRES_USER: village_test
+      POSTGRES_PASSWORD: village_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - village-postgres-test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U village_test -d village_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  village-postgres-test:

@@ -1,12 +1,12 @@
 from contextlib import asynccontextmanager
 
-import aiosqlite
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app.config import settings
-from app.db import init_schema
+from app.postgres_adapter import DatabaseConnection
+from app.postgres_migrations import init_schema
 from app.game.graph import build_graph
 from app.game.seat_mind import build_seat_mind
 from app.mcp_server.server import mcp
@@ -15,23 +15,21 @@ from app.routers import games, graph, input, relationships, replays, stream, tou
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    conn = await aiosqlite.connect(settings.db_path)
+    conn = await DatabaseConnection.connect(settings.database_url)
     await init_schema(conn)
 
-    checkpointer = AsyncSqliteSaver(conn)
-    await checkpointer.setup()
-
-    app.state.db_conn = conn
-    app.state.graph = build_graph(checkpointer)
-    # Same checkpointer as the game graph: a seat's memory and the game's own
-    # interrupt/resume state are both just threads in the one SQLite store,
-    # separated by thread_id (see game/seat_mind.py).
-    app.state.seat_mind = build_seat_mind(checkpointer)
-
-    async with mcp.session_manager.run():
-        yield
-
-    await conn.close()
+    async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
+        await checkpointer.setup()
+        app.state.db_conn = conn
+        app.state.graph = build_graph(checkpointer)
+        # The main graph and every seat mind share one durable Postgres
+        # checkpointer; thread_id keeps each private perspective isolated.
+        app.state.seat_mind = build_seat_mind(checkpointer)
+        try:
+            async with mcp.session_manager.run():
+                yield
+        finally:
+            await conn.close()
 
 
 app = FastAPI(title="Village of Shadows", lifespan=lifespan)

@@ -1,117 +1,29 @@
-# 8. Two kinds of persistence, easy to conflate
+# 8. Two kinds of persistence
 
-**Files:** [`backend/app/db.py`](../../backend/app/db.py),
-[`backend/app/persistence.py`](../../backend/app/persistence.py),
-[`backend/app/main.py`](../../backend/app/main.py)
+**Files:** [`backend/app/postgres_schema.py`](../../backend/app/postgres_schema.py), [`backend/app/persistence.py`](../../backend/app/persistence.py), [`backend/app/main.py`](../../backend/app/main.py)
 
-This project writes to SQLite in two completely different ways, for two
-completely different reasons, sharing the same connection and the same
-`.db` file but otherwise unrelated to each other. Confusing them is an easy
-mistake to make when you first read the code, because both are "SQLite" and
-both happen automatically as the game runs — but they answer different
-questions.
+Village of Shadows uses PostgreSQL in two deliberately separate ways. Both layers are durable, but they answer different questions.
 
-## Kind 1: `agent_decisions` / `log_entries` / `seats` / `games` — history for humans to read
+## Application tables: history for people to inspect
 
-```python
-CREATE TABLE IF NOT EXISTS log_entries (...);
-CREATE TABLE IF NOT EXISTS agent_decisions (...);
-CREATE TABLE IF NOT EXISTS agent_notes (...);
-CREATE TABLE IF NOT EXISTS agent_note_events (...);
-CREATE TABLE IF NOT EXISTS agent_belief_events (...);
-```
-([db.py](../../backend/app/db.py))
+The application schema owns `games`, `seats`, `log_entries`, `agent_decisions`, notes, belief events, room credentials, replay artifacts, and cached voice. `persistence.py` records what happened, which model was called, what evidence was available, and how a private theory evolved.
 
-These application tables (`games`, `seats`, `log_entries`, `agent_decisions`,
-legacy `agent_notes`, immutable `agent_note_events`, and immutable
-`agent_belief_events`) answer questions like "what did this game's log
-look like," "what prompt did seat 3 actually receive on round 2, and what
-did the model respond with," or "how did the seer's theory change over time."
-`persistence.py` is a thin, hand-written set of `INSERT`/`SELECT` functions
-against this schema — ordinary application-level persistence, the same kind
-you'd write for any app with a database.
+This is the source for God Mode, Learning Debrief, replay export, and technical evidence. Deterministic event keys make pause and resume replays read an existing effect rather than creating a duplicate row.
 
-The notebook event ledger is especially deliberate: revisions and retirements
-append rows, and a deterministic unique event key makes an identical replay a
-read of the existing event rather than a duplicate write. See
-[14-agent-authored-private-notes.md](14-agent-authored-private-notes.md).
-The relationship-score ledger uses the same append-only and deterministic-key
-pattern; see [15-trust-and-suspicion.md](15-trust-and-suspicion.md).
+## LangGraph checkpoint tables: exactly where to resume
 
-This is the layer that makes the "showcase agentic engineering" debug view
-possible after the fact: `GET /games/{id}/decisions`
-([routers/games.py:78-81](../../backend/app/routers/games.py#L78-L81))
-reads straight out of `agent_decisions` to answer "show me every model call
-this game made, with its prompt, raw response, and latency." Nothing about
-LangGraph or `interrupt()` is involved in this layer at all — it would work
-identically if the whole orchestration were still a plain Python loop.
-
-## Kind 2: the LangGraph checkpointer — durability for `interrupt()`
+LangGraph manages separate tables through `AsyncPostgresSaver`. A checkpoint serializes graph state at each transition and associates it with a `thread_id`. A game uses its session ID as the main thread, and every seat mind uses a related private thread ID.
 
 ```python
-checkpointer = AsyncSqliteSaver(conn)
-await checkpointer.setup()
-...
-app.state.graph = build_graph(checkpointer)
+async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
+    await checkpointer.setup()
+    app.state.graph = build_graph(checkpointer)
 ```
-([main.py:21-29](../../backend/app/main.py#L21-L29))
 
-This is a *second*, separate concern, answering a different question
-entirely: "if this graph is suspended mid-execution — inside a
-node, at an `interrupt()` call, waiting on a human or a pause — how does it
-know where it was when someone resumes it?" `AsyncSqliteSaver` is
-LangGraph's own SQLite-backed implementation of a *checkpointer*: every
-time the graph transitions between nodes, it serializes the current
-`GraphState` (the `{"game": GameState}` dict) and writes it to its own
-tables (managed entirely by LangGraph internally — not the tables in
-`db.py`'s `SCHEMA`) under a **thread ID**.
+When `interrupt()` waits for a human, the checkpointer records the exact graph position. `Command(resume=value)` reloads that state and continues safely. The `_sync` helper then repoints the live orchestrator to the checkpoint-restored `GameState`, so MCP and SSE code do not keep a stale state object.
 
-```python
-self.config = {"configurable": {"thread_id": session_id, "session_id": session_id}}
-```
-([orchestrator.py:57](../../backend/app/game/orchestrator.py#L57))
+## Why the distinction matters
 
-Every game's `session_id` doubles as its checkpointer thread ID. When
-`resume()` calls `graph.astream(Command(resume=value), self.config)`, the
-checkpointer uses that thread ID to find the exact serialized state the
-graph was in in when it suspended, deserializes it, and hands it back to
-the node that's resuming — which is also *why* `nodes.py`'s `_sync`
-function has to exist at all:
+Application history explains what happened and why, but cannot resume a graph mid-node. Checkpoints can resume the graph, but are not a human-facing audit API. Keeping both layers explicit is what makes a human interrupt durable and the resulting multi-agent behavior teachable.
 
-```python
-def _sync(config: RunnableConfig, game: GameState):
-    """Re-point the registry's live GameState at whatever object LangGraph
-    just handed this node. Necessary because a resumed run (after an
-    `interrupt()`) restores "game" from the checkpoint's serialized copy —
-    a different Python object than the one before suspension..."""
-    session_id = config["configurable"]["session_id"]
-    orch = registry.get(session_id)
-    orch.state = game
-    ...
-```
-([nodes.py:33-70](../../backend/app/game/nodes.py#L33-L70))
-
-The `game` object a resumed node receives is a *freshly deserialized copy*
-from the checkpoint, not the same Python object `orch.state` pointed at
-before suspension. `_sync` is the one place that re-points `orch.state` at
-this new object on every single node execution — anything reading
-`orch.state` from outside a node (an MCP tool handler, an SSE route) would
-otherwise be holding a stale reference the moment a resume happens.
-
-## Why the distinction matters in practice
-
-If you only had persistence Kind 1 (the hand-written tables) and no
-checkpointer, `interrupt()` would have nowhere durable to leave the graph's
-exact execution position — a server restart mid-game would lose the ability
-to resume at all, even though the *history* (who said what) would still be
-intact in `log_entries`. Conversely, if you only had the checkpointer and no
-hand-written tables, the game could still pause and resume correctly, but
-there'd be no queryable history of *why* a model made a decision — the
-checkpointer's job is "where was I," not "what happened and why," and it's
-not meant to be read by anything except LangGraph's own resume logic.
-
-Both share one physical `.db` file and one `aiosqlite.Connection`
-(`app.state.db_conn`, opened once in `lifespan` — see
-[01-fastapi-app-shape.md](01-fastapi-app-shape.md)) purely as a resource
-convenience; there's no meaningful coupling between their schemas, and
-nothing in `persistence.py` ever reads checkpointer tables or vice versa.
+The Docker test suite uses a separate PostgreSQL service on port 5433 and truncates only that disposable database between tests. It verifies persistence and LangGraph resume behavior without endangering local games.

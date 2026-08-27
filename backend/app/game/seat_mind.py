@@ -21,7 +21,7 @@ that seat's turns, alive until the game ends.
 
 Each seat's mind is the **same compiled subgraph** invoked under its **own
 `thread_id`** (`"{session_id}:{seat_id}"`), sharing the very same
-`AsyncSqliteSaver` the main game graph already uses for interrupt/resume
+`AsyncPostgresSaver` the main game graph already uses for interrupt/resume
 (see main.py, 08-persistence-and-checkpointing.md). LangGraph restores that
 thread's `messages` on every invocation and persists whatever the turn adds,
 so "memory" is not a new mechanism this project invented — it's the

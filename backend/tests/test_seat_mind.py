@@ -174,13 +174,19 @@ async def test_discarding_a_game_reclaims_every_seats_checkpoint_thread(tmp_path
     orch.start()
     await orch._task
 
-    cursor = await orch.conn.execute("SELECT COUNT(DISTINCT thread_id) FROM checkpoints")
+    cursor = await orch.conn.execute(
+        "SELECT COUNT(DISTINCT thread_id) FROM checkpoints WHERE thread_id = ? OR thread_id LIKE ?",
+        (orch.session_id, f"{orch.session_id}:%"),
+    )
     before = (await cursor.fetchone())[0]
     assert before > 1, "expected the game graph plus per-seat mind threads"
 
     await orch.discard_checkpoints()
 
-    cursor = await orch.conn.execute("SELECT COUNT(DISTINCT thread_id) FROM checkpoints")
+    cursor = await orch.conn.execute(
+        "SELECT COUNT(DISTINCT thread_id) FROM checkpoints WHERE thread_id = ? OR thread_id LIKE ?",
+        (orch.session_id, f"{orch.session_id}:%"),
+    )
     assert (await cursor.fetchone())[0] == 0
 
 

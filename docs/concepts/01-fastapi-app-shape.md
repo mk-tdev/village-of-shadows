@@ -1,101 +1,31 @@
 # 1. FastAPI app shape
 
-**Files:** [`backend/app/main.py`](../../backend/app/main.py),
-[`backend/app/config.py`](../../backend/app/config.py),
-[`backend/app/db.py`](../../backend/app/db.py)
+**Files:** [`backend/app/main.py`](../../backend/app/main.py), [`backend/app/config.py`](../../backend/app/config.py), [`backend/app/postgres_adapter.py`](../../backend/app/postgres_adapter.py)
 
 ## The shape
 
-This isn't a microservices system — everything (the HTTP API, the LangGraph
-orchestrator, the MCP tool server) runs in **one Python process**, sharing
-one event loop and one SQLite connection. That's a deliberate scope
-decision, not an oversight: it means an agent's MCP tool call, the graph
-node that triggered it, and the SSE stream watching it all happen in the
-same process with no network hop or serialization boundary between them.
-Real production systems might split these out; a learning project showing
-the *concepts* of agentic orchestration doesn't need that complexity yet.
+The HTTP API, LangGraph orchestrator, and MCP tool server run in one FastAPI process. They share an application PostgreSQL connection, while LangGraph owns a separate PostgreSQL checkpointer connection. This keeps agent tool calls, graph transitions, and SSE updates close together without pretending that database history and checkpoint state are the same thing.
 
-## `lifespan` — setup that outlives any single request
+## `lifespan` — setup that outlives one request
+
+At server startup, `lifespan` opens `DatabaseConnection` using `DATABASE_URL`, applies the versioned application schema, opens LangGraph `AsyncPostgresSaver`, and runs its setup. It attaches the database connection, compiled game graph, and compiled per-seat mind graph to `app.state`. It also enters the MCP session manager for the lifetime of the process.
 
 ```python
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    conn = await aiosqlite.connect(settings.db_path)
-    await init_schema(conn)
-
-    checkpointer = AsyncSqliteSaver(conn)
+conn = await DatabaseConnection.connect(settings.database_url)
+await init_schema(conn)
+async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
     await checkpointer.setup()
-
     app.state.db_conn = conn
     app.state.graph = build_graph(checkpointer)
-
-    async with mcp.session_manager.run():
-        yield
-
-    await conn.close()
+    app.state.seat_mind = build_seat_mind(checkpointer)
 ```
-([main.py:16-33](../../backend/app/main.py#L16-L33))
 
-FastAPI's `lifespan` context manager runs once when the server starts and
-once when it stops — not per-request. Three things get created here that
-every request needs but no single request owns:
+A `thread_id` separates the main game and every private seat mind in the common checkpoint store. The compiled graph structure is reused, but each game has independent checkpoint state.
 
-- **The database connection.** One `aiosqlite.Connection` for the whole
-  server's lifetime. SQLite is fine with this in a single-process app; a
-  connection pool would be solving a problem this app doesn't have.
-- **The compiled LangGraph app** (`build_graph(checkpointer)`) — compiling a
-  graph is relatively expensive and the graph's *structure* never changes
-  per-game, only its *state* does, so it's built once and reused for every
-  game.
-- **The MCP server's session manager**, entered as an async context so its
-  background bookkeeping runs for exactly as long as the app is up.
+## Why one backend replica today
 
-Everything created here is attached to `app.state`, which is the idiomatic
-FastAPI way to make long-lived objects reachable from route handlers without
-global variables — see `request.app.state.db_conn` and
-`request.app.state.graph` in [games.py](../../backend/app/routers/games.py).
+PostgreSQL makes records and interrupts durable. The active-game registry and mounted MCP server are still in-process, however, so production deployment deliberately uses one Container Apps replica. Horizontal scaling is a later architecture change: it requires a distributed game-owner registry and SSE routing, not merely a database switch.
 
-## Routers: one file per resource, not one giant file
+## Routers and configuration
 
-```python
-app.include_router(games.router)
-app.include_router(stream.router)
-app.include_router(input.router)
-app.include_router(graph.router)
-```
-([main.py:46-49](../../backend/app/main.py#L46-L49))
-
-Each router (`games.py`, `stream.py`, `input.py`, `graph.py`) owns one slice
-of the API surface and is mounted under a shared prefix
-(`APIRouter(prefix="/games", ...)`). This is FastAPI's standard scaling
-pattern — nothing exotic — but worth calling out because it's what makes
-`app/routers/stream.py` (SSE) and `app/routers/games.py` (pause/continue,
-create, state) independently readable despite touching the same
-`GameOrchestrator`.
-
-## Mounting a second ASGI app inside this one
-
-```python
-app.mount("/mcp", mcp.streamable_http_app())
-```
-([main.py:54](../../backend/app/main.py#L54))
-
-The MCP tool server (see
-[05-mcp-tool-server-identity.md](05-mcp-tool-server-identity.md)) is a
-*complete, separate* ASGI application — `FastMCP` produces its own app with
-its own routing — but it's mounted as a sub-app under `/mcp` on the same
-FastAPI instance rather than run as a separate process on a separate port.
-That's what "in-process MCP" means concretely: one `uvicorn` process, one
-port, two ASGI apps stitched together by `.mount()`. An agent's MCP client
-still talks real MCP-over-HTTP to `http://localhost:8000/mcp` — it has no
-way to tell this isn't a separate server — but there's no subprocess to
-manage and no separate deployment.
-
-## Config via `pydantic-settings`
-
-[`config.py`](../../backend/app/config.py) defines a `Settings` model whose
-fields can be overridden by environment variables or a `.env` file (`db_path`,
-`cors_origins`, `mcp_url`). This is the standard "typed, validated config
-object instead of scattered `os.environ.get(...)` calls" pattern — mentioned
-here mainly so you know where `settings.mcp_url` (used in
-`agent_turn.py` to open each agent's MCP connection) actually comes from.
+Routers remain separated by resource (`games`, `stream`, `input`, `graph`, and related features), and read durable resources through `request.app.state`. `Settings` accepts `DATABASE_URL`, `CORS_ORIGINS`, and `MCP_URL` from environment variables. Local Docker uses the Compose PostgreSQL service; Azure uses a TLS connection string stored as a Container Apps secret.

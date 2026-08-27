@@ -91,7 +91,7 @@ flowchart LR
     Minds -->|bound tools| MCP[MCP tool server]
     MCP --> Rules[Identity + game-rule validation]
     Rules --> Graph
-    Graph <--> Store[(SQLite logs + checkpoints)]
+    Graph <--> Store[(PostgreSQL logs + checkpoints)]
     API -->|SSE state and activity| UI
 ```
 
@@ -104,7 +104,7 @@ The graph provides orchestration, state boundaries, replay safety, and interrupt
 3. Its configured model reasons over its persona, memory, role, and visible evidence.
 4. The model calls MCP tools to inspect context or commit its action.
 5. The server binds tool identity to the connection and validates the action against current game state.
-6. SQLite persists the outcome, the graph advances, and SSE streams the change to the browser.
+6. PostgreSQL persists the outcome, the graph advances, and SSE streams the change to the browser.
 
 For the full engineering walkthrough, start with the [Concept Guide](docs/concepts/README.md).
 For step-by-step use and interpretation of every shipped enhancement, open the
@@ -129,21 +129,13 @@ See the in-app **How to Play** page for the model list, or inspect [`frontend/li
 
 ### Requirements
 
-- Python 3.12+
-- [`uv`](https://docs.astral.sh/uv/)
-- Node.js and [`pnpm`](https://pnpm.io/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
 ### 1. Install and configure
 
 ```bash
-cd backend
-uv sync
-cp .env.example .env
-
-cd ../frontend
-pnpm install
-cp .env.local.example .env.local
-cd ..
+cp backend/.env.example backend/.env
+cp frontend/.env.local.example frontend/.env.local
 ```
 
 API keys are optional because every AI seat defaults to the offline `mock` provider. To use hosted models, add the relevant values to `backend/.env`:
@@ -180,10 +172,7 @@ Stop both applications with:
 ./stop.sh
 ```
 
-`stop.sh` also clears project-scoped reload workers and test runners—including
-Pytest, Playwright, Vitest, and Jest—plus any process holding the configured
-development ports. This keeps repeated local runs from leaving hidden services
-behind.
+`stop.sh` stops the local Compose services while preserving PostgreSQL volumes, so local games survive a restart.
 
 <details>
 <summary><b>Run the backend and frontend separately</b></summary>
@@ -241,7 +230,7 @@ The post-game Learning Debrief identifies where execution suspended for the huma
 
 Read the standalone [Data Sources and Compliance Statement](docs/data-sources-and-compliance.md) for the complete data inventory, provider flows, educational boundaries, retention model, access controls, and known limitations. The [Third-party Notices](THIRD_PARTY_NOTICES.md) disclose optional model/speech services, principal dependencies, and asset provenance.
 
-Assessment answers and pre-game predictions stay in browser local storage. Game records are stored in the backend's SQLite database so sessions can reconnect, replay, and produce evidence. Stopping preserves the audit record; a host can permanently remove one game's database rows, private agent artifacts, replay snapshots, cached audio, derived memories, and LangGraph checkpoint threads with:
+Assessment answers and pre-game predictions stay in browser local storage. Game records are stored in the backend's PostgreSQL database so sessions can reconnect, replay, and produce evidence. Stopping preserves the audit record; a host can permanently remove one game's database rows, private agent artifacts, replay snapshots, cached audio, derived memories, and LangGraph checkpoint threads with:
 
 ```bash
 curl -X DELETE "http://127.0.0.1:8000/games/SESSION_ID/data?host_token=HOST_TOKEN"
@@ -257,7 +246,7 @@ backend/app/
 ├── model_preflight.py       # Real message + required tool-call readiness gate
 ├── game/                    # Graph, minds, rules, branches, insights, tournaments, replay exports
 ├── mcp_server/              # MCP tools and connection-bound seat identity
-├── persistence.py           # SQLite game records and decisions
+├── persistence.py           # PostgreSQL game records and decisions
 └── routers/                 # REST, SSE, game lifecycle, graph inspection
 
 frontend/
@@ -327,7 +316,7 @@ Additional references:
 
 - The decisions API is available, but there is no dedicated standalone decisions-history page.
 - Hosted-model availability and aliases vary by account and change over time; the readiness gate is intentionally the final source of truth.
-- Voice Council uses OpenAI neural speech when `OPENAI_API_KEY` is configured. It voices only persisted public statements, caches each immutable line in SQLite, and automatically falls back to the best available browser voice. Neural speech consumes API credits; device speech does not.
+- Voice Council uses OpenAI neural speech when `OPENAI_API_KEY` is configured. It voices only persisted public statements, caches each immutable line in PostgreSQL, and automatically falls back to the best available browser voice. Neural speech consumes API credits; device speech does not.
 
 ---
 

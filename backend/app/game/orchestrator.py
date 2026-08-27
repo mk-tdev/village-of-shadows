@@ -13,7 +13,7 @@ suspending the graph exactly like a human turn would. Continuing is a
 import asyncio
 from typing import Any
 
-import aiosqlite
+from app.postgres_adapter import DatabaseConnection
 from langgraph.types import Command
 
 from app.models import AwaitingInput, GameState
@@ -41,7 +41,7 @@ class GameOrchestrator:
         self,
         session_id: str,
         state: GameState,
-        conn: aiosqlite.Connection,
+        conn: DatabaseConnection,
         graph: Any,
         seat_mind: Any = None,
     ):

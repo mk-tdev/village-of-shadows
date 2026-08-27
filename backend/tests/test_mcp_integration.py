@@ -46,15 +46,18 @@ def _asgi_http_client_factory(app):
 
 @pytest.mark.asyncio
 async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
-    import aiosqlite
-    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-    from app.db import init_schema
     from app.game.graph import build_graph
+    from app.postgres_adapter import DatabaseConnection
+    from app.postgres_migrations import init_schema
+    from tests.helpers import database_url_for_tests
 
-    conn = await aiosqlite.connect(str(tmp_path / "mcp_test.db"))
+    database_url = database_url_for_tests()
+    conn = await DatabaseConnection.connect(database_url)
     await init_schema(conn)
-    checkpointer = AsyncSqliteSaver(conn)
+    checkpointer_context = AsyncPostgresSaver.from_conn_string(database_url)
+    checkpointer = await checkpointer_context.__aenter__()
     await checkpointer.setup()
     graph = build_graph(checkpointer)
 
@@ -70,6 +73,7 @@ async def test_bind_seat_then_gameplay_tool_over_real_mcp_session(tmp_path):
     state = GameState(session_id=session_id, players=players, phase="day-discuss")
     await persistence.create_game(conn, session_id, configs)
     orch = GameOrchestrator(session_id, state, conn, graph)
+    orch._checkpointer_context = checkpointer_context
     registry.register(orch)
 
     # Mount at "/mcp" exactly like main.py does -- rather than pointing the

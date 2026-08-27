@@ -50,7 +50,7 @@ preflight route used by the UI.
 | Next.js production build | **Passed**; 11 routes generated |
 
 Pytest reported two non-failing warnings: one upstream MCP client deprecation
-notice and one aiosqlite worker-shutdown warning in an existing village-event
+notice and one prior SQLite worker-shutdown warning in an existing village-event
 test. Neither warning changed a test outcome. The verification does not claim
 performance or learning-effectiveness results from hosted models; those remain
 controlled experiments for the evaluator's authorized provider accounts.

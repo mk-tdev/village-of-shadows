@@ -1,25 +1,31 @@
-"""Shared test setup — a fresh orchestrator wired to a temp SQLite DB and
-the real compiled graph, driven by scripted mock/human turns."""
+"""Shared PostgreSQL-backed test setup for real compiled game graphs."""
 
+import os
 import uuid
 
-import aiosqlite
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app import persistence
-from app.db import init_schema
+from app.config import settings
 from app.game import registry
 from app.game.graph import build_graph
 from app.game.orchestrator import GameOrchestrator
 from app.game.seat_mind import build_seat_mind
 from app.models import AgentConfig, GameState, Player
+from app.postgres_adapter import DatabaseConnection
+from app.postgres_migrations import init_schema
 
 
-async def make_orchestrator(tmp_path, controllers: list[str]) -> GameOrchestrator:
-    db_path = str(tmp_path / f"test-{uuid.uuid4().hex}.db")
-    conn = await aiosqlite.connect(db_path)
+def database_url_for_tests() -> str:
+    return os.getenv("TEST_DATABASE_URL", settings.database_url)
+
+
+async def make_orchestrator(_tmp_path, controllers: list[str]) -> GameOrchestrator:
+    database_url = database_url_for_tests()
+    conn = await DatabaseConnection.connect(database_url)
     await init_schema(conn)
-    checkpointer = AsyncSqliteSaver(conn)
+    checkpointer_context = AsyncPostgresSaver.from_conn_string(database_url)
+    checkpointer = await checkpointer_context.__aenter__()
     await checkpointer.setup()
     graph = build_graph(checkpointer)
     seat_mind = build_seat_mind(checkpointer)
@@ -36,17 +42,18 @@ async def make_orchestrator(tmp_path, controllers: list[str]) -> GameOrchestrato
     ]
     players = [
         Player(
-            seat_id=c.seat_id, name=c.display_name, personality=c.personality,
-            controller=c.controller, provider=c.provider, model_name=c.model_name,
+            seat_id=config.seat_id, name=config.display_name, personality=config.personality,
+            controller=config.controller, provider=config.provider, model_name=config.model_name,
         )
-        for c in configs
+        for config in configs
     ]
     state = GameState(session_id=session_id, players=players)
     await persistence.create_game(conn, session_id, configs)
 
-    orch = GameOrchestrator(session_id, state, conn, graph, seat_mind)
-    registry.register(orch)
-    return orch
+    orchestrator = GameOrchestrator(session_id, state, conn, graph, seat_mind)
+    orchestrator._checkpointer_context = checkpointer_context
+    registry.register(orchestrator)
+    return orchestrator
 
 
 def answer_for(awaiting) -> dict:

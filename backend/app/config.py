@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     host: str = "127.0.0.1"
     port: int = 8000
-    db_path: str = "./village.db"
+    database_url: str = "postgresql://village:village@127.0.0.1:5432/village?sslmode=disable"
     # start.sh runs the frontend on 4001; 3000 stays listed so a plain
     # `next dev` on its own default still works against this backend.
     cors_origins: list[str] = ["http://localhost:4001", "http://localhost:3000"]

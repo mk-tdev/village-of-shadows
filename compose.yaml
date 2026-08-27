@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: village
+      POSTGRES_USER: village
+      POSTGRES_PASSWORD: village
+    ports:
+      - "5432:5432"
+    volumes:
+      - village-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U village -d village"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://village:village@postgres:5432/village?sslmode=disable
+      HOST: 127.0.0.1
+      PORT: 8000
+      CORS_ORIGINS: '["http://localhost:4001","http://localhost:3000"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile --ignore-scripts && pnpm dev --webpack --hostname 0.0.0.0 --port 4001"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    environment:
+      PORT: 4001
+    ports:
+      - "4001:4001"
+    depends_on:
+      - backend
+
+volumes:
+  village-postgres:
+  frontend-node-modules:

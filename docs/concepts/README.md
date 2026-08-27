@@ -55,7 +55,7 @@ all general lessons that happened to surface here.
    cause if you're not careful, and `stop()`'s contrasting mechanism
    (`Task.cancel()`) for ending a game outright instead of pausing it.
 8. [Two kinds of persistence](08-persistence-and-checkpointing.md) — the
-   SQLite *checkpointer* that makes `interrupt()` durable vs. the SQLite
+   PostgreSQL *checkpointer* that makes `interrupt()` durable vs. the PostgreSQL
    *tables* that record game history for humans to read later. Easy to
    conflate; they solve different problems.
 9. [Streaming state out over SSE](09-sse-streaming-and-broadcast.md) — why
