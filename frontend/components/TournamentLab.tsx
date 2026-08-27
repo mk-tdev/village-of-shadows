@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createTournament, fetchTournament } from "@/lib/api";
-import { DEFAULT_NAMES, DEFAULT_PERSONALITIES, PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
+import { DEFAULT_NAMES, DEFAULT_PERSONALITIES, DEMO_ALLOWED_PROVIDER, DEMO_PROVIDER_OPTIONS, PROVIDER_MODEL_SUGGESTIONS } from "@/lib/seatDefaults";
 import type { AgentConfig, Provider, TournamentReport } from "@/lib/types";
 import { Select } from "@/components/Select";
 
@@ -12,8 +12,8 @@ const STARTER_LINEUP: AgentConfig[] = DEFAULT_NAMES.map((name, index) => ({
   display_name: name,
   personality: DEFAULT_PERSONALITIES[index],
   controller: "ai",
-  provider: "mock",
-  model_name: index % 2 ? "mock-deliberate" : "mock-cautious",
+  provider: DEMO_ALLOWED_PROVIDER,
+  model_name: PROVIDER_MODEL_SUGGESTIONS[DEMO_ALLOWED_PROVIDER][index % PROVIDER_MODEL_SUGGESTIONS[DEMO_ALLOWED_PROVIDER].length].value,
   endpoint: null,
 }));
 
@@ -84,7 +84,7 @@ export function TournamentLab() {
               <Select
                 ariaLabel={`${seat.display_name} provider`}
                 value={seat.provider ?? "mock"}
-                options={PROVIDER_OPTIONS}
+                options={DEMO_PROVIDER_OPTIONS}
                 onChange={(value) => {
                   const provider = value as Provider;
                   const model = PROVIDER_MODEL_SUGGESTIONS[provider][0]?.value ?? "";

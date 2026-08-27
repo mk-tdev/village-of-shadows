@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createGame, IS_LOCAL_API, preflightModels, waitForBackend } from "@/lib/api";
 import type { BackendWakeProgress } from "@/lib/api";
-import { defaultSeats, PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
+import { defaultSeats, DEMO_ALLOWED_PROVIDER, DEMO_ALLOWED_PROVIDERS, DEMO_PROVIDER_OPTIONS, PROVIDER_MODEL_SUGGESTIONS } from "@/lib/seatDefaults";
 import { SeatRow } from "@/components/SeatRow";
 import { Select } from "@/components/Select";
 import { Combobox } from "@/components/Combobox";
@@ -64,8 +64,8 @@ export default function SetupPage() {
   // per-seat edits have made the seats disagree with each other, and so a
   // seat that later flips from human to AI (see updateHumanIndex) has a
   // more useful fallback than always defaulting back to "mock".
-  const [masterProvider, setMasterProvider] = useState<Provider>("mock");
-  const [masterModel, setMasterModel] = useState<string>(PROVIDER_MODEL_SUGGESTIONS.mock[0].value);
+  const [masterProvider, setMasterProvider] = useState<Provider>(DEMO_ALLOWED_PROVIDER);
+  const [masterModel, setMasterModel] = useState<string>(PROVIDER_MODEL_SUGGESTIONS[DEMO_ALLOWED_PROVIDER][0].value);
 
   const duplicateNames = useMemo(() => {
     const names = seats.map((s) => s.display_name.trim().toLowerCase());
@@ -189,6 +189,13 @@ export default function SetupPage() {
       await waitForBackend(setWakeProgress);
       activePhase = "checking";
       setStartPhase("checking");
+      const lockedProvider = seats.find((seat) => seat.controller === "ai" && !DEMO_ALLOWED_PROVIDERS.includes(seat.provider ?? "mock"));
+      if (lockedProvider) {
+        setError("This public demo is configured for Mock + OpenAI only. Choose one of those providers for every AI seat before starting.");
+        setFailedPhase("checking");
+        setStartPhase("idle");
+        return;
+      }
       const preflight = await preflightModels(seats);
       setPreflightResults(preflight.results);
       if (!preflight.ok) {
@@ -304,7 +311,7 @@ export default function SetupPage() {
           }}
         >
           <div style={{ minWidth: 150 }}>
-            <Select value={masterProvider} options={PROVIDER_OPTIONS} onChange={handleMasterProviderChange} />
+            <Select value={masterProvider} options={DEMO_PROVIDER_OPTIONS} onChange={handleMasterProviderChange} />
           </div>
           <div style={{ flex: 1, minWidth: 180 }}>
             <Combobox

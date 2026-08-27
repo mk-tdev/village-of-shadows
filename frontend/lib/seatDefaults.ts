@@ -99,14 +99,25 @@ export const PROVIDER_OPTIONS: SelectOption[] = [
   { value: "ollama_cloud", label: "Ollama Cloud", sublabel: "hosted, needs OLLAMA_API_KEY" },
 ];
 
+export const DEMO_ALLOWED_PROVIDER: Provider = "openai";
+export const DEMO_ALLOWED_PROVIDERS: Provider[] = ["mock", "openai"];
+export const DEMO_PROVIDER_OPTIONS: SelectOption[] = PROVIDER_OPTIONS.map((option) => DEMO_ALLOWED_PROVIDERS.includes(option.value as Provider)
+  ? option
+  : {
+      ...option,
+      disabled: true,
+      disabledReason: "Mock + OpenAI only for this demo",
+      sublabel: option.sublabel ? option.sublabel + " · locked" : "locked",
+    });
+
 export function defaultSeats(humanIndex: number): AgentConfig[] {
   return DEFAULT_NAMES.map((name, i) => ({
     seat_id: `seat_${i}`,
     display_name: name,
     personality: DEFAULT_PERSONALITIES[i],
     controller: i === humanIndex ? "human" : "ai",
-    provider: i === humanIndex ? null : "mock",
-    model_name: i === humanIndex ? null : "mock-v1",
+    provider: i === humanIndex ? null : DEMO_ALLOWED_PROVIDER,
+    model_name: i === humanIndex ? null : PROVIDER_MODEL_SUGGESTIONS[DEMO_ALLOWED_PROVIDER][0].value,
     endpoint: null,
     behavior: { ...DEFAULT_BEHAVIOR },
     resilience: { ...DEFAULT_RESILIENCE },

@@ -6,6 +6,8 @@ export interface SelectOption {
   value: string;
   label: string;
   sublabel?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 type SelectProps = {
@@ -36,14 +38,22 @@ export function Select({
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
 
+  const enabledIndexes = options
+    .map((option, index) => option.disabled ? -1 : index)
+    .filter((index) => index >= 0);
+
   const focusOption = (index: number) => {
-    const safeIndex = Math.max(0, Math.min(index, options.length - 1));
+    if (enabledIndexes.length === 0) return;
+    const clampedIndex = Math.max(0, Math.min(index, options.length - 1));
+    const exactEnabled = !options[clampedIndex]?.disabled ? clampedIndex : null;
+    const nextEnabled = enabledIndexes.find((enabledIndex) => enabledIndex >= clampedIndex) ?? enabledIndexes[0];
+    const safeIndex = exactEnabled ?? nextEnabled;
     setActiveIndex(safeIndex);
     window.requestAnimationFrame(() => optionRefs.current[safeIndex]?.focus());
   };
 
   const openMenu = (preferredIndex = selectedIndex >= 0 ? selectedIndex : 0) => {
-    if (disabled || options.length === 0) return;
+    if (disabled || enabledIndexes.length === 0) return;
     setOpen(true);
     focusOption(preferredIndex);
   };
@@ -54,6 +64,7 @@ export function Select({
   };
 
   const choose = (option: SelectOption) => {
+    if (option.disabled) return;
     onChange(option.value);
     closeMenu(true);
   };
@@ -103,18 +114,23 @@ export function Select({
               type="button"
               role="option"
               aria-selected={option.value === value}
-              tabIndex={index === activeIndex ? 0 : -1}
+              aria-disabled={option.disabled ? "true" : undefined}
+              tabIndex={option.disabled ? -1 : index === activeIndex ? 0 : -1}
               key={option.value}
-              className={`dropdown-item${option.value === value ? " selected" : ""}`}
+              className={`dropdown-item${option.value === value ? " selected" : ""}${option.disabled ? " disabled" : ""}`}
+              disabled={option.disabled}
+              title={option.disabledReason}
               onClick={() => choose(option)}
               onMouseEnter={() => setActiveIndex(index)}
               onKeyDown={(event) => {
                 if (event.key === "ArrowDown") {
                   event.preventDefault();
-                  focusOption((index + 1) % options.length);
+                  const next = enabledIndexes.find((enabledIndex) => enabledIndex > index) ?? enabledIndexes[0];
+                  focusOption(next);
                 } else if (event.key === "ArrowUp") {
                   event.preventDefault();
-                  focusOption((index - 1 + options.length) % options.length);
+                  const previous = [...enabledIndexes].reverse().find((enabledIndex) => enabledIndex < index) ?? enabledIndexes[enabledIndexes.length - 1];
+                  focusOption(previous);
                 } else if (event.key === "Home") {
                   event.preventDefault();
                   focusOption(0);
@@ -126,14 +142,14 @@ export function Select({
                   closeMenu(event.key === "Escape");
                 } else if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  choose(option);
+                  if (!option.disabled) choose(option);
                 }
               }}
             >
               <span className="dropdown-item-mark" aria-hidden="true">{option.value === value ? "◆" : "◇"}</span>
               <span className="dropdown-item-copy">
                 <span>{option.label}</span>
-                {option.sublabel ? <small className="dropdown-item-sublabel">{option.sublabel}</small> : null}
+                {option.disabledReason ? <small className="dropdown-item-sublabel">{option.disabledReason}</small> : option.sublabel ? <small className="dropdown-item-sublabel">{option.sublabel}</small> : null}
               </span>
             </button>
           ))}

@@ -1,5 +1,5 @@
 import type { AgentConfig, Provider } from "@/lib/types";
-import { PROVIDER_MODEL_SUGGESTIONS, PROVIDER_OPTIONS } from "@/lib/seatDefaults";
+import { DEMO_PROVIDER_OPTIONS, PROVIDER_MODEL_SUGGESTIONS } from "@/lib/seatDefaults";
 import { Select } from "./Select";
 import { Combobox } from "./Combobox";
 import { CharacterPortrait } from "./CharacterPortrait";
@@ -57,7 +57,7 @@ export function SeatRow({
               <label className="field-label">Provider</label>
               <Select
                 value={seat.provider ?? "mock"}
-                options={PROVIDER_OPTIONS}
+                options={DEMO_PROVIDER_OPTIONS}
                 onChange={(value) => {
                   const provider = value as Provider;
                   onChange({

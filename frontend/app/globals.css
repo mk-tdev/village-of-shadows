@@ -1892,6 +1892,20 @@ input:focus {
   color: #f0e4d4;
   transform: translateX(1px);
 }
+.dropdown-item:disabled,
+.dropdown-item.disabled {
+  cursor: not-allowed;
+  color: rgba(120, 139, 144, .62);
+  opacity: .62;
+}
+.dropdown-item:disabled:hover,
+.dropdown-item.disabled:hover,
+.dropdown-item:disabled:focus-visible,
+.dropdown-item.disabled:focus-visible {
+  background: transparent;
+  color: rgba(120, 139, 144, .62);
+  transform: none;
+}
 .dropdown-item.selected {
   background: rgba(201, 129, 48, .08);
   color: #e7b36e;
