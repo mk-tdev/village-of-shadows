@@ -38,6 +38,19 @@ az group create \
 5. `rg-village-shadows-test-sea` was created successfully in `southeastasia` with `project=village-of-shadows`, `environment=test`, and `purpose=azure-migration` tags.
 6. Registration was requested for the `Microsoft.App`, `Microsoft.DBforPostgreSQL`, `Microsoft.ContainerRegistry`, and `Microsoft.OperationalInsights` providers. Azure may take a few minutes to finish that one-time subscription operation before resources can be created.
 
+### 2026-08-27 - Azure API deployment result
+
+- The backend image was rebuilt and pushed as a Linux AMD64 image.
+- The failed Container App shell from the earlier ARM image attempt was deleted and recreated.
+- Azure Container Apps created the public API endpoint below:
+
+```text
+https://ca-village-shadows-api.salmonbay-b4cb8cf9.southeastasia.azurecontainerapps.io
+```
+
+- The /health endpoint returned {"ok": true} from Azure.
+- Vercel should set NEXT_PUBLIC_API_URL to the Azure API endpoint above, without a trailing path.
+
 ### 2026-08-27 - data-plane result
 
 - Azure Container Registry and the PostgreSQL Flexible Server were created.
