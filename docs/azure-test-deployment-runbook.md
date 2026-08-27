@@ -86,6 +86,7 @@ The script:
 - builds the backend Docker image locally and pushes it to Azure Container Registry;
 - creates an Azure Container Apps environment if needed;
 - stores the PostgreSQL connection string as a Container Apps secret;
+- deletes and recreates only the API Container App if Azure left it in `ProvisioningState: Failed`;
 - exposes the FastAPI service over HTTPS;
 - keeps the demo warm with one replica;
 - waits until `/health` returns `{"ok": true}`;

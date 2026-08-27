@@ -55,7 +55,7 @@ fi
 echo "This script expects the rotated PostgreSQL administrator password."
 read -r -s -p "Rotated PostgreSQL password for ${POSTGRES_ADMIN}: " POSTGRES_PASSWORD
 printf '\n'
-trap 'unset POSTGRES_PASSWORD ACR_PASSWORD ACR_USERNAME DATABASE_URL PASSWORD_ENCODED' EXIT
+trap 'unset POSTGRES_PASSWORD ACR_PASSWORD ACR_USERNAME DATABASE_URL PASSWORD_ENCODED PROVISIONING_STATE' EXIT
 
 PASSWORD_ENCODED="$(printf '%s' "$POSTGRES_PASSWORD" | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=""))')"
 DATABASE_URL="postgresql://${POSTGRES_ADMIN}:${PASSWORD_ENCODED}@${POSTGRES_SERVER}.postgres.database.azure.com:5432/${DATABASE_NAME}?sslmode=require"
@@ -92,7 +92,22 @@ az acr update --name "$REGISTRY_NAME" --admin-enabled true >/dev/null
 ACR_USERNAME="$(az acr credential show --name "$REGISTRY_NAME" --query username --output tsv)"
 ACR_PASSWORD="$(az acr credential show --name "$REGISTRY_NAME" --query 'passwords[0].value' --output tsv)"
 
+APP_EXISTS=false
 if az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+  APP_EXISTS=true
+  PROVISIONING_STATE="$(az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --query properties.provisioningState --output tsv)"
+  if [ "$PROVISIONING_STATE" = "Failed" ]; then
+    echo "Existing Container App ${CONTAINER_APP_NAME} is in Failed provisioning state; deleting it before recreating..."
+    az containerapp delete \
+      --name "$CONTAINER_APP_NAME" \
+      --resource-group "$RESOURCE_GROUP" \
+      --yes \
+      >/dev/null
+    APP_EXISTS=false
+  fi
+fi
+
+if [ "$APP_EXISTS" = "true" ]; then
   echo "Updating existing Container App ${CONTAINER_APP_NAME}..."
   az containerapp secret set \
     --name "$CONTAINER_APP_NAME" \
