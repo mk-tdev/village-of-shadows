@@ -22,6 +22,17 @@ az account set --subscription "$SUBSCRIPTION_ID"
 
 az extension add --name containerapp --upgrade --yes >/dev/null
 
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker was not found. Install Docker Desktop, then rerun this script."
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker is installed, but the Docker daemon is not running."
+  echo "Start Docker Desktop and wait until it says Docker is running, then rerun this script."
+  exit 1
+fi
+
 if ! az group show --name "$RESOURCE_GROUP" >/dev/null 2>&1; then
   echo "Resource group '$RESOURCE_GROUP' was not found. Run the data-plane provisioning script first."
   exit 1
@@ -44,11 +55,6 @@ trap 'unset POSTGRES_PASSWORD ACR_PASSWORD ACR_USERNAME DATABASE_URL PASSWORD_EN
 
 PASSWORD_ENCODED="$(printf '%s' "$POSTGRES_PASSWORD" | python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=""))')"
 DATABASE_URL="postgresql://${POSTGRES_ADMIN}:${PASSWORD_ENCODED}@${POSTGRES_SERVER}.postgres.database.azure.com:5432/${DATABASE_NAME}?sslmode=require"
-
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker was not found. Install or start Docker Desktop, then rerun this script."
-  exit 1
-fi
 
 FULL_IMAGE_NAME="${REGISTRY_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
 

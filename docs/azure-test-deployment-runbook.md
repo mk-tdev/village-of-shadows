@@ -76,7 +76,7 @@ After the password is rotated, run the API deployment from the repository root:
 scripts/azure-deploy-api.sh
 ```
 
-The script now avoids Azure Container Registry Tasks because this subscription returned `TasksOperationsNotAllowed`. It uses local Docker build/push instead.
+The script now avoids Azure Container Registry Tasks because this subscription returned `TasksOperationsNotAllowed`. It uses local Docker build/push instead, so Docker Desktop must be running before the script prompts for the database password.
 
 The script:
 
