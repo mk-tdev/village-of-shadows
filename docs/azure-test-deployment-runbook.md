@@ -43,6 +43,7 @@ az group create \
 - Azure Container Registry and the PostgreSQL Flexible Server were created.
 - The backend image was built locally and pushed to Azure Container Registry because ACR Tasks were blocked in this subscription.
 - Azure Container Apps environment creation requires `Microsoft.OperationalInsights`; the deployment script now registers it before creating the environment.
+- Azure Container Apps expects a Linux AMD64 image. On Apple Silicon Macs, the deployment script must build Docker with `--platform linux/amd64`.
 - The database creation command originally used an obsolete `--database-name` flag; the provisioning script now uses the current `--name` flag.
 - The `village` database was created successfully with the current `az postgres flexible-server db create --name village` syntax.
 - The database administrator password was exposed outside the terminal during setup and must be rotated before the API is deployed.
@@ -78,7 +79,7 @@ After the password is rotated, run the API deployment from the repository root:
 scripts/azure-deploy-api.sh
 ```
 
-The script now avoids Azure Container Registry Tasks because this subscription returned `TasksOperationsNotAllowed`. It uses local Docker build/push instead, so Docker Desktop must be running before the script prompts for the database password.
+The script now avoids Azure Container Registry Tasks because this subscription returned `TasksOperationsNotAllowed`. It uses local Docker build/push instead, so Docker Desktop must be running before the script prompts for the database password. Local image builds are pinned to `linux/amd64` so Azure Container Apps can run them.
 
 The script:
 

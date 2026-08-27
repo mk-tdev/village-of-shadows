@@ -67,6 +67,7 @@ az acr login --name "$REGISTRY_NAME" >/dev/null
 
 echo "Building ${FULL_IMAGE_NAME} locally..."
 docker build \
+  --platform linux/amd64 \
   --file "$REPO_ROOT/Dockerfile" \
   --tag "$FULL_IMAGE_NAME" \
   "$REPO_ROOT"
