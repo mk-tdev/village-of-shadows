@@ -36,11 +36,13 @@ az group create \
 ```
 
 5. `rg-village-shadows-test-sea` was created successfully in `southeastasia` with `project=village-of-shadows`, `environment=test`, and `purpose=azure-migration` tags.
-6. Registration was requested for the `Microsoft.App`, `Microsoft.DBforPostgreSQL`, and `Microsoft.ContainerRegistry` providers. Azure may take a few minutes to finish that one-time subscription operation before resources can be created.
+6. Registration was requested for the `Microsoft.App`, `Microsoft.DBforPostgreSQL`, `Microsoft.ContainerRegistry`, and `Microsoft.OperationalInsights` providers. Azure may take a few minutes to finish that one-time subscription operation before resources can be created.
 
 ### 2026-08-27 - data-plane result
 
 - Azure Container Registry and the PostgreSQL Flexible Server were created.
+- The backend image was built locally and pushed to Azure Container Registry because ACR Tasks were blocked in this subscription.
+- Azure Container Apps environment creation requires `Microsoft.OperationalInsights`; the deployment script now registers it before creating the environment.
 - The database creation command originally used an obsolete `--database-name` flag; the provisioning script now uses the current `--name` flag.
 - The `village` database was created successfully with the current `az postgres flexible-server db create --name village` syntax.
 - The database administrator password was exposed outside the terminal during setup and must be rotated before the API is deployed.

@@ -13,7 +13,7 @@ DATABASE_NAME="village"
 
 az account set --subscription "$SUBSCRIPTION_ID"
 
-for provider in Microsoft.App Microsoft.DBforPostgreSQL Microsoft.ContainerRegistry; do
+for provider in Microsoft.App Microsoft.DBforPostgreSQL Microsoft.ContainerRegistry Microsoft.OperationalInsights; do
   az provider register --namespace "$provider" --wait
 done
 

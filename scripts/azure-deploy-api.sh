@@ -22,6 +22,10 @@ az account set --subscription "$SUBSCRIPTION_ID"
 
 az extension add --name containerapp --upgrade --yes >/dev/null
 
+for provider in Microsoft.App Microsoft.OperationalInsights; do
+  az provider register --namespace "$provider" --wait
+done
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker was not found. Install Docker Desktop, then rerun this script."
   exit 1
