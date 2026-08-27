@@ -52,6 +52,16 @@ app.include_router(voice.router)
 app.mount("/mcp", mcp.streamable_http_app())
 
 
+@app.get("/")
+async def root() -> dict:
+    return {
+        "ok": True,
+        "name": "Village of Shadows API",
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True}
