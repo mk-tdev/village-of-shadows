@@ -1,19 +1,17 @@
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    UV_LINK_MODE=copy \
-    PATH="/app/.venv/bin:$PATH"
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
+RUN python -m pip install --no-cache-dir --upgrade pip
 
-COPY backend/pyproject.toml backend/uv.lock ./
-RUN uv sync --frozen --no-dev
+COPY backend/requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY backend/ ./
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

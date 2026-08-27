@@ -79,7 +79,7 @@ After the password is rotated, run the API deployment from the repository root:
 scripts/azure-deploy-api.sh
 ```
 
-The script now avoids Azure Container Registry Tasks because this subscription returned `TasksOperationsNotAllowed`. It uses local Docker build/push instead, so Docker Desktop must be running before the script prompts for the database password. Local image builds are pinned to `linux/amd64` so Azure Container Apps can run them.
+The script now avoids Azure Container Registry Tasks because this subscription returned `TasksOperationsNotAllowed`. It uses local Docker build/push instead, so Docker Desktop must be running before the script prompts for the database password. Local image builds are pinned to `linux/amd64` so Azure Container Apps can run them. The Docker image installs from `backend/requirements.lock` with `pip` to avoid a `uv sync` QEMU segmentation fault during AMD64 builds on Apple Silicon.
 
 The script:
 
