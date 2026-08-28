@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import PresentationDeckControls from "./PresentationDeckControls";
 import styles from "./presentation.module.css";
 
 export const metadata: Metadata = {
@@ -186,11 +187,7 @@ export default function PresentationPage() {
         </div>
       </nav>
 
-      <div className={styles.progressRail} aria-hidden="true">
-        {slides.map((slide, index) => (
-          <a key={slide.title} href={`#slide-${index + 1}`} aria-label={`Go to slide ${index + 1}`} />
-        ))}
-      </div>
+      <PresentationDeckControls slides={slides.map((slide) => slide.title)} />
 
       {slides.map((slide, index) => (
         <section
