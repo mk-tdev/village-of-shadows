@@ -11,6 +11,8 @@
 [![Tests](https://img.shields.io/badge/backend%20tests-70%20passing-2e7d32?style=flat-square)](#testing)
 [![Built with Codex](https://img.shields.io/badge/Built%20with-Codex-111827?style=flat-square&logo=openai&logoColor=white)](https://openai.com/codex/)
 
+[Live demo](https://village-of-shadows.vercel.app/) · [Web presentation](https://village-of-shadows.vercel.app/presentation) · [How to play](https://village-of-shadows.vercel.app/how-to-play)
+
 <img src="assets/youtube-thumbnail-1280x720.jpg" alt="Village of Shadows — six AI agents versus one human" width="100%" />
 
 </div>
