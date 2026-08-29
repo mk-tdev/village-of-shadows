@@ -236,6 +236,21 @@
   pointer-events: none;
 }
 
+
+.containVisual {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(127, 182, 202, 0.12), transparent 26rem),
+    #071017;
+}
+
+.containVisual img {
+  object-fit: contain;
+}
+
+.containVisual::after {
+  display: none;
+}
+
 .visual figcaption {
   position: absolute;
   z-index: 2;

@@ -18,6 +18,7 @@ type Slide = {
   image?: string;
   imageAlt?: string;
   imageCaption?: string;
+  imageFit?: "cover" | "contain";
   accent?: "blue" | "amber" | "mint" | "red";
 };
 
@@ -165,6 +166,26 @@ const slides: Slide[] = [
     imageCaption: "A fictional learning environment, not real learner data.",
     accent: "red",
   },
+
+  {
+    eyebrow: "Deployment architecture",
+    title: "From browser to agent world",
+    body:
+      "The hosted demo uses a simple split: Vercel for the web experience, Azure for the API and database, and one agentic game engine for orchestration, memory, and validated actions.",
+    bullets: [
+      "Vercel serves the Next.js landing, setup, game, presentation, replay, and debrief pages.",
+      "Azure Container Apps runs the FastAPI backend and streams live activity to the UI.",
+      "The agentic game engine combines LangGraph orchestration, private agent minds, and MCP tool validation.",
+      "Azure PostgreSQL stores sessions, checkpoints, memories, decisions, reports, and replay evidence.",
+      "Provider keys stay server-side; the public demo is restricted to Mock + OpenAI.",
+    ],
+    image: "/presentation/architecture-map.webp",
+    imageAlt:
+      "Architecture diagram showing the Vercel frontend, Azure backend, agentic game engine, model providers, and PostgreSQL storage.",
+    imageCaption: "Deployment, orchestration, tools, models, and persistent learning evidence.",
+    imageFit: "contain",
+    accent: "blue",
+  },
 ];
 
 const links = [
@@ -206,7 +227,11 @@ export default function PresentationPage() {
           </div>
 
           {slide.image ? (
-            <figure className={styles.visual}>
+            <figure
+              className={`${styles.visual} ${
+                slide.imageFit === "contain" ? styles.containVisual : ""
+              }`}
+            >
               <Image
                 src={slide.image}
                 alt={slide.imageAlt ?? "Village of Shadows presentation screenshot"}
