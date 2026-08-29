@@ -20,7 +20,7 @@ common analytical mistakes, use the
 
 ## FE-01: Real werewolf negotiation
 
-**Status: Complete — implemented and verified on `codex/fe-01-werewolf-negotiation`.**
+**Status: Complete — implemented and verified on the werewolf-negotiation feature branch.**
 
 Allow the two werewolves to conduct a private, multi-turn conversation before
 committing the night's target. They should be able to disagree, persuade each
@@ -63,7 +63,7 @@ Implemented behavior:
 
 ## FE-02: Trust and suspicion system
 
-**Status: Complete — implemented and verified on `codex/fe-02-trust-suspicion`.**
+**Status: Complete — implemented and verified on the trust-suspicion feature branch.**
 
 Give every agent a private opinion of every other living player. Trust and
 suspicion can change after statements, votes, contradictions, investigations,
@@ -225,7 +225,7 @@ server.
 
 ## FE-07: Agent-authored private notes
 
-**Status: Complete — implemented and verified on `codex/fe-07-agent-private-notes`.**
+**Status: Complete — implemented and verified on the agent-private-notes feature branch.**
 
 Give agents structured tools for maintaining private working memory beyond the
 raw conversation history.

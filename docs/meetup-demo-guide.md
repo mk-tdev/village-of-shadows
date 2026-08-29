@@ -1,4 +1,4 @@
-# Codex Meetup Demo Guide
+# Meetup Demo Guide
 
 ## Village of Shadows — three-minute live demo
 

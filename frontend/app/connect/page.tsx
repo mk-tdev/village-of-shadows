@@ -190,7 +190,7 @@ export default function ConnectPage() {
 
       <footer className={styles.footer}>
         <span>Six AI agents · One human · One unscripted world</span>
-        <span>Built with LangGraph · MCP · Codex</span>
+        <span>Built with LangGraph · MCP · agent tools</span>
       </footer>
     </main>
   );

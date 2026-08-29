@@ -10,7 +10,6 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-state%20%2B%20checkpoints-336791?style=flat-square)](https://www.postgresql.org/)
 [![Tests](https://img.shields.io/badge/backend%20tests-70%20passing-2e7d32?style=flat-square)](#testing)
-[![Built with Codex](https://img.shields.io/badge/Built%20with-Codex-111827?style=flat-square&logo=openai&logoColor=white)](https://openai.com/codex/)
 
 [Live demo](https://village-of-shadows.vercel.app/) · [Web presentation](https://village-of-shadows.vercel.app/presentation) · [How to play](https://village-of-shadows.vercel.app/how-to-play) · [Connect](https://village-of-shadows.vercel.app/connect)
 
@@ -359,7 +358,7 @@ Start here:
 
 - [Concept Guide](docs/concepts/README.md) - architecture and source-linked implementation notes.
 - [Player and Experiment Guide](docs/player-guides/README.md) - how to use and interpret each feature.
-- [Codex meetup demo guide](docs/codex-meetup-demo-guide.md) - short demo narration.
+- [Meetup demo guide](docs/meetup-demo-guide.md) - short demo narration.
 - [Gameplay recording overlay script](docs/gameplay-recording-overlay-script.md) - suggested video captions.
 - [Original implementation plan](village-of-shadows-plan.md)
 - [`werewolf_game.html`](werewolf_game.html) - original single-file prototype.
@@ -377,6 +376,6 @@ Start here:
 
 ### Do not just watch agents work. Sit among them.
 
-Built by [Muthukumar](https://www.linkedin.com/in/muthukumar-dev/) with a lot of help from [OpenAI Codex](https://openai.com/codex/).
+Built by [Muthukumar](https://www.linkedin.com/in/muthukumar-dev/).
 
 </div>

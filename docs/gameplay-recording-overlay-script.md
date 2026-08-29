@@ -189,5 +189,5 @@ and then sit down at the table with them.
 ```text
 Village of Shadows
 
-Built with LangGraph, MCP, OpenAI, and Codex.
+Built with LangGraph, MCP, and OpenAI.
 ```

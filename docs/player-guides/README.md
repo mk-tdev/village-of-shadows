@@ -137,4 +137,4 @@ persisted caption is authoritative.
 - [Feature acceptance record](../feature-enhancements.md)
 - [Agentic-AI Concept Guide](../concepts/README.md)
 - [Deployment plan](../deployment-plan.md)
-- [Three-minute demo guide](../codex-meetup-demo-guide.md)
+- [Three-minute demo guide](../meetup-demo-guide.md)
