@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,8 @@ import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 import type { CouncilCameraMode } from "./CouncilTable3D";
 import { VoiceCouncil } from "./VoiceCouncil";
 import { RitualConfirmModal } from "./RitualConfirmModal";
+import { CouncilPictureInPicture } from "./CouncilPictureInPicture";
+import { GameGuideChat } from "./GameGuideChat";
 
 const CouncilTable3D = dynamic(
   () => import("./CouncilTable3D").then((module) => module.CouncilTable3D),
@@ -63,6 +65,10 @@ export function GameView({
   const [showSummary, setShowSummary] = useState(false);
   const [lineage, setLineage] = useState<GameBranch | null>(null);
   const [speakingSeatId, setSpeakingSeatId] = useState<string | null>(null);
+  const councilRef = useRef<HTMLElement | null>(null);
+  const [showCouncilPip, setShowCouncilPip] = useState(false);
+  const gamePhase = game?.phase;
+  const gameWinner = game?.winner;
   const closeStopConfirmation = useCallback(() => {
     if (!stopping) setConfirmingStop(false);
   }, [stopping]);
@@ -102,6 +108,18 @@ export function GameView({
     return () => { cancelled = true; };
   }, [sessionId, access]);
 
+  useEffect(() => {
+    const council = councilRef.current;
+    if (!council || !gamePhase || gamePhase === "lobby" || gameWinner) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      // A mini scene is useful only when the player scrolled *past* the
+      // council. Scrolling upward brings the full scene back and hides it.
+      setShowCouncilPip(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+    }, { threshold: 0 });
+    observer.observe(council);
+    return () => observer.disconnect();
+  }, [gamePhase, gameWinner]);
+
   if (errorMessage) {
     return (
       <div className="app">
@@ -139,6 +157,13 @@ export function GameView({
   const latestSceneEvent = [...game.log]
     .reverse()
     .find((entry) => entry.type === "statement" || entry.type === "vote" || entry.type === "death") ?? null;
+  const councilCaption = speakingSeatId
+    ? `${game.players.find((player) => player.seat_id === speakingSeatId)?.name ?? "An agent"} is speaking`
+    : active?.name
+      ? `${active.name} is deciding`
+      : latestSceneEvent?.type === "death"
+        ? "A villager has fallen"
+        : "The council is watching";
 
   const handleSubmit = async (value: Record<string, unknown>) => {
     if (!game.awaiting) return false;
@@ -260,7 +285,7 @@ export function GameView({
         onSpeaking={setSpeakingSeatId}
       />
 
-      <section className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
+      <section ref={councilRef} className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
         <div className="council-3d-caption">
           <div>
             <span>THE JUNGLE COUNCIL · LIVE</span>
@@ -333,6 +358,17 @@ export function GameView({
           )}
         </div>
       </section>
+
+      {showCouncilPip && game.phase !== "lobby" && !game.winner ? <CouncilPictureInPicture
+        players={game.players}
+        activeSeatId={speakingSeatId ?? active?.seat_id ?? null}
+        phase={game.phase}
+        caption={councilCaption}
+        onReturn={() => {
+          councilRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          setShowCouncilPip(false);
+        }}
+      /> : null}
 
       <div className="board">
         <div className="players">
@@ -458,7 +494,7 @@ export function GameView({
         </div>
       ) : null}
 
-          <DebugPanel
+      <DebugPanel
             sessionId={sessionId}
             access={access ?? undefined}
         godView={godView}
@@ -471,6 +507,7 @@ export function GameView({
         beliefEvents={beliefEvents}
         players={game.players}
       />
+      <GameGuideChat sessionId={sessionId} access={access} active={!game.winner && game.phase !== "lobby"} />
     </div>
   );
 }

@@ -10,7 +10,7 @@ from app.postgres_migrations import init_schema
 from app.game.graph import build_graph
 from app.game.seat_mind import build_seat_mind
 from app.mcp_server.server import mcp
-from app.routers import games, graph, input, relationships, replays, stream, tournaments, voice
+from app.routers import games, graph, guide, input, relationships, replays, stream, tournaments, voice
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ app.add_middleware(
 app.include_router(games.router)
 app.include_router(stream.router)
 app.include_router(input.router)
+app.include_router(guide.router)
 app.include_router(graph.router)
 app.include_router(tournaments.router)
 app.include_router(relationships.router)

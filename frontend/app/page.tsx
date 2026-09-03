@@ -84,6 +84,7 @@ export default function LandingPage() {
             <Link href="/presentation">Presentation</Link>
             <Link href="/how-to-play">How to play</Link>
             <Link href="/tournament">Tournament lab</Link>
+            <Link href="/history">Game archive</Link>
             <Link className="landing-nav-enter" href="/setup">Enter the village</Link>
           </div>
         </nav>

@@ -8,6 +8,7 @@ from app import persistence
 from app.game import access, registry
 from app.game.views import build_human_state_view, log_visible_to_human
 from app.models import LogEntry
+from app.visitor_location import country_for_request
 
 router = APIRouter(prefix="/games", tags=["stream"])
 
@@ -35,6 +36,12 @@ async def stream(
         raise HTTPException(403, "A valid room or seat credential is required.")
     if viewer.seat_id:
         await access.mark_claimed(request.app.state.db_conn, session_id, viewer.seat_id)
+        await persistence.record_game_participant(
+            request.app.state.db_conn,
+            session_id,
+            viewer.seat_id,
+            await country_for_request(request),
+        )
 
     def visible_event(event: str, data: dict) -> dict | None:
         if event == "log":

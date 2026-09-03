@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app import persistence
 from app.game import access, branching, insights, registry, timeline
+from app.game.history_access import require_game_history_access
 from app.game.views import build_human_state_view
 from app.game.orchestrator import GameOrchestrator
 from app.model_preflight import ModelPreflightResponse, preflight_models
@@ -118,6 +119,28 @@ async def create_game(body: list[AgentConfig] | GameCreateRequest, request: Requ
     }
 
 
+@router.get("/history")
+async def game_history(request: Request) -> dict:
+    """Deployment-wide, operator-only list of game sessions.
+
+    This deliberately does not accept a room host token. A host controls one
+    session, while the archive is a private operations surface across every
+    game created on this Azure deployment.
+    """
+    require_game_history_access(request)
+    return {"games": await persistence.list_game_history(request.app.state.db_conn)}
+
+
+@router.get("/history/{session_id}")
+async def game_archive(session_id: str, request: Request) -> dict:
+    """Operator-only roster and public transcript for one archived game."""
+    require_game_history_access(request)
+    archive = await persistence.get_game_archive(request.app.state.db_conn, session_id)
+    if archive is None:
+        raise HTTPException(404, "No archived game with that session ID.")
+    return archive
+
+
 @router.get("/{session_id}/configuration")
 async def get_game_configuration(session_id: str, request: Request, host_token: str | None = None) -> dict:
     await _viewer(request, session_id, host_token=host_token, require_host=True)
@@ -142,6 +165,7 @@ async def begin_game(session_id: str, request: Request, host_token: str | None =
         raise HTTPException(404, "No such game.")
     if orch.started:
         raise HTTPException(409, "Game has already begun.")
+    await persistence.begin_game(request.app.state.db_conn, session_id)
     orch.start()
     return {"ok": True}
 

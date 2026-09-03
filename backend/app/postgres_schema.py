@@ -2,6 +2,8 @@ POSTGRES_SCHEMA = """
 CREATE TABLE IF NOT EXISTS games (
     id            TEXT PRIMARY KEY,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at    TIMESTAMP,
+    finished_at   TIMESTAMP,
     status        TEXT NOT NULL,
     winner        TEXT
 );
@@ -178,6 +180,31 @@ CREATE TABLE IF NOT EXISTS seat_access_tokens (
     UNIQUE(token_hash)
 );
 
+-- Operator-facing attendance metadata. We record only an ISO country code,
+-- never the source IP address used to infer it. A row is created once a
+-- human actually opens their protected seat, rather than merely when the
+-- room host issues an invitation.
+CREATE TABLE IF NOT EXISTS game_participants (
+    game_id       TEXT NOT NULL REFERENCES games(id),
+    seat_id       TEXT NOT NULL,
+    country_code  TEXT,
+    browser_name  TEXT,
+    os_name       TEXT,
+    language      TEXT,
+    timezone      TEXT,
+    device_class  TEXT,
+    viewport_size TEXT,
+    connection_type TEXT,
+    save_data     BOOLEAN,
+    actions_taken INTEGER NOT NULL DEFAULT 0,
+    joined_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(game_id, seat_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_participants_game
+ON game_participants(game_id, joined_at);
+
 -- FE-13: opt-in continuity. Memories describe observed behaviour and always
 -- cite a source game/event; current secret roles are never stored here.
 CREATE TABLE IF NOT EXISTS cross_game_memories (
@@ -229,4 +256,3 @@ CREATE TABLE IF NOT EXISTS voice_audio_cache (
 CREATE INDEX IF NOT EXISTS idx_voice_audio_cache_game
 ON voice_audio_cache(game_id, log_seq);
 """
-

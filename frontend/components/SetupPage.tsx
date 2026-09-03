@@ -256,6 +256,9 @@ export default function SetupPage() {
         <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/relationships">
           Relationship archive
         </Link>
+        <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/history">
+          Game archive
+        </Link>
       </header>
 
       <div className="setup-card">

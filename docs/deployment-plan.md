@@ -42,6 +42,9 @@ Store values in Container Apps secrets, never Git:
 | `HOST` | `127.0.0.1` |
 | `PORT` | `8000` |
 | provider keys | Optional operator-owned keys for enabled providers |
+| `GAME_GUIDE_MODEL` | Optional OpenAI model for the read-only player guide; defaults to `gpt-5.4-nano` |
+| `GAME_HISTORY_ACCESS_KEY` | Secret required to open the private `/history` operator archive |
+| `VISITOR_COUNTRY_LOOKUP_URL` | Optional IP-to-country endpoint template; see privacy note below |
 
 Example shape only:
 
@@ -56,6 +59,28 @@ At startup the backend runs its versioned application-schema bootstrap and LangG
 The public demo is operator-keyed today. A future BYOK version should collect one key per provider per game, transmit it once over HTTPS, retain it only in process memory, and delete it at completion, failure, expiry, or restart. Never put visitor keys in PostgreSQL, LangGraph checkpoints, logs, SSE events, URLs, or browser storage.
 
 Before public BYOK, add a per-game control token, strict CORS, rate/concurrency limits, model-call budgets, redacted errors, SSRF protection for custom Ollama endpoints, reconnect-safe SSE, and documented data retention.
+
+## Game archive and visitor country
+
+`/history` is an operator-only review page. Set a long random
+`GAME_HISTORY_ACCESS_KEY` in Container Apps and enter it when opening the
+page; the browser sends it as a request header and keeps it only for that
+browser session. The archive lists each game, human seats that actually
+connected, session timing, active game duration, result, and its public
+transcript. When a human player opens a protected seat, the browser also
+contributes coarse, non-identifying context: browser family, operating-system
+family, language, timezone, device/viewport class, connection preference, and
+accepted-action count. It never records raw user-agent strings, device IDs,
+cookies, browsing history, precise location, or IP addresses.
+
+The application never stores a visitor IP address. Azure Container Apps does
+not provide a country header to application code, so country is `Unknown` by
+default. If jurisdiction and privacy notices permit it, configure
+`VISITOR_COUNTRY_LOOKUP_URL` with a URL containing `{ip}` that returns JSON
+with a `country_code` field. This sends the transient client IP to that
+provider solely to retain the resulting ISO country code. Leave it unset to
+disable lookup. A deployment behind Cloudflare can use its `CF-IPCountry`
+header without an external lookup.
 
 ## Expected demo costs
 
