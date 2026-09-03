@@ -104,7 +104,7 @@ def _guide_context(view: dict) -> dict:
     return {
         "round": view["round"],
         "phase": view["phase"],
-        "winner": view["winner"],
+        "winner": view.get("winner"),
         "your_awaiting_action": view.get("awaiting"),
         "players": [
             {
@@ -117,8 +117,14 @@ def _guide_context(view: dict) -> dict:
             for player in view["players"]
         ],
         "recent_visible_events": [
-            {"round": entry["round"], "phase": entry["phase"], "type": entry["type"], "text": entry["text"]}
+            {
+                "round": entry.get("round", view["round"]),
+                "phase": entry.get("phase", view["phase"]),
+                "type": entry.get("type", "event"),
+                "text": entry["text"],
+            }
             for entry in view["log"][-18:]
+            if entry.get("text")
         ],
     }
 
