@@ -185,14 +185,15 @@ export async function recordParticipantPresence(
   if (!res.ok) return;
 }
 
-export async function askGameGuide(
+export async function streamGameGuide(
   sessionId: string,
   access: GameAccessCredentials,
   message: string,
-): Promise<string> {
-  const res = await fetch(`${API_BASE}/games/${sessionId}/guide`, {
+  onDelta: (text: string) => void,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/guide/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Accept": "text/event-stream", "Content-Type": "application/json" },
     body: JSON.stringify({
       seat_id: access.seatId,
       access_token: access.accessToken,
@@ -203,7 +204,40 @@ export async function askGameGuide(
     const detail = await res.json().catch(() => null);
     throw new Error(detail?.detail ?? "The game guide is unavailable right now.");
   }
-  return (await res.json()).answer;
+  if (!res.body) throw new Error("The Game Guide did not start a response stream.");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+  let complete = false;
+
+  const readEvent = (rawEvent: string) => {
+    const lines = rawEvent.split(/\r?\n/);
+    const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+    const data = lines
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim())
+      .join("\n");
+    if (!event || !data) return;
+    const payload = JSON.parse(data) as { text?: string; message?: string };
+    if (event === "delta" && payload.text) onDelta(payload.text);
+    if (event === "error") throw new Error(payload.message ?? "The Game Guide is unavailable right now.");
+    if (event === "done") complete = true;
+  };
+
+  try {
+    while (!complete) {
+      const { done, value } = await reader.read();
+      pending += decoder.decode(value, { stream: !done });
+      const events = pending.split(/\r?\n\r?\n/);
+      pending = events.pop() ?? "";
+      events.forEach(readEvent);
+      if (done) break;
+    }
+    if (!complete) throw new Error("The Game Guide response ended before it was complete.");
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function accessParams(access?: GameAccessCredentials, includeHost = true): string {

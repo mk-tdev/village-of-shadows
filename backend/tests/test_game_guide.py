@@ -1,4 +1,4 @@
-from app.routers.guide import _answer
+from app.routers.guide import _answer, _content_text, _model_messages
 
 
 def _view():
@@ -31,3 +31,10 @@ def test_guide_uses_only_the_player_filtered_game_view():
     # Tomas's role is absent in this player-filtered projection and must not
     # be invented by the helper.
     assert "secret" not in _answer("Who is alive in the village?", _view()).lower()
+
+
+def test_streaming_guide_prompt_requests_display_ready_markdown():
+    messages = _model_messages("What can I do?", _view())
+    assert "display-ready Markdown" in str(messages[0].content)
+    assert _content_text("partial") == "partial"
+    assert _content_text([{"text": "part "}, {"text": "two"}]) == "part two"

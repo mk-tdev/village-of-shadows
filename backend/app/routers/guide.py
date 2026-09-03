@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import re
 import asyncio
+import json
 
 from fastapi import APIRouter, HTTPException, Request
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
+from sse_starlette.sse import EventSourceResponse
 
 from app.config import settings
 from app.game import access, registry
@@ -121,7 +123,41 @@ def _guide_context(view: dict) -> dict:
     }
 
 
-async def _answer_with_openai(message: str, view: dict) -> str:
+def _model_messages(message: str, view: dict) -> list[SystemMessage | HumanMessage]:
+    """Build the sole, privacy-filtered prompt sent to the guide model."""
+    instructions = """You are the read-only Village of Shadows Game Guide.
+Answer only the player's question about this Werewolf game using the supplied
+context and general role rules. Be concise and useful. Never make a game
+action, recommend that an action was already submitted, call tools, or expose
+or infer any role that is null/missing in the context. If a requested fact is
+not visible in the context, say that the player cannot see it. Do not answer
+questions unrelated to this game. Hidden reasoning is not available.
+
+Write display-ready Markdown: use short paragraphs, put each list item on its
+own line, and use **bold** sparingly for key game terms."""
+    return [
+        SystemMessage(content=instructions),
+        HumanMessage(content=(
+            f"Player question: {message}\n\n"
+            f"Permitted game context: {_guide_context(view)}"
+        )),
+    ]
+
+
+def _content_text(content: object) -> str:
+    """Extract display text from either Chat Completions or Responses chunks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return str(content) if content else ""
+
+
+async def _stream_answer_with_openai(message: str, view: dict):
+    """Yield text chunks without giving the model any game-changing capability."""
     if not settings.openai_api_key:
         raise HTTPException(503, "Game Guide needs OPENAI_API_KEY configured on the backend.")
     from langchain_openai import ChatOpenAI
@@ -132,44 +168,24 @@ async def _answer_with_openai(message: str, view: dict) -> str:
         use_responses_api=True,
         max_tokens=350,
     )
-    instructions = """You are the read-only Village of Shadows Game Guide.
-Answer only the player's question about this Werewolf game using the supplied
-context and general role rules. Be concise and useful. Never make a game
-action, recommend that an action was already submitted, call tools, or expose
-or infer any role that is null/missing in the context. If a requested fact is
-not visible in the context, say that the player cannot see it. Do not answer
-questions unrelated to this game. Hidden reasoning is not available."""
     try:
-        response = await asyncio.wait_for(
-            model.ainvoke([
-                SystemMessage(content=instructions),
-                HumanMessage(content=(
-                    f"Player question: {message}\n\n"
-                    f"Permitted game context: {_guide_context(view)}"
-                )),
-            ]),
-            timeout=25,
-        )
+        has_text = False
+        async with asyncio.timeout(25):
+            async for chunk in model.astream(_model_messages(message, view)):
+                text = _content_text(chunk.content)
+                if text:
+                    has_text = True
+                    yield text
+        if not has_text:
+            yield "The Game Guide did not return an answer."
     except TimeoutError:
         raise HTTPException(504, "The Game Guide timed out. Please try again.") from None
     except Exception as exc:  # Provider errors must not alter or expose game state.
         detail = str(exc).replace(settings.openai_api_key, "[redacted]") if settings.openai_api_key else str(exc)
         raise HTTPException(502, f"The Game Guide could not answer: {detail[:240]}") from None
-    content = response.content
-    if isinstance(content, str):
-        return content.strip() or "The Game Guide did not return an answer."
-    if isinstance(content, list):
-        text = "".join(
-            block.get("text", "") if isinstance(block, dict) else str(block)
-            for block in content
-        ).strip()
-        return text or "The Game Guide did not return an answer."
-    return str(content).strip() or "The Game Guide did not return an answer."
 
 
-@router.post("/{session_id}/guide")
-async def game_guide(session_id: str, body: GuideQuestion, request: Request) -> dict:
-    """Answer a game question without mutating graph state or calling a model."""
+async def _authorized_guide_view(session_id: str, body: GuideQuestion, request: Request) -> dict:
     try:
         orch = registry.get(session_id)
     except KeyError:
@@ -182,8 +198,40 @@ async def game_guide(session_id: str, body: GuideQuestion, request: Request) -> 
     )
     if viewer is None or viewer.seat_id != body.seat_id:
         raise HTTPException(403, "This credential is not bound to that seat.")
-    view = build_human_state_view(orch.state, seat_id=viewer.seat_id, host=False)
+    return build_human_state_view(orch.state, seat_id=viewer.seat_id, host=False)
+
+
+@router.post("/{session_id}/guide")
+async def game_guide(session_id: str, body: GuideQuestion, request: Request) -> dict:
+    """Compatibility endpoint for callers that still expect one JSON answer."""
+    view = await _authorized_guide_view(session_id, body, request)
     question = body.message.strip()
     if not _is_game_question(question, [player["name"] for player in view["players"]]):
         return {"answer": "I can only help with this Village of Shadows game—its current state, visible events, roles, rules, and legal player actions."}
-    return {"answer": await _answer_with_openai(question, view)}
+    answer = ""
+    async for text in _stream_answer_with_openai(question, view):
+        answer += text
+    return {"answer": answer.strip() or "The Game Guide did not return an answer."}
+
+
+@router.post("/{session_id}/guide/stream")
+async def stream_game_guide(
+    session_id: str, body: GuideQuestion, request: Request,
+) -> EventSourceResponse:
+    """Stream a read-only guide response as named server-sent events."""
+    view = await _authorized_guide_view(session_id, body, request)
+    question = body.message.strip()
+
+    async def events():
+        if not _is_game_question(question, [player["name"] for player in view["players"]]):
+            yield {"event": "delta", "data": json.dumps({"text": "I can only help with this Village of Shadows game—its current state, visible events, roles, rules, and legal player actions."})}
+            yield {"event": "done", "data": "{}"}
+            return
+        try:
+            async for text in _stream_answer_with_openai(question, view):
+                yield {"event": "delta", "data": json.dumps({"text": text})}
+            yield {"event": "done", "data": "{}"}
+        except HTTPException as exc:
+            yield {"event": "error", "data": json.dumps({"message": str(exc.detail)})}
+
+    return EventSourceResponse(events(), headers={"Cache-Control": "no-cache"})
