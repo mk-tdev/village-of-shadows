@@ -77,6 +77,7 @@ Two representative learning paths:
 | **God Mode observability** | Instructor-style panels reveal role, permitted context, stated rationale, graph movement, tools, tokens, memory, and decisions. |
 | **Learning Debrief** | Post-game reflection connects the run to human-in-the-loop, memory, tool calling, partial observability, and failure handling. |
 | **Multi-human rooms** | Seat-specific links let multiple people join while private information stays server-filtered. |
+| **Operator game archive** | A deployment-secret-protected history page records played sessions, human attendance, timing, outcomes, and public transcripts. |
 | **Replay and branching** | Completed games can be replayed, shared, inspected, or branched from a checkpoint. |
 | **Model tournaments** | Run repeated autonomous games to compare models, personalities, roles, latency, survival, and outcomes. |
 | **Voice Council** | Optional OpenAI neural narration with cached public lines and browser fallback. |

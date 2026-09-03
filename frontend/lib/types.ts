@@ -552,6 +552,55 @@ export interface RelationshipMemory {
   edited_at: string | null;
 }
 
+export interface GameParticipant {
+  seat_id: string;
+  name: string;
+  country_code: string | null;
+  joined_at: string | null;
+  last_seen_at: string | null;
+  joined: boolean;
+  browser_name: string | null;
+  os_name: string | null;
+  language: string | null;
+  timezone: string | null;
+  device_class: string | null;
+  viewport_size: string | null;
+  connection_type: string | null;
+  save_data: boolean | null;
+  actions_taken: number;
+}
+
+export interface GameHistoryRecord {
+  session_id: string;
+  created_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  status: "created" | "in_progress" | "finished" | "stopped";
+  winner: "villagers" | "werewolves" | "jester" | null;
+  duration_seconds: number | null;
+  participants: GameParticipant[];
+}
+
+export interface GameArchive extends GameHistoryRecord {
+  seats: {
+    seat_id: string;
+    name: string;
+    controller: Controller;
+    provider: Provider | null;
+    model_name: string | null;
+    role: Role | null;
+  }[];
+  public_log: {
+    seq: number;
+    round: number;
+    phase: string;
+    type: string;
+    seat_id: string | null;
+    text: string | null;
+    created_at: string | null;
+  }[];
+}
+
 export interface ReplayShareRecord {
   id: string;
   game_id: string;

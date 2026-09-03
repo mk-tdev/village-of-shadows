@@ -12,7 +12,7 @@ async def create_game(
     options: GameOptions | None = None,
 ) -> None:
     await conn.execute(
-        "INSERT INTO games (id, status, winner) VALUES (?, 'in_progress', NULL)",
+        "INSERT INTO games (id, status, winner) VALUES (?, 'created', NULL)",
         (session_id,),
     )
     await conn.executemany(
@@ -57,7 +57,9 @@ async def set_seat_role(conn: DatabaseConnection, session_id: str, seat_id: str,
 
 async def finish_game(conn: DatabaseConnection, session_id: str, winner: str) -> None:
     await conn.execute(
-        "UPDATE games SET status = 'finished', winner = ? WHERE id = ?",
+        """UPDATE games
+           SET status = 'finished', winner = ?, finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP)
+           WHERE id = ?""",
         (winner, session_id),
     )
     await conn.commit()
@@ -68,10 +70,185 @@ async def stop_game(conn: DatabaseConnection, session_id: str) -> None:
     win/loss conclusion -- 'stopped' rather than 'finished', with no
     winner, so a later look at the games table can tell the two apart."""
     await conn.execute(
-        "UPDATE games SET status = 'stopped' WHERE id = ?",
+        """UPDATE games
+           SET status = 'stopped', finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP)
+           WHERE id = ?""",
         (session_id,),
     )
     await conn.commit()
+
+
+async def begin_game(conn: DatabaseConnection, session_id: str) -> None:
+    """Stamp the moment gameplay—not setup—actually begins.
+
+    A room can sit in the lobby while invitees arrive. Measuring from this
+    explicit transition makes the archive's duration represent game time.
+    """
+    await conn.execute(
+        """UPDATE games
+           SET status = 'in_progress', started_at = COALESCE(started_at, CURRENT_TIMESTAMP)
+           WHERE id = ?""",
+        (session_id,),
+    )
+    await conn.commit()
+
+
+async def record_game_participant(
+    conn: DatabaseConnection,
+    session_id: str,
+    seat_id: str,
+    country_code: str | None,
+    telemetry: dict | None = None,
+) -> None:
+    """Record a real human arrival and refresh their last-seen time.
+
+    Country is intentionally the only location attribute. An invited seat
+    does not appear here until its seat-bound browser connects.
+    """
+    await conn.execute(
+        """INSERT INTO game_participants
+           (game_id, seat_id, country_code, browser_name, os_name, language, timezone,
+            device_class, viewport_size, connection_type, save_data)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (game_id, seat_id) DO UPDATE SET
+             last_seen_at = CURRENT_TIMESTAMP,
+             country_code = COALESCE(game_participants.country_code, EXCLUDED.country_code),
+             browser_name = COALESCE(EXCLUDED.browser_name, game_participants.browser_name),
+             os_name = COALESCE(EXCLUDED.os_name, game_participants.os_name),
+             language = COALESCE(EXCLUDED.language, game_participants.language),
+             timezone = COALESCE(EXCLUDED.timezone, game_participants.timezone),
+             device_class = COALESCE(EXCLUDED.device_class, game_participants.device_class),
+             viewport_size = COALESCE(EXCLUDED.viewport_size, game_participants.viewport_size),
+             connection_type = COALESCE(EXCLUDED.connection_type, game_participants.connection_type),
+             save_data = COALESCE(EXCLUDED.save_data, game_participants.save_data)""",
+        (
+            session_id, seat_id, country_code,
+            telemetry.get("browser_name") if telemetry else None,
+            telemetry.get("os_name") if telemetry else None,
+            telemetry.get("language") if telemetry else None,
+            telemetry.get("timezone") if telemetry else None,
+            telemetry.get("device_class") if telemetry else None,
+            telemetry.get("viewport_size") if telemetry else None,
+            telemetry.get("connection_type") if telemetry else None,
+            telemetry.get("save_data") if telemetry else None,
+        ),
+    )
+    await conn.commit()
+
+
+async def increment_participant_actions(
+    conn: DatabaseConnection, session_id: str, seat_id: str,
+) -> None:
+    """Count accepted human game actions without retaining their input payload."""
+    await conn.execute(
+        """UPDATE game_participants SET actions_taken = actions_taken + 1,
+           last_seen_at = CURRENT_TIMESTAMP WHERE game_id = ? AND seat_id = ?""",
+        (session_id, seat_id),
+    )
+    await conn.commit()
+
+
+async def list_game_history(conn: DatabaseConnection) -> list[dict]:
+    """Return operator-safe session metadata without logs or credentials."""
+    games = await conn.execute(
+        """SELECT id, created_at, started_at, finished_at, status, winner,
+                  CASE WHEN status IN ('finished', 'stopped') AND finished_at IS NULL THEN NULL
+                       ELSE EXTRACT(EPOCH FROM (
+                         COALESCE(finished_at, CURRENT_TIMESTAMP) - COALESCE(started_at, created_at)
+                       ))
+                  END AS duration_seconds
+           FROM games
+           ORDER BY created_at DESC"""
+    )
+    rows = await games.fetchall()
+    result: list[dict] = []
+    for row in rows:
+        session_id = row[0]
+        people = await conn.execute(
+            """SELECT s.seat_id, s.display_name, p.country_code, p.joined_at, p.last_seen_at,
+                      p.browser_name, p.os_name, p.language, p.timezone, p.device_class,
+                      p.viewport_size, p.connection_type, p.save_data, p.actions_taken
+               FROM seats s
+               LEFT JOIN game_participants p
+                 ON p.game_id = s.game_id AND p.seat_id = s.seat_id
+               WHERE s.game_id = ? AND s.controller = 'human'
+               ORDER BY s.id""",
+            (session_id,),
+        )
+        participants = [
+            {
+                "seat_id": participant[0],
+                "name": participant[1],
+                "country_code": participant[2],
+                "joined_at": str(participant[3]) if participant[3] is not None else None,
+                "last_seen_at": str(participant[4]) if participant[4] is not None else None,
+                "joined": participant[3] is not None,
+                "browser_name": participant[5],
+                "os_name": participant[6],
+                "language": participant[7],
+                "timezone": participant[8],
+                "device_class": participant[9],
+                "viewport_size": participant[10],
+                "connection_type": participant[11],
+                "save_data": participant[12],
+                "actions_taken": participant[13] or 0,
+            }
+            for participant in await people.fetchall()
+        ]
+        result.append(
+            {
+                "session_id": session_id,
+                "created_at": str(row[1]) if row[1] is not None else None,
+                "started_at": str(row[2]) if row[2] is not None else None,
+                "finished_at": str(row[3]) if row[3] is not None else None,
+                "status": row[4],
+                "winner": row[5],
+                # Games that ended before this feature was deployed have no
+                # truthful end timestamp; report duration as unavailable
+                # rather than presenting time since deployment as play time.
+                "duration_seconds": max(0, int(row[6])) if row[6] is not None else None,
+                "participants": participants,
+            }
+        )
+    return result
+
+
+async def get_game_archive(conn: DatabaseConnection, session_id: str) -> dict | None:
+    """Return the public transcript and roster for one operator-selected game."""
+    history = await list_game_history(conn)
+    summary = next((item for item in history if item["session_id"] == session_id), None)
+    if summary is None:
+        return None
+    seats = await conn.execute(
+        """SELECT seat_id, display_name, controller, provider, model_name, role
+           FROM seats WHERE game_id = ? ORDER BY id""",
+        (session_id,),
+    )
+    logs = await conn.execute(
+        """SELECT seq, round, phase, type, seat_id, text, created_at
+           FROM log_entries
+           WHERE game_id = ? AND private = FALSE
+           ORDER BY seq""",
+        (session_id,),
+    )
+    return {
+        **summary,
+        "seats": [
+            {
+                "seat_id": seat[0], "name": seat[1], "controller": seat[2],
+                "provider": seat[3], "model_name": seat[4], "role": seat[5],
+            }
+            for seat in await seats.fetchall()
+        ],
+        "public_log": [
+            {
+                "seq": entry[0], "round": entry[1], "phase": entry[2],
+                "type": entry[3], "seat_id": entry[4], "text": entry[5],
+                "created_at": str(entry[6]) if entry[6] is not None else None,
+            }
+            for entry in await logs.fetchall()
+        ],
+    }
 
 
 async def delete_game_data(conn: DatabaseConnection, session_id: str) -> dict[str, int]:

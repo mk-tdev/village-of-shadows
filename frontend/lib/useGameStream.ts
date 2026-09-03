@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { streamUrl } from "./api";
+import { recordParticipantPresence, streamUrl } from "./api";
 import type {
   ActivityEntry,
   AwaitingInput,
@@ -48,6 +48,35 @@ export interface GameStreamState {
 
 const MAX_ACTIVITY_ENTRIES = 60;
 
+function browserTelemetry() {
+  const userAgent = navigator.userAgent;
+  const browserName = /Edg\//.test(userAgent) ? "Edge"
+    : /Firefox\//.test(userAgent) ? "Firefox"
+      : /Chrome\//.test(userAgent) ? "Chrome"
+        : /Safari\//.test(userAgent) ? "Safari" : "Other";
+  const osName = /Windows/.test(userAgent) ? "Windows"
+    : /Android/.test(userAgent) ? "Android"
+      : /iPhone|iPad|iPod/.test(userAgent) ? "iOS"
+        : /Mac OS X/.test(userAgent) ? "macOS"
+          : /Linux/.test(userAgent) ? "Linux" : "Other";
+  const width = window.innerWidth;
+  const deviceClass = width < 768 ? "mobile" : width < 1024 ? "tablet" : "desktop";
+  const viewportSize = width < 768 ? "compact" : width < 1280 ? "medium" : "wide";
+  const connection = (navigator as Navigator & {
+    connection?: { effectiveType?: string; saveData?: boolean };
+  }).connection;
+  return {
+    browser_name: browserName,
+    os_name: osName,
+    language: navigator.language || undefined,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || undefined,
+    device_class: deviceClass,
+    viewport_size: viewportSize,
+    connection_type: connection?.effectiveType,
+    save_data: connection?.saveData,
+  } as const;
+}
+
 /** Subscribes to /games/{id}/stream and reduces incoming SSE events into a
  * client-side GameState, mirroring the shape the werewolf_game.html
  * prototype rendered directly off of. See plan §9 / §5 -- SSE replaces the
@@ -72,8 +101,14 @@ export function useGameStream(sessionId: string, access?: GameAccessCredentials)
   const [beliefEvents, setBeliefEvents] = useState<BeliefEvent[]>([]);
   const gameRef = useRef<GameState | null>(null);
   const activityIdRef = useRef(0);
+  const presenceSentRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const presenceKey = access ? `${sessionId}:${access.seatId}:${access.accessToken}` : null;
+    if (access && presenceSentRef.current !== presenceKey) {
+      presenceSentRef.current = presenceKey;
+      void recordParticipantPresence(sessionId, access, browserTelemetry());
+    }
     const source = new EventSource(streamUrl(sessionId, access));
 
     function pushActivity(kind: ActivityEntry["kind"], text: string) {

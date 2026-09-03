@@ -15,6 +15,8 @@ import type {
   ReplayShareRecord,
   ResolvedReplay,
   Timeline,
+  GameArchive,
+  GameHistoryRecord,
 } from "./types";
 
 const LOCAL_API_PORT = 8000;
@@ -122,6 +124,86 @@ export async function createGame(
     throw new Error(detail?.detail ?? `Failed to create game (${res.status})`);
   }
   return res.json();
+}
+
+function historyHeaders(accessKey: string): HeadersInit {
+  return { "X-Game-History-Key": accessKey };
+}
+
+export async function fetchGameHistory(accessKey: string): Promise<GameHistoryRecord[]> {
+  const res = await fetch(`${API_BASE}/games/history`, {
+    headers: historyHeaders(accessKey),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Could not load the game archive (${res.status})`);
+  }
+  const payload = await res.json();
+  return payload.games;
+}
+
+export async function fetchGameArchive(sessionId: string, accessKey: string): Promise<GameArchive> {
+  const res = await fetch(`${API_BASE}/games/history/${sessionId}`, {
+    headers: historyHeaders(accessKey),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Could not load game details (${res.status})`);
+  }
+  return res.json();
+}
+
+export type ParticipantTelemetry = {
+  browser_name?: string;
+  os_name?: string;
+  language?: string;
+  timezone?: string;
+  device_class?: "mobile" | "tablet" | "desktop";
+  viewport_size?: "compact" | "medium" | "wide";
+  connection_type?: string;
+  save_data?: boolean;
+};
+
+export async function recordParticipantPresence(
+  sessionId: string,
+  access: GameAccessCredentials,
+  telemetry: ParticipantTelemetry,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/presence`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      seat_id: access.seatId,
+      access_token: access.accessToken,
+      telemetry,
+    }),
+  });
+  // Presence data is supplementary. It must never prevent play if a privacy
+  // extension, a weak network, or an older server rejects the request.
+  if (!res.ok) return;
+}
+
+export async function askGameGuide(
+  sessionId: string,
+  access: GameAccessCredentials,
+  message: string,
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/guide`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      seat_id: access.seatId,
+      access_token: access.accessToken,
+      message,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? "The game guide is unavailable right now.");
+  }
+  return (await res.json()).answer;
 }
 
 function accessParams(access?: GameAccessCredentials, includeHost = true): string {
