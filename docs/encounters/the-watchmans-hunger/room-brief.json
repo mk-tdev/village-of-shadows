@@ -1,0 +1,76 @@
+{
+  "schema": "game-room.room-brief.v1",
+  "roomId": "the-watchmans-hunger",
+  "family": "gameplay-room",
+  "purpose": "Local gameplay prototype: witness a watchman transform, attack a villager, feed, then repel or evade him.",
+  "runtimeSurface": "Existing Three.js /explore scene; no room rebuild or GLB export.",
+  "boundsMeters": [
+    8,
+    5,
+    23
+  ],
+  "hero": {
+    "id": "watchman-werewolf",
+    "role": "Articulated transforming antagonist",
+    "reservedBoundsMeters": [
+      2.4,
+      3,
+      3
+    ]
+  },
+  "symmetry": {
+    "mode": "none",
+    "order": 1,
+    "appliesTo": [
+      "encounter actors"
+    ],
+    "exceptions": [
+      "Existing village architecture retained. Two deliberately staggered actors preserve the north route."
+    ]
+  },
+  "circulation": {
+    "description": "Existing lane x=-4..4. Watchman (-0.9,-7.5), victim (1.2,-9.5). West bypass x=-2.5 stays open. Escape north past z=-19 or >19m from creature.",
+    "minimumClearanceMeters": 1.6
+  },
+  "productionCamera": {
+    "viewport": [
+      1280,
+      800
+    ],
+    "location": [
+      0,
+      1.68,
+      3
+    ],
+    "target": [
+      -0.9,
+      1.6,
+      -7.5
+    ],
+    "verticalFovDegrees": 64
+  },
+  "performanceBudget": {
+    "maxSceneTriangles": 250000,
+    "maxVLowBytes": 0,
+    "maxHighTextureBytes": 0,
+    "note": "Prototype increment target: <50000 triangles; shared geometries/materials, no new texture downloads. Full-device performance unbenchmarked."
+  },
+  "creditBudget": {
+    "maximumCredits": 0,
+    "approvalRequired": true
+  },
+  "environment": {
+    "type": "existing-procedural",
+    "identity": "last-light-village",
+    "source": "frontend/lib/exploration/scene.ts",
+    "assignmentKey": "existing scene"
+  },
+  "artifacts": {
+    "floorPlan": "",
+    "reflectedCeilingPlan": "",
+    "planMetadata": "plan-metadata.json",
+    "wallElevations": [],
+    "visualTarget": "",
+    "openingContactSheet": ""
+  }
+}

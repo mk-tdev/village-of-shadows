@@ -76,7 +76,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:130-146](../../backend/app/routers/games.py#L130-L146))
+([routers/games.py:153-170](../../backend/app/routers/games.py#L153-L170))
 
 *Now* `orch.start()` calls `asyncio.create_task(self._run({"game":
 self.state}))` — but this time, the browser's SSE connection has already

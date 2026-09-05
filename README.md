@@ -98,6 +98,31 @@ Two representative learning paths:
 
 ## 🕯️ Meet the village
 
+### Walk the village: The Last Light
+
+The homepage's **Walk into the shadows** action opens `/explore`, a playable
+first-person horror prologue. Walk through a foggy village, recover three seals
+at the abandoned lantern, old well, and chapel, then reach the council fire.
+The ending leads into the existing AI game setup. **Go straight to the AI
+council** remains available for returning players.
+
+Use **WASD** to walk, **Shift** to hurry, drag to look, or click nearby ground
+to walk. **E** examines, **F** toggles the lantern, **J** opens the journal,
+and **Escape** pauses. Arrow keys and on-screen movement buttons provide
+alternatives. The pause menu includes brightness, sound, reduced motion,
+optional mouse capture, and a restart action.
+
+This prologue runs entirely in the browser: its environmental story is
+authored, and collected seals are saved on this device. It does not create or
+alter an AI session, reveal roles, or require model credentials. The live
+multi-agent simulation begins after setup. See the
+[prologue player guide](docs/player-guides/06-explore-the-village.md).
+
+The scene reuses the village's character art, adds generated timber and
+cobblestone materials, and renders the world with Three.js. The local movement,
+collision, progression, and save-validation suite runs with
+`cd frontend && pnpm test:exploration` (Node 22.18+ or Node 24).
+
 <p align="center">
   <img src="frontend/public/portraits/mara.webp" alt="Mara" width="12%" />
   <img src="frontend/public/portraits/tomas.webp" alt="Tomas" width="12%" />

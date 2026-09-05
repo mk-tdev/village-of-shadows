@@ -1,0 +1,65 @@
+{
+  "schema": "game-room.prop-manifest.v1",
+  "roomId": "the-watchmans-hunger",
+  "generation": {
+    "provider": "none-local-procedural",
+    "apiModel": "meshy-5",
+    "pricingSource": "https://docs.meshy.ai/en/api/pricing",
+    "pricingVerifiedAt": "",
+    "creditsPerTexturedTask": null,
+    "hardCreditCeiling": 0,
+    "maxChargedAttemptsPerAsset": 2,
+    "note": "No Meshy submission planned or authorized. Pricing must be checked before any future paid generation."
+  },
+  "assets": [
+    {
+      "id": "watchman-werewolf",
+      "function": "Readable human-to-wolf transformation and hunt",
+      "dimensionsMeters": [
+        1.7,
+        2.7,
+        1.3
+      ],
+      "attachmentFace": "feet",
+      "semanticFront": "+Z",
+      "class": "hero",
+      "instances": 1,
+      "imagePrompt": null,
+      "polygonTarget": 35000,
+      "source": "frontend/lib/exploration/creature.ts",
+      "rejectionCriteria": [
+        "Muzzle or claws unreadable from production camera",
+        "Human face remains after transformation",
+        "Player can walk through actor",
+        "Pause advances animation"
+      ],
+      "approval": {
+        "status": "pending"
+      },
+      "note": "Authored articulated prototype. A production rig and fur assets remain a separate asset pass."
+    },
+    {
+      "id": "anonymous-villager",
+      "function": "Victim with standing/falling poses and extinguished lantern",
+      "dimensionsMeters": [
+        0.65,
+        1.9,
+        0.6
+      ],
+      "attachmentFace": "feet when standing; back after fall",
+      "semanticFront": "+Z",
+      "class": "support",
+      "instances": 1,
+      "imagePrompt": null,
+      "polygonTarget": 15000,
+      "source": "frontend/lib/exploration/creature.ts",
+      "rejectionCriteria": [
+        "Fall floats above ground",
+        "Blocks all northbound routes"
+      ],
+      "approval": {
+        "status": "pending"
+      }
+    }
+  ]
+}
