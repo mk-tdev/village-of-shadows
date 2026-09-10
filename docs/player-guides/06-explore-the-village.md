@@ -69,8 +69,10 @@ rain, moving fog, light variation, and the brief visual apparition. Its story
 cue remains readable. Reduced motion also removes transformation tremor, jump
 height, feeding bob, and running gait, while preserving readable character
 poses and the encounter's rules. Pause and journal freeze the encounter clock,
-including the protection meter and capture checks. The audio is synthesized
-locally and uses no microphone.
+including the protection meter and capture checks. The soundscape combines locally served CC0 creature recordings with synthesized
+wind, footsteps, and fire crackle. No microphone is used. Roars change direction
+and loudness with the creature’s location. Pausing freezes audio playback as
+well as the encounter; Sound off silences it.
 
 Recovered seals are stored in local browser storage. **Continue the night**
 starts at the village entrance with those discoveries intact; position and

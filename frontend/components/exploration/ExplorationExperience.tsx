@@ -86,6 +86,7 @@ export default function ExplorationExperience() {
           if (action === "lantern") setLantern(value => !value);
         },
         step: running => audioRef.current?.step(running),
+        spatial: (player, yaw, wolf) => audioRef.current?.spatial(player, yaw, wolf),
         omen: () => { audioRef.current?.whisper(); audioRef.current?.bell(); setNotice("You are certain someone was standing there."); },
         encounter: phase => {
           setEncounter(phase); setNotice("");

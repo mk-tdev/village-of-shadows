@@ -1,8 +1,9 @@
 import * as THREE from "three";
+import { createWolf } from "./wolf";
 import { ENCOUNTER_DURATIONS, VICTIM, WATCHMAN, type EncounterState } from "./encounter";
 
 /** A locally authored joint rig, not a generated/skinned production character asset. */
-export function createCreatureEncounter(scene: THREE.Scene) {
+export function createCreatureEncounter(scene: THREE.Scene, loading: THREE.LoadingManager, onError: () => void) {
   const root = new THREE.Group();
   scene.add(root);
   const fur = new THREE.MeshStandardMaterial({ color: "#303735", roughness: 1, flatShading: true });
@@ -10,11 +11,9 @@ export function createCreatureEncounter(scene: THREE.Scene) {
   const cloth = new THREE.MeshStandardMaterial({ color: "#6d6153", roughness: 1 });
   const skin = new THREE.MeshStandardMaterial({ color: "#a6a08b", roughness: .95 });
   const dark = new THREE.MeshStandardMaterial({ color: "#131a19", roughness: .8 });
-  const ivory = new THREE.MeshStandardMaterial({ color: "#bcbba3", roughness: .65 });
   const eye = new THREE.MeshBasicMaterial({ color: "#f7b354" });
   const wound = new THREE.MeshStandardMaterial({ color: "#401d1b", roughness: .6 });
   const unit = new THREE.IcosahedronGeometry(1, 2);
-  const point = new THREE.ConeGeometry(1, 1, 5);
   const coatShape = new THREE.CylinderGeometry(.24, .32, .7, 9);
 
   function shape(parent: THREE.Object3D, material: THREE.Material, pos: number[], size: number[], geometry: THREE.BufferGeometry = unit) {
@@ -59,42 +58,7 @@ export function createCreatureEncounter(scene: THREE.Scene) {
   const victim = person(cloth);
   victim.body.position.set(VICTIM.x, 0, VICTIM.z);
   victim.body.rotation.y = -.7;
-  // The wolf grows from the watchman's same joints: shoulders, hands, muzzle, knees.
-  const wolfHead = joint(man.head, 0, .02, .02);
-  shape(wolfHead, fur, [0, 0, 0], [.23, .25, .25]);
-  shape(wolfHead, fur, [0, -.06, .24], [.13, .10, .32]);
-  shape(wolfHead, dark, [0, -.045, .53], [.075, .048, .045]);
-  const jaw = joint(wolfHead, 0, -.1, .03);
-  shape(jaw, dark, [0, -.09, .22], [.125, .07, .25]);
-  for (const side of [-1, 1]) {
-    const ear = shape(wolfHead, fur, [side * .17, .27, -.02], [.105, .32, .1], point);
-    ear.rotation.z = -side * .25;
-    shape(wolfHead, eye, [side * .15, .045, .195], [.046, .024, .024]);
-    const brow = shape(wolfHead, fur, [side * .14, .095, .21], [.09, .043, .047]); brow.rotation.z = side * .3;
-    for (let i = 0; i < 4; i++) {
-      const tooth = shape(wolfHead, ivory, [side * .11, -.16, .13 + i * .085], [.022, i === 2 ? .14 : .065, .022], point);
-      tooth.rotation.z = Math.PI;
-      shape(jaw, ivory, [side * .095, -.025, .14 + i * .08], [.019, .065, .019], point);
-    }
-  }
-  const mane = joint(man.hips, 0, .65, -.1);
-  shape(mane, fur, [0, 0, 0], [.47, .44, .32]);
-  for (let i = 0; i < 13; i++) {
-    const a = i / 13 * Math.PI * 2;
-    const tuft = shape(mane, fur, [Math.sin(a) * .36, Math.cos(a) * .29, -.12], [.09, .32, .1], point);
-    tuft.rotation.z = -a;
-  }
-  const claws = man.arms.map(({ lower }) => {
-    const paw = joint(lower, 0, -.31, .015);
-    shape(paw, fur, [0, -.02, 0], [.12, .14, .08]);
-    for (let i = 0; i < 4; i++) {
-    const claw = shape(paw, ivory, [(i - 1.5) * .058, -.2, .04], [.014, .15, .02], point);
-      claw.rotation.x = .3; claw.rotation.z = Math.PI;
-    }
-    return paw;
-  });
-  const tail = joint(man.hips, 0, -.05, -.18);
-  const tailMesh = shape(tail, fur, [0, -.14, -.28], [.13, .14, .44]); tailMesh.rotation.x = -.45;
+  const wolf = createWolf(root, loading, onError);
   const fallenLantern = joint(root, VICTIM.x + .7, .12, VICTIM.z + .6);
   shape(fallenLantern, dark, [0, .1, 0], [.14, .22, .13]);
   const flame = shape(fallenLantern, eye, [0, .11, .03], [.065, .13, .07]);
@@ -128,16 +92,11 @@ export function createCreatureEncounter(scene: THREE.Scene) {
     man.head.position.set(0, .97 - progress * .12, progress * .22);
     man.humanHead.visible = progress < .6;
     man.hem.visible = progress < .8;
-    wolfHead.scale.setScalar(Math.max(.001, progress));
-    mane.scale.setScalar(Math.max(.001, progress));
-    tail.scale.setScalar(Math.max(.001, progress));
-    jaw.rotation.x = -.06 + (transformed ? .3 : progress * .6);
     man.arms.forEach(({ upper, lower }, i) => {
       upper.position.x = (i ? 1 : -1) * (.29 + progress * .19);
       upper.scale.set(1 + progress * .55, 1 + progress * .7, 1 + progress * .55);
       upper.rotation.set(-progress * .25, 0, (i ? 1 : -1) * (.08 + progress * .28));
       lower.rotation.x = -.12 - progress * .45;
-      claws[i].scale.setScalar(Math.max(.001, progress));
       upper.children.forEach(child => { if (child instanceof THREE.Mesh) child.material = progress > .5 ? fur : coat; });
       lower.children.forEach((child, index) => { if (child instanceof THREE.Mesh) child.material = progress > .5 ? fur : index === 0 ? coat : skin; });
     });
@@ -177,7 +136,6 @@ export function createCreatureEncounter(scene: THREE.Scene) {
       man.hips.position.y = .68;
       man.hips.rotation.x = .95 + (reducedMotion ? 0 : Math.sin(time * 5) * .045);
       man.head.rotation.x = .25;
-      jaw.rotation.x = reducedMotion ? .35 : .35 + Math.sin(time * 7) * .16;
       man.arms.forEach(({ upper }) => { upper.rotation.x = -1.1; });
       man.legs.forEach(({ leg, shin }) => { leg.rotation.x = -1.1; shin.rotation.x = 1.5; });
     }
@@ -191,10 +149,12 @@ export function createCreatureEncounter(scene: THREE.Scene) {
       man.arms.forEach(({ upper }, i) => { upper.rotation.x += gait * (i ? .2 : -.2); });
       if (phase === "hunting" && time < .6) man.body.position.lerp(new THREE.Vector3(huntStart.x, 0, huntStart.z + .5), 1 - time / .6);
     }
-    rim.intensity = man.body.visible ? 16 : 4;
+    wolf.pose(state, man.body.position, man.body.rotation.y, progress, reducedMotion);
+    man.body.visible = man.body.visible && progress <= .52;
+    rim.intensity = !["aftermath", "caught"].includes(phase) ? 16 : 4;
   }
-  return { pose, obstacles: () => [
-    ...(man.body.visible ? [{ x: man.body.position.x, z: man.body.position.z, radius: .65 }] : []),
+  return { pose, dispose: () => wolf.dispose(), obstacles: () => [
+    ...(!["aftermath", "caught"].includes(previous) ? [{ x: man.body.position.x, z: man.body.position.z, radius: .65 }] : []),
     { x: VICTIM.x, z: VICTIM.z, radius: .5 },
   ] };
 }

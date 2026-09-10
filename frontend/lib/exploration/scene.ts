@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { COUNCIL, COTTAGES, LANDMARKS, SPAWN, atCouncil, movePlayer, nearbyLandmark, type Point } from "./world";
 import { advanceEncounter, canStartEncounter, encounterActive, newEncounter, VICTIM, type EncounterPhase } from "./encounter";
 import { createCreatureEncounter } from "./creature";
+import { createCouncilFire } from "./fire";
 
 export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number };
 export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[] };
@@ -12,6 +13,7 @@ type SceneEvents = {
   step: (running: boolean) => void;
   omen: () => void;
   encounter: (phase: EncounterPhase) => void;
+  spatial: (player: Point, yaw: number, wolf: Point) => void;
   error: () => void;
 };
 
@@ -280,11 +282,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   });
 
   // The council is the final destination, visually legible through the fog.
-  cylinder(scene, 1.1, 1.3, .3, [COUNCIL.x, .1, COUNCIL.z], stone, 14);
-  const fire = new THREE.Mesh(new THREE.ConeGeometry(.48, 1.2, 7), warm);
-  fire.position.set(0, .7, COUNCIL.z); scene.add(fire);
-  const firelight = new THREE.PointLight("#ff9346", 35, 16, 1.7);
-  firelight.position.set(0, 2, COUNCIL.z); scene.add(firelight);
+  const fire = createCouncilFire(scene, COUNCIL.z);
   for (let i = 0; i < 7; i++) {
     const a = i / 7 * Math.PI * 2;
     const x = Math.sin(a) * 3.8; const z = COUNCIL.z + Math.cos(a) * 3.8;
@@ -307,7 +305,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   // A distant silhouette is a brief environmental event, not a combat enemy.
   const watcher = character("corvin", -2.5, -16, "#142125");
   watcher.visible = false;
-  const creature = createCreatureEncounter(scene);
+  const creature = createCreatureEncounter(scene, loading, events.error);
 
   const lamp = new THREE.PointLight("#ffd08b", 14, 12, 1.6);
   scene.add(lamp);
@@ -438,11 +436,12 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     lamp.intensity = settings.lantern ? 14 + (settings.reducedMotion ? 0 : Math.sin(elapsed * 7) * .5) : 0;
     lamps.forEach(({ light, base }, i) => { light.intensity = base + (settings.reducedMotion ? 0 : Math.sin(elapsed * 5 + i) * 1.2); });
     seals.forEach((seal, i) => { seal.visible = !settings.found.includes(LANDMARKS[i].id); seal.rotation.y = settings.reducedMotion ? 0 : elapsed * .4; });
-    fire.scale.y = settings.reducedMotion ? 1 : 1 + Math.sin(elapsed * 7) * .1;
+    fire.update(elapsed, camera, settings.reducedMotion);
     rain.visible = !settings.reducedMotion;
     rain.position.set(point.x, -(elapsed * 2 % 8), point.z);
     fogBanks.forEach((bank, i) => { if (!settings.reducedMotion) bank.position.x = Math.sin(elapsed * .045 + i * 2) * 4; });
     if (elapsed - lastSnapshot > .12 || lastSnapshot === 0) {
+      events.spatial(point, yaw, wolfPosition);
       events.snapshot({ point: { ...point }, bearing: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearby: encounterActive(encounter.phase) ? null : nearbyLandmark(point, settings.found)?.id ?? null, council: !encounterActive(encounter.phase) && atCouncil(point, settings.found), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6 });
       lastSnapshot = elapsed || -.001;
     }
@@ -467,7 +466,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     },
     async lockPointer() { await canvas.requestPointerLock(); },
     dispose() {
-      destroyed = true; cancelAnimationFrame(animation); observer.disconnect(); clock.dispose(); unlock();
+      destroyed = true; creature.dispose(); cancelAnimationFrame(animation); observer.disconnect(); clock.dispose(); unlock();
       window.removeEventListener("keydown", keydown); window.removeEventListener("keyup", keyup); window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", visibility); document.removeEventListener("pointerlockchange", lockchange);
       canvas.removeEventListener("pointerdown", pointerdown); window.removeEventListener("pointermove", pointermove);

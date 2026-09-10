@@ -1,8 +1,14 @@
-/** Synthesized ambience: no network, microphone, or autoplay before a gesture. */
+/** Local CC0 creature recordings and synthesized ambience; starts on a gesture. */
 export class VillageAudio {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
   private wind: AudioBufferSourceNode | null = null;
+  private creaturePan: StereoPannerNode | null = null;
+  private creatureGain: GainNode | null = null;
+  private fireGain: GainNode | null = null;
+  private samples = new Map<string, AudioBuffer>();
+  private sampleLoad: Promise<void> | null = null;
+  private disposed = false;
 
   async start() {
     if (!this.context) {
@@ -10,7 +16,13 @@ export class VillageAudio {
       this.context = context;
       this.master = context.createGain();
       this.master.gain.value = .32;
-      this.master.connect(context.destination);
+      const limiter = context.createDynamicsCompressor();
+      limiter.threshold.value = -12; limiter.knee.value = 10; limiter.ratio.value = 8;
+      limiter.attack.value = .003; limiter.release.value = .18;
+      this.master.connect(limiter).connect(context.destination);
+      this.creaturePan = context.createStereoPanner();
+      this.creatureGain = context.createGain(); this.creatureGain.gain.value = .7;
+      this.creaturePan.connect(this.creatureGain).connect(this.master);
       const buffer = context.createBuffer(1, context.sampleRate * 4, context.sampleRate);
       const data = buffer.getChannelData(0);
       let last = 0;
@@ -26,13 +38,58 @@ export class VillageAudio {
       filter.frequency.value = 420;
       this.wind.connect(filter).connect(this.master);
       this.wind.start();
+      const fireBuffer = context.createBuffer(1, context.sampleRate * 6, context.sampleRate);
+      const fireData = fireBuffer.getChannelData(0);
+      let crackle = 0;
+      for (let i = 0; i < fireData.length; i++) {
+        if (Math.random() < .0004) crackle = .3 + Math.random() * .6;
+        crackle *= .97;
+        fireData[i] = (Math.random() * 2 - 1) * (.025 + crackle);
+      }
+      const fire = context.createBufferSource(); fire.buffer = fireBuffer; fire.loop = true;
+      this.fireGain = context.createGain(); this.fireGain.gain.value = 0;
+      fire.connect(this.fireGain).connect(this.master); fire.start();
     }
     await this.context.resume();
+    if (!this.sampleLoad) {
+      const context = this.context;
+      this.sampleLoad = Promise.allSettled(["attack", "growl"].map(async name => {
+        const response = await fetch(`/exploration/audio/${name}.mp3`, { signal: AbortSignal.timeout(4000) });
+        if (!response.ok) throw new Error("Audio asset unavailable");
+        const buffer = await context.decodeAudioData(await response.arrayBuffer());
+        if (!this.disposed) this.samples.set(name, buffer);
+      })).then(() => {});
+    }
+    await this.sampleLoad;
   }
 
   setActive(active: boolean) {
     if (!this.context || !this.master) return;
     this.master.gain.setTargetAtTime(active ? .32 : 0, this.context.currentTime, .12);
+    // Suspending freezes the recordings too, so a paused roar resumes in sync.
+    if (active) void this.context.resume().catch(() => {});
+    else void this.context.suspend().catch(() => {});
+  }
+
+  spatial(player: { x: number; z: number }, yaw: number, wolf: { x: number; z: number }) {
+    if (!this.context) return;
+    const dx = wolf.x - player.x, dz = wolf.z - player.z;
+    const distance = Math.hypot(dx, dz);
+    this.creaturePan?.pan.setTargetAtTime(Math.max(-1, Math.min(1, (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / Math.max(1, distance))), this.context.currentTime, .1);
+    this.creatureGain?.gain.setTargetAtTime(Math.min(1, 5 / Math.max(3, distance)), this.context.currentTime, .1);
+    this.fireGain?.gain.setTargetAtTime(.65 / (1 + Math.hypot(player.x, player.z + 32) * .55), this.context.currentTime, .2);
+  }
+
+  private roar(name: string, rate: number, volume: number) {
+    const c = this.context, sample = this.samples.get(name);
+    if (!c || !sample || !this.creaturePan || c.state !== "running") { this.noise(1.2, 420, .2); return; }
+    for (const [pitch, gainValue, delay] of [[rate, volume, 0], [rate * .67, volume * .45, .035]]) {
+      const source = c.createBufferSource(); source.buffer = sample; source.playbackRate.value = pitch;
+      const gain = c.createGain(); gain.gain.value = gainValue;
+      const filter = c.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 3200;
+      source.connect(filter).connect(gain).connect(this.creaturePan); source.start(c.currentTime + delay);
+      source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
+    }
   }
 
   tone(frequency: number, duration: number, volume: number, pan = 0) {
@@ -58,15 +115,16 @@ export class VillageAudio {
   bell() { [174, 348, 467].forEach(f => this.tone(f, 4, .09, -.6)); }
   whisper() { this.tone(93, 2.5, .12, .8); }
   creature(phase: string) {
-    if (phase === "stirring") { this.tone(72, 1.8, .16, -.2); }
+    if (phase === "stirring") { this.roar("growl", .85, .6); }
     if (phase === "transforming") {
       [46, 69, 94, 141].forEach(f => this.tone(f, 4.5, .1, -.2));
       this.noise(1.1, 360, .24);
+      this.roar("growl", .62, .8);
     }
-    if (phase === "pouncing") { this.noise(.65, 150, .5); this.tone(52, .7, .35); }
+    if (phase === "pouncing") { this.roar("attack", .73, 1); this.noise(.35, 150, .3); }
     if (phase === "feeding") { this.noise(3.8, 230, .2); }
-    if (phase === "hunting") { this.tone(58, 2.7, .25); this.tone(117, 2.7, .12); }
-    if (phase === "fleeing") { this.tone(220, 3, .17, -.6); this.tone(330, 3, .09, -.6); }
+    if (phase === "hunting") { this.roar("attack", .57, 1.1); }
+    if (phase === "fleeing") { this.roar("growl", .95, .5); }
   }
   private noise(duration: number, frequency: number, volume: number) {
     const c = this.context;
@@ -83,6 +141,7 @@ export class VillageAudio {
     source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
   }
   dispose() {
+    this.disposed = true; this.samples.clear();
     this.wind?.stop();
     if (this.context) void this.context.close();
     this.context = null;
