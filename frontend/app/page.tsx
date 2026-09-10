@@ -85,7 +85,7 @@ export default function LandingPage() {
             <Link href="/how-to-play">How to play</Link>
             <Link href="/tournament">Tournament lab</Link>
             <Link href="/history">Game archive</Link>
-            <Link className="landing-nav-enter" href="/setup">Enter the village</Link>
+            <Link className="landing-nav-enter" href="/explore">Explore the village</Link>
           </div>
         </nav>
 
@@ -103,12 +103,12 @@ export default function LandingPage() {
             competing objectives—and no script for what happens next.
           </p>
           <div className="landing-hero-actions">
-            <Link className="landing-primary-action" href="/setup">
-              <span>Take your seat</span>
+            <Link className="landing-primary-action" href="/explore">
+              <span>Walk into the shadows</span>
               <b aria-hidden="true">→</b>
             </Link>
-            <Link className="landing-text-action" href="#the-system">
-              See how the world thinks
+            <Link className="landing-text-action" href="/setup">
+              Go straight to the AI council
             </Link>
           </div>
           <dl className="landing-hero-stats">

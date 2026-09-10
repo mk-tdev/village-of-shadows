@@ -27,6 +27,7 @@ evidence.
 
 | Stage | Features covered | Guide |
 |---|---|---|
+| Explore | First-person village, seals, lantern, journal, local prologue | [Explore the village](06-explore-the-village.md) |
 | Configure | Expanded roles, Agent Laboratory, cross-game relationships, resilience | [Configure the experiment](02-configure-the-experiment.md) |
 | Play | Werewolf negotiation, beliefs, private notes, multiple humans, Voice Council, village events | [Play the live council](01-play-the-live-council.md) |
 | Observe | Graph nodes, live activity, context, memory, tool calls, God Mode | [Read the observability panels](05-read-the-observability-panels.md) |

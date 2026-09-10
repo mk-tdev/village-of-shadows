@@ -1,0 +1,32 @@
+{
+  "schema": "game-room.milestone-reviews.v1",
+  "roomId": "the-watchmans-hunger",
+  "function": {
+    "status": "pending",
+    "approvedBy": "",
+    "approvedAt": "",
+    "evidence": [
+      "room-brief.json",
+      "props.json",
+      "room-layout.json"
+    ],
+    "strangestElement": "Stylized procedural anatomy promises a creature, not photorealistic skin/fur. Evaluate staging before commissioning final assets.",
+    "notes": "Local code prototype only. No human gate approval claimed; no paid generation, Blender export, final asset composition, or deployment performed."
+  },
+  "form": {
+    "status": "pending",
+    "approvedBy": "",
+    "approvedAt": "",
+    "evidence": [],
+    "strangestElement": "",
+    "notes": "Local code prototype only. No human gate approval claimed; no paid generation, Blender export, final asset composition, or deployment performed."
+  },
+  "runtime": {
+    "status": "pending",
+    "approvedBy": "",
+    "approvedAt": "",
+    "evidence": [],
+    "strangestElement": "",
+    "notes": "Local code prototype only. No human gate approval claimed; no paid generation, Blender export, final asset composition, or deployment performed."
+  }
+}

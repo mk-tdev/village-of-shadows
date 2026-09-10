@@ -1,0 +1,9 @@
+{
+  "schema": "game-room.opening-schedule.v1",
+  "roomId": "the-watchmans-hunger",
+  "primaryArrival": {
+    "openingId": "",
+    "exception": "Outdoor encounter in an existing 8m lane. No architectural openings added or changed."
+  },
+  "openings": []
+}

@@ -60,7 +60,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:130-146](../../backend/app/routers/games.py#L130-L146))
+([routers/games.py:153-170](../../backend/app/routers/games.py#L153-L170))
 
 `GameState.phase` starts at `"lobby"` and stays there until `begin_game`
 actually calls `orch.start()`. The frontend's game page already opens its
@@ -97,7 +97,7 @@ async def pause_game(session_id: str) -> dict:
     orch.request_pause()
     return {"ok": True}
 ```
-([games.py:299-311](../../backend/app/routers/games.py#L299-L311))
+([games.py:323-335](../../backend/app/routers/games.py#L323-L335))
 
 `POST /pause` doesn't stop anything immediately — it just sets a plain
 boolean on the orchestrator. Whatever seat's turn is currently mid-flight

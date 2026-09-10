@@ -83,7 +83,7 @@ async def submit_input(session_id: str, body: InputRequest) -> dict:
     orch.resume(body.value)
     return {"ok": True}
 ```
-([input.py:15-29](../../backend/app/routers/input.py#L15-L29))
+([input.py:61-92](../../backend/app/routers/input.py#L61-L92))
 
 When the human submits an answer via `POST /games/{id}/input`, the route
 calls `orch.resume(body.value)`, which starts a **new** `graph.astream(...)`
@@ -119,7 +119,7 @@ if awaiting is None:
 if awaiting.seat_id != body.seat_id or awaiting.kind != body.kind:
     raise HTTPException(409, f"Expected input from seat {awaiting.seat_id} of kind {awaiting.kind}.")
 ```
-([input.py:36-40](../../backend/app/routers/input.py#L36-L40))
+([input.py:81-85](../../backend/app/routers/input.py#L81-L85))
 
 LangGraph doesn't know or care *what* value you resume with — it just hands
 it back as the `interrupt()` return value, whatever type that is. The

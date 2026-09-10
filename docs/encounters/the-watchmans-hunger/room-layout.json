@@ -1,0 +1,38 @@
+{
+  "schema": "game-room.layout.v1",
+  "roomId": "the-watchmans-hunger",
+  "units": "meters",
+  "surfaces": [],
+  "instances": [
+    {
+      "id": "watchman-werewolf",
+      "position": [
+        -0.9,
+        0,
+        -7.5
+      ]
+    },
+    {
+      "id": "anonymous-villager",
+      "position": [
+        1.2,
+        0,
+        -9.5
+      ]
+    }
+  ],
+  "productionCamera": {
+    "location": [
+      0,
+      1.68,
+      3
+    ],
+    "target": [
+      -0.9,
+      1.6,
+      -7.5
+    ],
+    "verticalFovDegrees": 64
+  },
+  "scope": "Existing world retained. Actor placements below describe local runtime prototype, not a Blender composition."
+}
