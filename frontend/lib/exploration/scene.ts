@@ -1,7 +1,8 @@
 import * as THREE from "three";
-import { COUNCIL, COTTAGES, LANDMARKS, SPAWN, atCouncil, movePlayer, nearbyLandmark, type Point } from "./world";
+import { COUNCIL, COUNCIL_SEAT, COTTAGES, LANDMARKS, SPAWN, atCouncil, movePlayer, nearbyLandmark, type Point } from "./world";
 import { advanceEncounter, canStartEncounter, encounterActive, newEncounter, VICTIM, type EncounterPhase } from "./encounter";
 import { createCreatureEncounter } from "./creature";
+import { createKeepsakes } from "./props";
 import { createCouncilFire } from "./fire";
 
 export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number };
@@ -38,6 +39,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   let point = { ...SPAWN };
   let yaw = 0;
   let pitch = -.035;
+  let sitting: { from: Point; yaw: number; pitch: number; progress: number; resolve: () => void } | null = null;
+  let seated = false;
   let elapsed = 0;
   let lastSnapshot = 0;
   let footDistance = 0;
@@ -276,17 +279,21 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   box(scene, [2.6, .15, .17], [2.5, 2.6, -3], wood);
   cylinder(scene, .015, .015, 2.6, [2.5, 1.3, -3], beam);
 
-  const seals = LANDMARKS.map(l => {
-    const seal = new THREE.Mesh(new THREE.TorusGeometry(.18, .045, 6, 24), warm);
-    seal.position.set(l.x, 1.1, l.z + .8); scene.add(seal); return seal;
-  });
+  const keepsakes = createKeepsakes(scene, wood);
 
   // The council is the final destination, visually legible through the fog.
   const fire = createCouncilFire(scene, COUNCIL.z);
   for (let i = 0; i < 7; i++) {
     const a = i / 7 * Math.PI * 2;
     const x = Math.sin(a) * 3.8; const z = COUNCIL.z + Math.cos(a) * 3.8;
-    cylinder(scene, .4, .55, .75, [x, .35, z], wood);
+    const chair=new THREE.Group();chair.position.set(x,0,z);chair.rotation.y=a;scene.add(chair);
+    box(chair,[.68,.10,.62],[0,.49,0],wood);
+    for(const side of [-1,1]) {
+      box(chair,[.075,1.12,.075],[side*.27,.56,.25],wood);
+      box(chair,[.075,.47,.075],[side*.27,.235,-.24],wood);
+    }
+    box(chair,[.63,.16,.08],[0,1.02,.25],wood);
+    box(chair,[.63,.10,.065],[0,.77,.25],wood);
   }
 
   function character(name: string, x: number, z: number, color = "#9da8a2") {
@@ -409,14 +416,14 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
         if (!moving) walkTarget = null;
         if (footDistance > (running ? 1.5 : 1.15)) { events.step(running); footDistance = 0; }
       }
-      if (settings.found.length > 0 && point.z < 10 && !omenSeen) { omenSeen = true; omenUntil = elapsed + 2; events.omen(); }
+      if (point.z < 10 && !omenSeen) { omenSeen = true; omenUntil = elapsed + 2; events.omen(); }
     }
     const wolfDx = wolfPosition.x - point.x, wolfDz = wolfPosition.z - point.z;
     const wolfDistance = Math.hypot(wolfDx, wolfDz);
     const facingWolf = wolfDistance > 0 && (-Math.sin(yaw) * wolfDx - Math.cos(yaw) * wolfDz) / wolfDistance > .65;
     const warding = settings.lantern && facingWolf && wolfDistance < 9;
     const previousPhase = encounter.phase;
-    encounter = advanceEncounter(encounter, dt, { playing: settings.playing, trigger: canStartEncounter(point, yaw, settings.found), warding, distance: wolfDistance, escaped: point.z < -19 || wolfDistance > 19 });
+    encounter = advanceEncounter(encounter, dt, { playing: settings.playing, trigger: canStartEncounter(point, yaw), warding, distance: wolfDistance, escaped: point.z < -19 || wolfDistance > 19 });
     if (encounter.phase !== previousPhase) {
       if (encounter.phase === "hunting") wolfPosition = { x: VICTIM.x, z: VICTIM.z + .5 };
       if (encounter.phase === "caught") { clearInput(); settings.playing = false; }
@@ -426,23 +433,31 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       const speed = warding ? (wolfDistance < 3 ? -1 : 0) : 2.3;
       wolfPosition = movePlayer(wolfPosition, -wolfDx / wolfDistance * dt * speed, -wolfDz / wolfDistance * dt * speed);
     }
-    creature.pose(encounter, wolfPosition, point, settings.reducedMotion);
+    creature.pose(encounter.phase === "waiting" ? {...encounter,time:elapsed} : encounter, wolfPosition, point, settings.reducedMotion);
     watcher.visible = settings.playing && elapsed < omenUntil && !settings.reducedMotion;
-    camera.position.set(point.x, 1.68 + (moving && !settings.reducedMotion ? Math.sin(elapsed * (running ? 12 : 8)) * .025 : 0), point.z);
+    if(sitting) {
+      sitting.progress=Math.min(1,sitting.progress+dt/(settings.reducedMotion?.12:1.25));
+      const t=THREE.MathUtils.smoothstep(sitting.progress,0,1);
+      point={x:THREE.MathUtils.lerp(sitting.from.x,COUNCIL_SEAT.x,t),z:THREE.MathUtils.lerp(sitting.from.z,COUNCIL_SEAT.z,t)};
+      yaw=THREE.MathUtils.lerp(sitting.yaw,0,t);pitch=THREE.MathUtils.lerp(sitting.pitch,-.06,t);
+      if(sitting.progress===1) {seated=true;const resolve=sitting.resolve;sitting=null;resolve();}
+    }
+    const eyeHeight=seated?1.05:sitting?THREE.MathUtils.lerp(1.68,1.05,THREE.MathUtils.smoothstep(sitting.progress,0,1)):1.68;
+    camera.position.set(point.x, eyeHeight + (moving && !settings.reducedMotion ? Math.sin(elapsed * (running ? 12 : 8)) * .025 : 0), point.z);
     camera.rotation.set(pitch, yaw, 0);
     hand.visible = settings.lantern;
     hand.rotation.z = moving && !settings.reducedMotion ? Math.sin(elapsed * 5) * .04 : 0;
     lamp.position.copy(camera.position); lamp.position.y -= .45;
     lamp.intensity = settings.lantern ? 14 + (settings.reducedMotion ? 0 : Math.sin(elapsed * 7) * .5) : 0;
     lamps.forEach(({ light, base }, i) => { light.intensity = base + (settings.reducedMotion ? 0 : Math.sin(elapsed * 5 + i) * 1.2); });
-    seals.forEach((seal, i) => { seal.visible = !settings.found.includes(LANDMARKS[i].id); seal.rotation.y = settings.reducedMotion ? 0 : elapsed * .4; });
+    keepsakes.forEach((item, i) => { item.visible = !settings.found.includes(LANDMARKS[i].id); });
     fire.update(elapsed, camera, settings.reducedMotion);
     rain.visible = !settings.reducedMotion;
     rain.position.set(point.x, -(elapsed * 2 % 8), point.z);
     fogBanks.forEach((bank, i) => { if (!settings.reducedMotion) bank.position.x = Math.sin(elapsed * .045 + i * 2) * 4; });
     if (elapsed - lastSnapshot > .12 || lastSnapshot === 0) {
       events.spatial(point, yaw, wolfPosition);
-      events.snapshot({ point: { ...point }, bearing: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearby: encounterActive(encounter.phase) ? null : nearbyLandmark(point, settings.found)?.id ?? null, council: !encounterActive(encounter.phase) && atCouncil(point, settings.found), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6 });
+      events.snapshot({ point: { ...point }, bearing: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearby: encounterActive(encounter.phase) ? null : nearbyLandmark(point, settings.found)?.id ?? null, council: !encounterActive(encounter.phase) && atCouncil(point), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6 });
       lastSnapshot = elapsed || -.001;
     }
     renderer.render(scene, camera);
@@ -455,7 +470,13 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       renderer.toneMappingExposure = 1.35 * next.brightness;
       if (!next.playing) { clearInput(); dragging = null; unlock(); }
     },
-    reset() { point = { ...SPAWN }; yaw = 0; pitch = -.035; elapsed = 0; lastSnapshot = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
+    sit() {
+      if (seated) return Promise.resolve();
+      if (sitting || !atCouncil(point) || encounterActive(encounter.phase)) return Promise.reject(new Error("Reach the empty council chair first."));
+      settings.playing=false;clearInput();unlock();
+      return new Promise<void>(resolve => { sitting={from:{...point},yaw:Math.atan2(Math.sin(yaw),Math.cos(yaw)),pitch,progress:0,resolve}; });
+    },
+    reset() { seated=false; sitting=null; point = { ...SPAWN }; yaw = 0; pitch = -.035; elapsed = 0; lastSnapshot = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
     retryEncounter() { point = { x: 0, z: 3.8 }; yaw = 0; pitch = -.035; encounter = newEncounter(); wolfPosition = { ...VICTIM }; lastSnapshot = 0; events.encounter("waiting"); clearInput(); },
     step(direction: "forward" | "back" | "left" | "right") {
       if (!settings.playing) return;
@@ -481,7 +502,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
           if (object instanceof THREE.InstancedMesh) object.dispose();
         }
       });
-      geometries.forEach(g => g.dispose()); usedMaterials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); renderer.dispose();
+      geometries.forEach(g => g.dispose()); usedMaterials.forEach(m => m.dispose()); scene.traverse(object=>{ if(object instanceof THREE.Mesh) for(const material of Array.isArray(object.material)?object.material:[object.material]) for(const value of Object.values(material)) if(value instanceof THREE.Texture && !textures.includes(value)) textures.push(value); });
+      textures.forEach(t => t.dispose()); renderer.dispose();
     },
   };
 }

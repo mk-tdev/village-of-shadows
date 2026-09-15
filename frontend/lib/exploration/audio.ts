@@ -5,6 +5,8 @@ export class VillageAudio {
   private wind: AudioBufferSourceNode | null = null;
   private creaturePan: StereoPannerNode | null = null;
   private creatureGain: GainNode | null = null;
+  private scoreGain: GainNode | null = null;
+  private tension = 0;
   private fireGain: GainNode | null = null;
   private samples = new Map<string, AudioBuffer>();
   private sampleLoad: Promise<void> | null = null;
@@ -49,6 +51,22 @@ export class VillageAudio {
       const fire = context.createBufferSource(); fire.buffer = fireBuffer; fire.loop = true;
       this.fireGain = context.createGain(); this.fireGain.gain.value = 0;
       fire.connect(this.fireGain).connect(this.master); fire.start();
+      // Original horror score: detuned bowed drones, sub-bass and an uneven pulse.
+      // AudioContext time freezes the complete score when the player pauses.
+      this.scoreGain=context.createGain();this.scoreGain.gain.value=.7;this.scoreGain.connect(this.master);
+      [36.7,55,58.27,77.78,110.4].forEach((frequency,i)=>{
+        const oscillator=context.createOscillator();oscillator.type=i<2?"sine":"sawtooth";oscillator.frequency.value=frequency;
+        const bow=context.createBiquadFilter();bow.type="lowpass";bow.frequency.value=180+i*100;bow.Q.value=1.2;
+        const gain=context.createGain();gain.gain.value=i<2?.13:.025;
+        const pan=context.createStereoPanner();pan.pan.value=(i%2?1:-1)*.6;
+        const drift=context.createOscillator();drift.frequency.value=.045+i*.013;
+        const depth=context.createGain();depth.gain.value=40+i*12;
+        drift.connect(depth).connect(oscillator.detune);drift.start();
+        oscillator.connect(bow).connect(gain).connect(pan).connect(this.scoreGain!);oscillator.start();
+      });
+      const pulse=context.createOscillator();pulse.frequency.value=43;const heartbeat=context.createGain();heartbeat.gain.value=.035;
+      const rhythm=context.createOscillator();rhythm.frequency.value=.73;const rhythmDepth=context.createGain();rhythmDepth.gain.value=.033;
+      rhythm.connect(rhythmDepth).connect(heartbeat.gain);pulse.connect(heartbeat).connect(this.scoreGain);pulse.start();rhythm.start();
     }
     await this.context.resume();
     if (!this.sampleLoad) {
@@ -73,6 +91,7 @@ export class VillageAudio {
 
   spatial(player: { x: number; z: number }, yaw: number, wolf: { x: number; z: number }) {
     if (!this.context) return;
+    this.scoreGain?.gain.setTargetAtTime(player.z < -25 ? .28 : .65 + this.tension * .55, this.context.currentTime, 1.2);
     const dx = wolf.x - player.x, dz = wolf.z - player.z;
     const distance = Math.hypot(dx, dz);
     this.creaturePan?.pan.setTargetAtTime(Math.max(-1, Math.min(1, (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / Math.max(1, distance))), this.context.currentTime, .1);
@@ -111,10 +130,12 @@ export class VillageAudio {
     osc.onended = () => { osc.disconnect(); gain.disconnect(); spatial.disconnect(); };
   }
 
-  step(running: boolean) { this.tone(running ? 76 : 58, .14, .28); }
+  step(running: boolean) { this.noise(running ? .14 : .18, 680, .18); this.tone(46,.1,.08); }
+  discovery() { this.noise(.65,1200,.13); this.tone(61,1.2,.08); }
   bell() { [174, 348, 467].forEach(f => this.tone(f, 4, .09, -.6)); }
   whisper() { this.tone(93, 2.5, .12, .8); }
   creature(phase: string) {
+    this.tension = ["stirring","transforming","pouncing","feeding","hunting"].includes(phase) ? 1 : 0;
     if (phase === "stirring") { this.roar("growl", .85, .6); }
     if (phase === "transforming") {
       [46, 69, 94, 141].forEach(f => this.tone(f, 4.5, .1, -.2));

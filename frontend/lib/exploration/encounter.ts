@@ -8,10 +8,10 @@ const NEXT: Partial<Record<EncounterPhase, EncounterPhase>> = { stirring: "trans
 export const newEncounter = (): EncounterState => ({ phase: "waiting", time: 0, lightTime: 0 });
 export const encounterActive = (phase: EncounterPhase) => !["waiting", "aftermath", "caught"].includes(phase);
 
-export function canStartEncounter(point: { x: number; z: number }, yaw: number, found: readonly string[]) {
+export function canStartEncounter(point: { x: number; z: number }, yaw: number) {
   const dx = WATCHMAN.x - point.x, dz = WATCHMAN.z - point.z;
   const distance = Math.hypot(dx, dz);
-  return found.length > 0 && distance > 3 && distance < 12 && (-Math.sin(yaw) * dx - Math.cos(yaw) * dz) / distance > .78;
+  return distance > 3 && distance < 12 && (-Math.sin(yaw) * dx - Math.cos(yaw) * dz) / distance > .78;
 }
 
 export function advanceEncounter(state: EncounterState, dt: number, input: { playing: boolean; trigger: boolean; warding: boolean; distance: number; escaped: boolean }): EncounterState {
@@ -37,5 +37,5 @@ export const ENCOUNTER_COPY: Record<EncounterPhase, { title: string; text: strin
   hunting: { title: "It has your scent.", text: "Face it with your lantern lit to drive it back, or run away. F toggles the lantern." },
   fleeing: { title: "It retreats into the mist.", text: "Keep moving. Reach the council fire." },
   aftermath: { title: "The watchman’s hunger", text: "I saw a man become a wolf. It fell upon a villager, then fed beside the fallen lantern. It turned toward me. I survived. The council must hear this." },
-  caught: { title: "The light went out.", text: "The creature reached you in the dark. Return to the lane with your seals intact." },
+  caught: { title: "The light went out.", text: "The creature reached you in the dark. Return to the lane with your discoveries intact." },
 };

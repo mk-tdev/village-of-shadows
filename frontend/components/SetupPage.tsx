@@ -72,7 +72,8 @@ export default function SetupPage() {
     return new Set(names).size !== names.length;
   }, [seats]);
 
-  const canStart = !duplicateNames && seats.every((s) => s.display_name.trim().length > 0);
+  const episodeCompatible = options.scenario !== "missing-villager" || (humanIndices.length === 1 && options.role_pack === "standard");
+  const canStart = episodeCompatible && !duplicateNames && seats.every((s) => s.display_name.trim().length > 0);
   const starting = startPhase !== "idle";
 
   const wakeStepState: ProgressState = failedPhase === "waking"
@@ -337,6 +338,8 @@ export default function SetupPage() {
 
         <section className="world-rules-config">
           <div><span>WORLD RULES · VERSION 1</span><h2>Choose how strange this village becomes</h2></div>
+          <ThemedCheckbox checked={options.scenario === "missing-villager"} onChange={(checked) => setOptions((current) => ({ ...current, scenario: checked ? "missing-villager" : "classic", ...(checked ? { role_pack: "standard" as const } : {}) }))}><span><b>Night of the Missing Villager</b><small>Follow a scream, inspect two clues, question three witnesses, and bring your evidence to the council. One human investigator, six AI villagers, standard roles.</small></span></ThemedCheckbox>
+          {!episodeCompatible && <p role="alert" className="error-text">This episode needs one human seat and standard roles. Adjust those settings to continue.</p>}
           <ThemedCheckbox checked={options.role_pack === "expanded"} onChange={(checked) => setOptions((current) => ({ ...current, role_pack: checked ? "expanded" : "standard" }))}><span><b>Expanded roles</b><small>Add Hunter, Mayor, and Jester with server-enforced rules.</small></span></ThemedCheckbox>
           <ThemedCheckbox checked={options.village_events} onChange={(checked) => setOptions((current) => ({ ...current, village_events: checked }))}><span><b>Dynamic village events</b><small>Deterministic silence, sealed ballots, forced testimony, and discovered evidence.</small></span></ThemedCheckbox>
           <ThemedCheckbox checked={options.cross_game_memory} onChange={(checked) => setOptions((current) => ({ ...current, cross_game_memory: checked }))}><span><b>Cross-game relationships</b><small>Opt in to inspectable memories from previous games. Roles are never carried forward.</small></span></ThemedCheckbox>

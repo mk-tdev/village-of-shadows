@@ -95,6 +95,9 @@ def build_agent_view(state: GameState, seat_id: str) -> dict:
         "public_transcript": [e.model_dump() for e in public_log],
     }
 
+    from app.game.missing_villager import case_memory
+    view["case_memory"] = case_memory(state, seat_id)
+
     if player.role == "werewolf":
         teammate = next(
             (p for p in state.players if p.role == "werewolf" and p.seat_id != seat_id),

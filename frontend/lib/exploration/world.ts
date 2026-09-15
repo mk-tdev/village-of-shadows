@@ -5,10 +5,11 @@ export type Landmark = Point & { id: string; name: string; seal: string; text: s
 
 export const SPAWN: Point = { x: 0, z: 19 };
 export const COUNCIL: Point = { x: 0, z: -32 };
+export const COUNCIL_SEAT: Point = { x: 0, z: -28.2 };
 export const LANDMARKS: Landmark[] = [
-  { id: "lantern", x: -2.6, z: 13, name: "The abandoned lantern", seal: "The watcher's seal", text: "Mara's lantern is still warm. Beneath it, a note: ‘There were seven of us at sunset. I counted eight shadows. Take the seal. Follow the lights to the old well.’", hint: "Follow the lane to the old well." },
-  { id: "well", x: 2.5, z: -3, name: "The old well", seal: "The keeper's seal", text: "A rope disappears into the black water. Something below knocks three times. Carved into the stone: ‘The bell has no tongue. If you hear it, do not answer.’ A second seal rests on the rim.", hint: "The final seal waits at the chapel door." },
-  { id: "chapel", x: -1.8, z: -24, name: "The silent chapel", seal: "The bell-ringer's seal", text: "Seven names are scratched into the door. Yours is the last. A brass seal hangs from a nail, beside a message: ‘The council is waiting. One of them already knows what you found.’", hint: "Carry the three seals to the council fire beyond the chapel." },
+  { id: "lantern", x: -2.6, z: 13, name: "The abandoned lantern", seal: "The watchman’s letter", text: "Mara's lantern is still warm. Beneath it, a note: ‘There were seven of us at sunset. I counted eight shadows. Follow the lamps north. Your chair is waiting beyond the chapel.’", hint: "Follow the lane to the old well." },
+  { id: "well", x: 2.5, z: -3, name: "The old well", seal: "The well keeper’s key", text: "A rope disappears into the black water. Something below knocks three times. Carved into the stone: ‘The bell has no tongue. If you hear it, do not answer.’ A rusted iron key rests on the wet stone rim.", hint: "The council fire burns beyond the chapel. Keep heading north." },
+  { id: "chapel", x: -1.8, z: -24, name: "The silent chapel", seal: "The bell-ringer’s medallion", text: "Seven names are scratched into the door. Yours is the last. A tarnished brass medallion hangs from a nail, beside a message: ‘The council is waiting. One of them already knows what you found.’", hint: "Find the empty wooden chair beside the council fire and take your seat." },
 ];
 
 export const COTTAGES = [
@@ -42,8 +43,8 @@ export function nearbyLandmark(p: Point, found: readonly string[]): Landmark | u
   return LANDMARKS.find(l => !found.includes(l.id) && Math.hypot(l.x - p.x, l.z - p.z) < 3.3);
 }
 
-export function atCouncil(p: Point, found: readonly string[]): boolean {
-  return LANDMARKS.every(l => found.includes(l.id)) && Math.hypot(p.x - COUNCIL.x, p.z - COUNCIL.z) < 3.5;
+export function atCouncil(p: Point): boolean {
+  return Math.hypot(p.x - COUNCIL_SEAT.x, p.z - COUNCIL_SEAT.z) < 1.8;
 }
 
 export function restoreSeals(raw: string | null): string[] {

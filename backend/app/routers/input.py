@@ -84,9 +84,17 @@ async def submit_input(session_id: str, body: InputRequest, request: Request = N
     if awaiting.seat_id != body.seat_id or awaiting.kind != body.kind:
         raise HTTPException(409, f"Expected input from seat {awaiting.seat_id} of kind {awaiting.kind}.")
 
+    if awaiting.kind == "investigation":
+        if body.value.get("turn_id") != awaiting.turn_id:
+            raise HTTPException(409, "This investigation step has already changed. Refresh and try again.")
+        if body.value.get("action") not in awaiting.options:
+            raise HTTPException(422, "That action is not available in this investigation step.")
+
     if request is not None:
         await persistence.increment_participant_actions(
             request.app.state.db_conn, session_id, body.seat_id,
         )
+    if awaiting.kind == "investigation" and orch.state.awaiting is not awaiting:
+        raise HTTPException(409, "This investigation action was already accepted.")
     orch.resume(body.value)
     return {"ok": True}

@@ -9,6 +9,7 @@ Controller = Literal["ai", "human"]
 Provider = Literal["claude", "openai", "gemini", "ollama", "ollama_cloud", "mock"]
 Phase = Literal[
     "lobby",
+    "investigation",
     "night",
     "day-discuss",
     "day-vote",
@@ -55,6 +56,7 @@ class ResiliencePolicy(BaseModel):
 
 class GameOptions(BaseModel):
     version: int = Field(default=1, ge=1, le=10)
+    scenario: Literal["classic", "missing-villager"] = "classic"
     role_pack: Literal["standard", "expanded"] = "standard"
     village_events: bool = False
     cross_game_memory: bool = False
@@ -124,11 +126,27 @@ class LogEntry(BaseModel):
 
 
 class AwaitingInput(BaseModel):
-    kind: Literal["statement", "vote", "night_action", "werewolf_negotiation", "hunter_action"]
+    kind: Literal["statement", "vote", "night_action", "werewolf_negotiation", "hunter_action", "investigation"]
     seat_id: str
     prompt: str
     options: list[str] = Field(default_factory=list)
     turn_id: str | None = None
+    investigation: dict | None = None
+
+
+class MissingVillagerCase(BaseModel):
+    """Canonical case and progress, saved atomically in graph checkpoints."""
+
+    investigator: str
+    culprit: str
+    framed: str
+    witness: str
+    stage: Literal["arrival", "house", "interviews", "complete"] = "arrival"
+    discovered: list[str] = Field(default_factory=list)
+    interviews: dict[str, str] = Field(default_factory=dict)
+    presented: list[str] = Field(default_factory=list)
+    revision: int = 0
+    consequence: str | None = None
 
 
 class GameState(BaseModel):
@@ -142,6 +160,8 @@ class GameState(BaseModel):
     seer_knowledge: dict[str, dict[str, str]] = Field(default_factory=dict)
     winner: Literal["villagers", "werewolves", "jester"] | None = None
     options: GameOptions = Field(default_factory=GameOptions)
+
+    missing_villager: MissingVillagerCase | None = None
 
     # Orchestration bookkeeping for interrupt-safe graph looping (never leaked
     # to any AgentView — see game/nodes.py for why each of these must only be

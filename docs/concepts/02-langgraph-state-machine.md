@@ -54,7 +54,7 @@ builder.add_conditional_edges(
 )
 ```
 ([graph.py:26-32](../../backend/app/game/graph.py#L26-L32),
-[graph.py:73-79](../../backend/app/game/graph.py#L73-L79))
+[graph.py:73-84](../../backend/app/game/graph.py#L73-L84))
 
 Each time `werewolf_negotiation` finishes, LangGraph calls
 `_route_werewolf_negotiation` on the *returned* state to decide where to go
@@ -81,7 +81,7 @@ def build_graph(checkpointer):
     ...
     return builder.compile(checkpointer=checkpointer)
 ```
-([graph.py:20-80](../../backend/app/game/graph.py#L20-L80))
+([graph.py:20-85](../../backend/app/game/graph.py#L20-L85))
 
 `StateGraph` is generic over a state shape — here, a `TypedDict` with a
 single key `"game"` holding the entire `GameState`. Every node is an

@@ -151,7 +151,7 @@ seat's *own* statements and votes, since those are already in its conversation
 as its own tool calls.
 
 The read cursor lives in `GameState`
-([models.py:103](../../backend/app/models.py#L103)) rather than in the mind,
+([models.py:105](../../backend/app/models.py#L105)) rather than in the mind,
 specifically so it's checkpointed and rolled back with the rest of the game —
 see the pitfall below for why that matters.
 
@@ -202,7 +202,7 @@ if orch.seat_mind is not None:
         if player.controller == "ai":
             await remember(orch, player.seat_id, text)
 ```
-([nodes.py:748-751](../../backend/app/game/nodes.py#L748-L751))
+([nodes.py:761-764](../../backend/app/game/nodes.py#L761-L764))
 
 `remember` appends straight into a seat's conversation with `aupdate_state` and
 **no model invocation**

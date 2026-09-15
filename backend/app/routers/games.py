@@ -63,6 +63,10 @@ async def create_game(body: list[AgentConfig] | GameCreateRequest, request: Requ
     humans = [c for c in configs if c.controller == "human"]
     if not humans:
         raise HTTPException(400, "At least one seat must have controller='human'.")
+    if options.scenario == "missing-villager" and (
+        len(humans) != 1 or len(configs) != 7 or options.role_pack != "standard"
+    ):
+        raise HTTPException(400, "Night of the Missing Villager needs one human, six AI seats, and standard roles.")
     names = [c.display_name for c in configs]
     if len(names) != len(set(names)):
         raise HTTPException(400, "Seat names must be unique.")
@@ -464,6 +468,10 @@ async def replace_room_seat_with_ai(
         player = orch.state.find_seat(seat_id)
     except (KeyError, ValueError):
         raise HTTPException(404, "No such game or seat.") from None
+    if orch.state.options.scenario == "missing-villager" and (
+        orch.state.missing_villager is None or orch.state.missing_villager.stage != "complete"
+    ):
+        raise HTTPException(409, "The investigator must remain human until the first council.")
     if player.controller != "human":
         raise HTTPException(409, "That seat is not human-controlled.")
     if not await access.release_human_seat_to_ai(request.app.state.db_conn, session_id, seat_id):

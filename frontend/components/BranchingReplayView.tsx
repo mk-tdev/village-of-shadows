@@ -39,6 +39,10 @@ export function BranchingReplayView({ sessionId, access }: { sessionId: string; 
   const launch = async () => {
     if (!point) return;
     const replacement: Record<string, unknown> = {};
+    if (point.kind === "investigation") {
+      replacement.action = target || point.options[0];
+      replacement.turn_id = point.turn_id;
+    }
     if (needsText) replacement.text = text.trim() || "I reconsider the evidence and choose a different course.";
     if (point.kind !== "statement") replacement.target = target || point.options[0];
     if (point.kind !== "statement" && point.kind !== "werewolf_negotiation") {
@@ -93,7 +97,7 @@ export function BranchingReplayView({ sessionId, access }: { sessionId: string; 
                 <label>Replacement words<textarea value={text} maxLength={320} onChange={(event) => setText(event.target.value)} /></label>
               ) : null}
               {point.kind !== "statement" ? (
-                <label>Replacement target<Select value={target || point.options[0] || ""} onChange={setTarget} ariaLabel="Replacement target" options={point.options.map((option) => ({ value: option, label: option }))} /></label>
+                <label>Replacement target<Select value={target || point.options[0] || ""} onChange={setTarget} ariaLabel="Replacement target" options={point.options.map((option) => ({ value: option, label: point.investigation?.choices.find((choice) => choice.id === option)?.label ?? option, sublabel: point.investigation?.choices.find((choice) => choice.id === option)?.detail }))} /></label>
               ) : null}
             </div>
           ) : null}

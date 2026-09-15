@@ -1,0 +1,31 @@
+{
+  "source": "https://polyhaven.com/a/boulder_01",
+  "license": "CC0",
+  "manifest": {
+    "include": {
+      "textures/boulder_01_arm_1k.jpg": {
+        "size": 659386,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_arm_1k.jpg",
+        "md5": "d632159982cc3121ed3d69b89a122146"
+      },
+      "textures/boulder_01_diff_1k.jpg": {
+        "size": 987467,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_diff_1k.jpg",
+        "md5": "25f8a843f13369d56d37f49db05ea8c3"
+      },
+      "boulder_01.bin": {
+        "size": 2938808,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/boulder_01/boulder_01.bin",
+        "md5": "27a19fa031d8b4c3a09261f19c444dc5"
+      },
+      "textures/boulder_01_nor_gl_1k.jpg": {
+        "size": 1183552,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_nor_gl_1k.jpg",
+        "md5": "0c4da644d901144b53e4fe2446f3c389"
+      }
+    },
+    "size": 2773,
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/boulder_01/boulder_01_1k.gltf",
+    "md5": "26e2eef4a1f68c9557c65cd375b21d6c"
+  }
+}

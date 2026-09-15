@@ -11,12 +11,14 @@ from app.game.graph import build_graph
 from app.game.seat_mind import build_seat_mind
 from app.mcp_server.server import mcp
 from app.routers import games, graph, guide, input, relationships, replays, stream, tournaments, voice
+from app.routers import forest
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     conn = await DatabaseConnection.connect(settings.database_url)
     await init_schema(conn)
+    await forest.initialize()
 
     async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
         await checkpointer.setup()
@@ -50,6 +52,7 @@ app.include_router(tournaments.router)
 app.include_router(relationships.router)
 app.include_router(replays.router)
 app.include_router(voice.router)
+app.include_router(forest.router)
 app.mount("/mcp", mcp.streamable_http_app())
 
 

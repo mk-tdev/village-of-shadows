@@ -1,0 +1,31 @@
+{
+  "source": "https://polyhaven.com/a/gothic_statue",
+  "license": "CC0",
+  "manifest": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/gothic_statue/gothic_statue_1k.gltf",
+    "md5": "4fb49ae8f4278a0f5f1c7ca89a416f69",
+    "size": 2900,
+    "include": {
+      "textures/gothic_statue_nor_gl_1k.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/gothic_statue/gothic_statue_nor_gl_1k.jpg",
+        "md5": "ecba6e86dc6dd8195710765f4889c895",
+        "size": 1064867
+      },
+      "textures/gothic_statue_diff_1k.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/gothic_statue/gothic_statue_diff_1k.jpg",
+        "md5": "a8110eba7602d4d3ff00b05abf25397e",
+        "size": 1037433
+      },
+      "textures/gothic_statue_arm_1k.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/gothic_statue/gothic_statue_arm_1k.jpg",
+        "md5": "0403abefbd62dfc03eb6b237d6d82119",
+        "size": 960949
+      },
+      "gothic_statue.bin": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/gothic_statue/gothic_statue.bin",
+        "md5": "64ff6a07591c56042e01c780dce7685b",
+        "size": 912484
+      }
+    }
+  }
+}

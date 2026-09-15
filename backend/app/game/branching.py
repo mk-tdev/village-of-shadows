@@ -41,12 +41,16 @@ async def branch_points(graph: Any, session_id: str) -> list[dict]:
             "kind": payload["kind"],
             "prompt": payload.get("prompt", ""),
             "options": payload.get("options", []),
+            "turn_id": payload.get("turn_id"),
+            "investigation": payload.get("investigation"),
         })
     points.sort(key=lambda point: (point["log_count"], point["created_at"]))
     return points
 
 
 def _predecessor(game: GameState, awaiting: AwaitingInput) -> str:
+    if awaiting.kind == "investigation":
+        return "open_case"
     if awaiting.kind == "werewolf_negotiation":
         return "start_night" if game.wolf_index == 0 else "werewolf_negotiation"
     if awaiting.kind == "statement":
@@ -116,6 +120,11 @@ async def create_branch(
         raise ValueError("The selected checkpoint is not a playable human decision.")
 
     awaiting = AwaitingInput(**payload)
+    if awaiting.kind == "investigation" and (
+        replacement.get("action") not in awaiting.options
+        or replacement.get("turn_id") != awaiting.turn_id
+    ):
+        raise ValueError("Choose a valid action from the selected investigation checkpoint.")
     child_id = str(uuid.uuid4())
     child_state = source.model_copy(deep=True)
     child_state.session_id = child_id

@@ -4627,3 +4627,11 @@ input:focus {
   .landing-primary-action,
   .landing-experience-grid > article { transition: none; }
 }
+
+/* The case takes the stage until the investigator returns to council. */
+.board.board-investigation { display: block; max-width: 850px; margin-inline: auto; }
+.board-investigation > .players { display: none; }
+.council-3d-shell[hidden] { display: none; }
+
+.debug-panel-body > div { min-width: 0; }
+.graph-section-heading { flex-wrap: wrap; }

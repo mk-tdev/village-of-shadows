@@ -149,6 +149,9 @@ def _briefing(game: GameState, seat, instruction: str) -> str:
         known = ", ".join(f"{name} is a {role}" for name, role in view["known_roles"].items())
         lines.append(f"You have secretly confirmed: {known}.")
     lines.append("")
+    if view.get("case_memory"):
+        lines.append("Your private case memory (testimony can be disputed; physical facts cannot be rewritten):")
+        lines.extend(view["case_memory"])
     lines.append(instruction)
     return "\n".join(lines)
 
@@ -228,6 +231,11 @@ async def assign_roles(state: dict, config: RunnableConfig) -> dict:
     roles = roles[: len(game.players)]
     if game.role_deck is None:
         random.shuffle(roles)
+    if game.options.scenario == "missing-villager":
+        # The investigator must be human and innocent; the other roles remain shuffled.
+        human_index = next(i for i, p in enumerate(game.players) if p.controller == "human")
+        villager_index = roles.index("villager")
+        roles[human_index], roles[villager_index] = roles[villager_index], roles[human_index]
     for player, role in zip(game.players, roles):
         player.role = role
         await persistence.set_seat_role(orch.conn, orch.session_id, player.seat_id, role)
@@ -489,7 +497,12 @@ async def resolve_night(state: dict, config: RunnableConfig) -> dict:
         top = max(tally.values())
         victim_name = random.choice([n for n, c in tally.items() if c == top])
 
-    if victim_name and victim_name == game.night_saved:
+    case = game.missing_villager
+    warned = bool(case and case.consequence == "rescued" and game.round == 2
+                  and victim_name == game.find_seat(case.investigator).name)
+    if warned:
+        await _log_system(orch, "The bellkeeper rings his warning bell. The investigator escapes through the back door; the wolf's attack fails. His one-night watch is over.")
+    elif victim_name and victim_name == game.night_saved:
         await _log_system(
             orch, f"Someone crept toward {victim_name} in the dark — but they were protected. No one died last night."
         )

@@ -26,7 +26,7 @@ if wolf.controller == "human":
     })
     await actions.negotiate_message(orch, wolf.seat_id, answer["text"], answer["target"])
 ```
-([nodes.py:349-361](../../backend/app/game/nodes.py#L349-L361))
+([nodes.py:357-369](../../backend/app/game/nodes.py#L357-L369))
 
 `interrupt(payload)` does something that looks like a blocking call but
 isn't: it raises a special LangGraph exception that unwinds execution all
@@ -83,7 +83,7 @@ async def submit_input(session_id: str, body: InputRequest) -> dict:
     orch.resume(body.value)
     return {"ok": True}
 ```
-([input.py:61-92](../../backend/app/routers/input.py#L61-L92))
+([input.py:61-98](../../backend/app/routers/input.py#L61-L98))
 
 When the human submits an answer via `POST /games/{id}/input`, the route
 calls `orch.resume(body.value)`, which starts a **new** `graph.astream(...)`

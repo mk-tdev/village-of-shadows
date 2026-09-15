@@ -36,6 +36,7 @@ export function GameView({
   initialAccess: GameAccessCredentials | null;
 }) {
   const router = useRouter();
+  const [inputError, setInputError] = useState<string | null>(null);
   const [access] = useState<GameAccessCredentials | null>(() => {
     if (initialAccess) return initialAccess;
     if (typeof window === "undefined") return null;
@@ -51,7 +52,7 @@ export function GameView({
   } =
     useGameStream(sessionId, access ?? undefined);
   const canGodView = Boolean(access?.hostToken);
-  const [godView, setGodView] = useState(canGodView);
+  const [godView, setGodView] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [confirmingStop, setConfirmingStop] = useState(false);
@@ -168,6 +169,7 @@ export function GameView({
   const handleSubmit = async (value: Record<string, unknown>) => {
     if (!game.awaiting) return false;
     setSubmitting(true);
+    setInputError(null);
     try {
       await submitInput(sessionId, {
         seat_id: game.awaiting.seat_id,
@@ -176,7 +178,7 @@ export function GameView({
       }, access ?? undefined);
       return true;
     } catch (err) {
-      console.error(err);
+      setInputError(err instanceof Error ? err.message : "Your action could not be sent. Please try again.");
       return false;
     } finally {
       setSubmitting(false);
@@ -231,7 +233,7 @@ export function GameView({
             {/* "Night" would be a lie before the graph has run anything --
                 assign_roles hasn't dealt roles and start_night hasn't set the
                 phase yet. */}
-            <span>{game.phase === "lobby" ? "Not started" : isNight ? "Night" : "Day"}</span>
+            <span>{game.phase === "lobby" ? "Not started" : game.phase === "investigation" ? "Investigation" : isNight ? "Night" : "Day"}</span>
           </div>
           <div className="badge">
             <EyeIcon />
@@ -285,7 +287,7 @@ export function GameView({
         onSpeaking={setSpeakingSeatId}
       />
 
-      <section ref={councilRef} className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
+      <section hidden={game.phase === "investigation"} ref={councilRef} className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
         <div className="council-3d-caption">
           <div>
             <span>THE JUNGLE COUNCIL · LIVE</span>
@@ -370,7 +372,7 @@ export function GameView({
         }}
       /> : null}
 
-      <div className="board">
+      <div className={`board${game.phase === "investigation" ? " board-investigation" : ""}`}>
         <div className="players">
           {game.players.map((p) => (
             <PlayerCard
@@ -388,13 +390,14 @@ export function GameView({
             than the modal this replaced. Collapse it until there's something
             to show. */}
         <div className={`feed-wrap${game.phase === "lobby" ? " feed-wrap-lobby" : ""}`}>
-          <Feed
+          {game.phase !== "investigation" && <Feed
             entries={game.log}
             godView={godView}
             canSeeWerewolfCouncil={humanCanSeeWerewolfCouncil}
             active={activeAiTurn}
-          />
+          />}
           <div className="controls">
+            {inputError && <p role="alert" className="error-text">{inputError}</p>}
             {/* Start lives here rather than in a modal overlay. A centred
                 dialog covers the board, so pressing Start meant looking at a
                 dialog at the exact moment the first turns resolved -- and with

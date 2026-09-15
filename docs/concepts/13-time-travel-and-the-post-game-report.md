@@ -132,7 +132,7 @@ picking one and hoping.
 ## Where it surfaces
 
 `GET /games/{id}/timeline`
-([games.py:84-98](../../backend/app/routers/games.py#L84-L98)) builds the report
+([games.py:88-102](../../backend/app/routers/games.py#L88-L102)) builds the report
 on demand. Two properties fall out of reading the checkpointer rather than a
 bespoke table:
 

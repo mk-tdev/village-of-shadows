@@ -38,6 +38,7 @@ export interface AgentBehavior {
 }
 
 export interface GameOptions {
+  scenario?: "classic" | "missing-villager";
   version: number;
   role_pack: "standard" | "expanded";
   village_events: boolean;
@@ -116,11 +117,18 @@ export interface LogEntry {
 }
 
 export interface AwaitingInput {
-  kind: "statement" | "vote" | "night_action" | "werewolf_negotiation" | "hunter_action";
+  kind: "statement" | "vote" | "night_action" | "werewolf_negotiation" | "hunter_action" | "investigation";
   seat_id: string;
   prompt: string;
   options: string[];
   turn_id?: string | null;
+  investigation?: {
+    stage: "arrival" | "house" | "interviews" | "complete";
+    clues: { id: string; title: string; location: string; text: string }[];
+    interviews: { name: string; question: string; text: string }[];
+    choices: { id: string; label: string; detail: string }[];
+    questioned: number;
+  } | null;
 }
 
 export interface InputAcceptedEvent {
@@ -420,6 +428,8 @@ export interface DeceptionReport {
 }
 
 export interface BranchPoint {
+  turn_id?: string | null;
+  investigation?: AwaitingInput["investigation"];
   checkpoint_id: string;
   created_at: string;
   round: number;

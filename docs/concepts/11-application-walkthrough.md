@@ -29,7 +29,7 @@ registry.register(orch)
 # docstring.
 return {"session_id": session_id}
 ```
-([routers/games.py:72-118](../../backend/app/routers/games.py#L72-L118))
+([routers/games.py:76-122](../../backend/app/routers/games.py#L76-L122))
 
 The orchestrator exists and is registered — `GET /state` and `GET /stream`
 both work against it immediately — but its background task never gets
@@ -76,7 +76,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:153-170](../../backend/app/routers/games.py#L153-L170))
+([routers/games.py:157-174](../../backend/app/routers/games.py#L157-L174))
 
 *Now* `orch.start()` calls `asyncio.create_task(self._run({"game":
 self.state}))` — but this time, the browser's SSE connection has already
@@ -113,7 +113,7 @@ await run_seat_turn(
     fallback={"pool": pool, "text": "I favor this target..."},
 )
 ```
-([nodes.py:321-374](../../backend/app/game/nodes.py#L321-L374))
+([nodes.py:329-382](../../backend/app/game/nodes.py#L329-L382))
 
 This used to be a call to `run_agent_turn`, which built a fresh two-message
 conversation and threw it away when the turn ended. It now goes through this
@@ -183,7 +183,7 @@ itself is otherwise unchanged: same tool-calling mechanism, same
 `MAX_TOOL_ITERATIONS` ceiling, same MCP round-trips.
 
 The leading system message is `_persona(wolf, game)`
-([nodes.py:550-567](../../backend/app/game/nodes.py#L550-L567)) — this seat's
+([nodes.py:563-580](../../backend/app/game/nodes.py#L563-L580)) — this seat's
 personality, its secret role, and (only because it's a werewolf) its
 teammate's name. It sits at the head of `history` from the seat's first turn
 onward rather than being rebuilt here. Everything *else* the wolf was told
@@ -328,3 +328,17 @@ event reaches a browser). That's not an accident of how this was built; it's
 the direct consequence of the design principles in docs 03–09 — validate
 identity at the connection, validate rules at one function, and treat every
 state change as an event to broadcast, not a value to poll for.
+
+## Arriving from the first-person village
+
+The `/explore` route now ends at a physical empty chair beside the council fire.
+The three keepsakes are optional journal discoveries, not admission tokens.
+Sitting lowers and turns the local camera toward the fire, completing the intro,
+then opens `/setup`. Players always choose the council roster, controllers, and
+AI models through the existing setup flow before creating or starting a game.
+The prologue does not create a session or call `beginGame`, and the game route
+has no arrival-triggered automatic start. Local discoveries never grant a role,
+change votes, or bypass server rules.
+
+See [ExplorationExperience.tsx](../../frontend/components/exploration/ExplorationExperience.tsx)
+and [SetupPage.tsx](../../frontend/components/SetupPage.tsx).

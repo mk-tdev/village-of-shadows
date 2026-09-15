@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SPAWN, COUNCIL, COTTAGES, LANDMARKS, canWalk, movePlayer, nearbyLandmark, atCouncil, restoreSeals } from "../lib/exploration/world.ts";
+import { SPAWN, COUNCIL, COUNCIL_SEAT, COTTAGES, LANDMARKS, canWalk, movePlayer, nearbyLandmark, atCouncil, restoreSeals } from "../lib/exploration/world.ts";
 import { advanceEncounter, canStartEncounter, newEncounter } from "../lib/exploration/encounter.ts";
 
 const encounterInput = { playing: true, trigger: false, warding: false, distance: 5, escaped: false };
@@ -9,11 +9,11 @@ const tick = (state, seconds, overrides = {}) => {
   return state;
 };
 
-test("the transformation starts only when a player with a seal is near and looking at the watchman", () => {
-  assert.equal(canStartEncounter({ x: 0, z: 3 }, 0, ["lantern"]), true);
-  assert.equal(canStartEncounter({ x: 0, z: 3 }, Math.PI, ["lantern"]), false);
-  assert.equal(canStartEncounter({ x: 0, z: 3 }, 0, []), false);
-  assert.equal(canStartEncounter(SPAWN, 0, ["lantern"]), false);
+test("the transformation starts only when a player is near and looking at the watchman", () => {
+  assert.equal(canStartEncounter({ x: 0, z: 3 }, 0), true);
+  assert.equal(canStartEncounter({ x: 0, z: 3 }, Math.PI), false);
+  assert.equal(canStartEncounter({ x: 0, z: -6 }, 0), false);
+  assert.equal(canStartEncounter(SPAWN, 0), false);
 });
 
 test("the scene runs transformation, pounce, feeding, and hunt in order", () => {
@@ -52,10 +52,10 @@ test("the entire main lane connects spawn, every seal, and the council", () => {
     const nearby = nearbyLandmark(point, found);
     if (nearby) found.push(nearby.id);
     point = movePlayer(point, 0, -.1);
-    if (atCouncil(point, found)) break;
+    if (atCouncil(point)) break;
   }
   assert.deepEqual(found, LANDMARKS.map(l => l.id));
-  assert.ok(atCouncil(point, found));
+  assert.ok(atCouncil(point));
 });
 
 test("large movement cannot tunnel through cottages, the well, or world bounds", () => {
@@ -87,16 +87,25 @@ test("characters have clearance without sealing off the lane", () => {
   assert.ok(route.z < -11.9);
 });
 
-test("seals require proximity, cannot be collected twice, and all gate the ending", () => {
+test("keepsakes require proximity and cannot be collected twice; the empty chair is the goal", () => {
   assert.equal(nearbyLandmark(SPAWN, []), undefined);
   assert.equal(nearbyLandmark({ x: 0, z: 13 }, [])?.id, "lantern");
   assert.equal(nearbyLandmark({ x: 0, z: 13 }, ["lantern"]), undefined);
-  assert.equal(atCouncil(COUNCIL, ["lantern", "well"]), false);
-  assert.equal(atCouncil(SPAWN, LANDMARKS.map(l => l.id)), false);
-  assert.equal(atCouncil(COUNCIL, LANDMARKS.map(l => l.id)), true);
+  assert.equal(atCouncil(COUNCIL), false);
+  assert.equal(atCouncil(SPAWN), false);
+  assert.equal(atCouncil(COUNCIL_SEAT), true);
+  assert.equal(atCouncil({x: 0, z: -26.8}), true);
 });
 
 test("saved journal rejects malformed data, unknown IDs, and duplicates", () => {
   for (const raw of [null, "not json", "{}", "true", "1"]) assert.deepEqual(restoreSeals(raw), []);
   assert.deepEqual(restoreSeals('["chapel","unknown","lantern","lantern",123]'), ["lantern", "chapel"]);
+});
+
+
+test("the council seat can be reached without picking up any keepsakes", () => {
+  let point = {...SPAWN};
+  for(let i=0;i<550 && !atCouncil(point);i++) point=movePlayer(point,0,-.1);
+  assert.ok(atCouncil(point));
+  assert.ok(canWalk(COUNCIL_SEAT));
 });

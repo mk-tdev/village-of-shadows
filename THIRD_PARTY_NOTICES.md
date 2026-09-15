@@ -58,3 +58,11 @@ removed through the host-authorized game-data deletion endpoint.
 References to LangGraph, LangChain, MCP, OpenAI, Anthropic, Google, Ollama,
 Next.js, React, Three.js, FastAPI, Vercel, Render, or their marks indicate
 technical interoperability only. No endorsement or sponsorship is implied.
+
+## Watchman human head scan
+
+“INFINITE, 3D Head Scan” by Lee Perry-Smith, based on work at Triplegangers.
+License: Creative Commons Attribution 3.0 Unported.
+Source: https://github.com/mrdoob/three.js/tree/r185/examples/models/gltf/LeePerrySmith
+Files: `frontend/public/exploration/watchman/head.glb`, `skin.jpg`, `normal.jpg`.
+The runtime trims the scanned shoulders, scales the face, adjusts material tint, and fits it into the game's authored coat. Original license is included beside the assets.

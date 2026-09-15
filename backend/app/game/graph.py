@@ -14,7 +14,7 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from app.game import nodes
+from app.game import nodes, missing_villager
 from app.game.rules import werewolf_turn_limit
 from app.models import GameState
 
@@ -72,7 +72,12 @@ def build_graph(checkpointer):
     builder.add_node("check_win_vote", nodes.check_win)
 
     builder.add_edge(START, "assign_roles")
-    builder.add_edge("assign_roles", "start_night")
+    builder.add_node("open_case", missing_villager.open_case)
+    builder.add_node("investigate", missing_villager.investigate)
+    builder.add_node("case_consequence", missing_villager.consequence)
+    builder.add_conditional_edges("assign_roles", lambda s: "open_case" if s["game"].options.scenario == "missing-villager" else "start_night", ["open_case", "start_night"])
+    builder.add_edge("open_case", "investigate")
+    builder.add_conditional_edges("investigate", lambda s: "start_day" if s["game"].missing_villager.stage == "complete" else "investigate", ["start_day", "investigate"])
     builder.add_edge("start_night", "werewolf_negotiation")
     builder.add_conditional_edges(
         "werewolf_negotiation",
@@ -90,7 +95,8 @@ def build_graph(checkpointer):
     builder.add_conditional_edges("day_discussion", _route_day_discussion, ["day_discussion", "start_vote"])
     builder.add_edge("start_vote", "voting")
     builder.add_conditional_edges("voting", _route_voting, ["voting", "resolve_vote"])
-    builder.add_edge("resolve_vote", "hunter_retaliation_vote")
+    builder.add_edge("resolve_vote", "case_consequence")
+    builder.add_edge("case_consequence", "hunter_retaliation_vote")
     builder.add_edge("hunter_retaliation_vote", "check_win_vote")
     builder.add_conditional_edges("check_win_vote", _route_after_vote_check, [END, "start_night"])
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MissingVillagerInvestigation } from "@/components/MissingVillagerInvestigation";
 import type { AwaitingInput } from "@/lib/types";
 
 export function Controls({
@@ -42,6 +43,10 @@ export function Controls({
 
   if (!awaiting) {
     return <div className="controls-hint">The village is deciding what happens next...</div>;
+  }
+
+  if (awaiting.kind === "investigation" && awaiting.investigation) {
+    return <MissingVillagerInvestigation key={awaiting.turn_id} awaiting={awaiting} submitting={submitting} onSubmit={onSubmit} />;
   }
 
   if (awaiting.kind === "statement") {

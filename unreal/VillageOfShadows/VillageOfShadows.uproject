@@ -1,0 +1,8 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "Games",
+  "Description": "Village of Shadows — human and AI council",
+  "Modules": [{"Name": "VillageOfShadows", "Type": "Runtime", "LoadingPhase": "Default"}],
+  "Plugins": [{"Name": "TextToSpeech", "Enabled": true}, {"Name": "AudioCapture", "Enabled": true}]
+}

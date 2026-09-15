@@ -41,3 +41,26 @@ stereo direction, and routes through a compressor. Files are served locally.
 
 The council fire uses procedural shader flames, coals/logs, ember particles,
 and a synthesized crackle loop. No external flame media is used.
+
+## Walk into Shadows update — 2026-09-15
+
+The three optional keepsakes are supported physical objects: a wax-sealed letter
+on a crate, a rusted key on the well rim, and a stamped brass medallion hanging
+against wood. `props.ts` authors their geometry and patina locally. There are no
+spinning, emissive pickup rings. The main objective is the empty council chair.
+
+The pre-transformation watchman and witness use **INFINITE, 3D Head Scan** by
+**Lee Perry-Smith**, based on Triplegangers work, under **CC BY 3.0**. The source
+is pinned to the Three.js r185 example archive:
+https://github.com/mrdoob/three.js/tree/r185/examples/models/gltf/LeePerrySmith
+
+`watchman/LICENSE.txt` preserves the original attribution/license. The runtime
+trims the scanned shoulders, scales/tints the head, and fits it into locally
+authored clothing. The approximately 0.7 MB asset set includes the original
+head GLB, color texture and normal map. The finished wolf asset is unchanged.
+
+`audio.ts` adds an original synthesized horror score: detuned bowed drones,
+sub-bass, slow pitch drift and a low heartbeat pulse. It swells during the
+encounter and recedes near the council fire, alongside spatial creature
+recordings, wind and fire. It begins only on a gesture; sound-off and pause
+suspend it. This is a procedural score, not a licensed music recording.

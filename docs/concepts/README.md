@@ -109,3 +109,8 @@ all general lessons that happened to surface here.
 21. [Immutable, revocable replay exports](21-shareable-replays.md) — publish
     sanitized evidence snapshots with separate public/God authorization,
     expiration, and revocation.
+22. [The missing-villager episode](22-missing-villager-episode.md) — connect
+    authored evidence and private witness accounts to agent memory, checkpoint
+    branches, the council vote, and a bounded next-night consequence.
+23. [Native Unreal game client](23-unreal-game-client.md) — first-person forest,
+    bounded character minds, persistent dialogue, voice transport, and the earlier council client.
