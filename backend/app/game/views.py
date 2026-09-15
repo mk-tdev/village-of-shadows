@@ -46,6 +46,7 @@ def build_human_state_view(
         projected = {
             "seat_id": player.seat_id,
             "name": player.name,
+            "character_id": player.character_id,
             "personality": player.personality,
             "controller": player.controller,
             "provider": player.provider,

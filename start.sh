@@ -11,7 +11,11 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 echo "Building and starting Village of Shadows..."
-docker compose up --build --detach
+if ! docker compose up --build --detach --wait --wait-timeout 120; then
+    echo "The local stack did not become healthy. Backend logs:" >&2
+    docker compose logs --tail 60 backend
+    exit 1
+fi
 docker compose ps
 
 echo

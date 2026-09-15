@@ -139,7 +139,7 @@ async def create_branch(
             controller=player.controller,
             provider=player.provider,
             model_name=player.model_name,
-            endpoint=player.endpoint,
+            endpoint=player.endpoint, character_id=player.character_id,
             behavior=player.behavior,
             resilience=player.resilience,
         )

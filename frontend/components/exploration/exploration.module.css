@@ -7,13 +7,13 @@
 .canvas:focus-visible { outline: 1px solid var(--gold); outline-offset: -2px; }
 .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 43%, transparent 20%, rgba(3,8,9,.25) 65%, rgba(3,6,7,.77) 100%), linear-gradient(0deg, rgba(4,8,9,.78), transparent 32%, transparent 76%, rgba(4,8,9,.45)); }
 .grain { position: absolute; inset: 0; opacity: .035; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.89' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.5' d='M0 0h180v180H0z'/%3E%3C/svg%3E"); }
-.header { position: absolute; inset: 30px 38px auto; display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.header { z-index: 5; position: absolute; inset: 30px 38px auto; display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
 .brand { font-size: 13px; font-weight: 500; letter-spacing: .33em; text-transform: uppercase; text-decoration: none; color: var(--paper); text-shadow: 0 1px 8px #000; }
 .brand span { display: block; font-size: 12px; text-transform: none; letter-spacing: .18em; color: var(--muted); margin-top: 8px; }
 .topControls { display: flex; align-items: center; gap: 20px; }
 .experience button, .modal button { cursor: pointer; font: inherit; color: inherit; }
-.topControls button { background: none; border: 0; padding: 0; font-size: 14px; color: var(--paper); text-shadow: 0 1px 8px #000; }
-.topControls button + button { border-left: 1px solid var(--line); padding-left: 20px; }
+.topControls > button { background: none; border: 0; padding: 0; font-size: 14px; color: var(--paper); text-shadow: 0 1px 8px #000; }
+.topControls > button + button { border-left: 1px solid var(--line); padding-left: 20px; }
 .experience kbd, .modal kbd { font: 10px "Inter", sans-serif; color: var(--muted); border: 1px solid var(--line); padding: 3px 5px; border-radius: 2px; margin-left: 7px; }
 .compass { position: absolute; left: 50%; transform: translateX(-50%); width: 30vw; display: flex; justify-content: center; gap: 24px; align-items: center; font-size: 11px; color: var(--muted); letter-spacing: 3px; }
 .compass b { font-size: 13px; font-weight: 400; color: var(--paper); }
@@ -107,7 +107,7 @@
 @media (max-width: 600px) {
   .header { inset: 22px 20px auto; gap: 10px; }
   .brand { font-size: 10px; letter-spacing: .18em; } .brand span { font-size: 10px; }
-  .topControls { gap: 10px; } .topControls button { font-size: 11px; } .topControls button + button { padding-left: 10px; } .topControls kbd { display: none; }
+  .topControls { gap: 10px; } .topControls > button { font-size: 11px; } .topControls > button + button { padding-left: 10px; } .topControls kbd { display: none; }
   .compass { top: 62px; }
   .intro { left: 25px; width: calc(100% - 50px); transform: translateY(-47%); }
   .intro h1 { font-size: clamp(43px,11vw,62px); margin-bottom: 22px; }
@@ -128,3 +128,5 @@
   .introFooter { bottom: 15px; } .header { top: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .primary { transition: none; } }
+.languagePicker { width: 148px; flex-shrink: 0; }
+@media (max-width: 600px) { .topControls { gap: 8px; } .brand { max-width: 140px; } }

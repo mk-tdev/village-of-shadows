@@ -24,12 +24,13 @@ then gives the seat a stable OpenAI voice with an ancient-village performance
 direction. Audio is cached by game, immutable log sequence, model, and voice,
 so two human browsers do not generate or pay for the same line twice.
 
-If neural speech is not configured or fails, the browser ranks its installed
-voices for natural English speakers, avoids known novelty/compact engines, and
-uses restrained seat-specific pacing and pitch. Mute, skip, replay, engine,
-and pace controls never modify game state. Speech failure always falls back to
-the caption because persisted text—not generated audio—is authoritative. The
-interface explicitly labels neural narration as AI-generated.
+The client queues public statement IDs and highlights the exact spoken caption.
+New statements never cancel the line already playing. If neural speech is not
+configured or fails, text remains available with Retry/Skip controls; there is
+no automatic browser-voice fallback. Pause, skip, replay, and pace controls do
+not modify game state. The interface labels narration as AI-generated.
+See [bilingual teaching council](24-bilingual-teaching-council.md) for microphone
+input, English/Chinese dialogue, and the queue's cancellation guarantees.
 
 ## Continuity must not smuggle old secrets into a new world
 

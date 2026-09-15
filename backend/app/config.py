@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     # Optional lifelike council narration. The browser always retains a
     # no-cost device-voice fallback when this key/model is unavailable.
+    openai_transcribe_model: str = "gpt-4o-transcribe"
+    character_image_model: str = "gpt-image-2.5-sunburst"
     openai_tts_model: str = "gpt-4o-mini-tts"
     # The read-only player guide always uses OpenAI independently of the
     # models seated at the game table. Keep it small and inexpensive by

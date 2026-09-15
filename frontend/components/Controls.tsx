@@ -1,10 +1,14 @@
 "use client";
 
+import { MicrophoneInput } from "./MicrophoneInput";
+import { usePreferences, type Language } from "./Preferences";
+import type { GameAccessCredentials } from "@/lib/types";
 import { useState } from "react";
 import { MissingVillagerInvestigation } from "@/components/MissingVillagerInvestigation";
 import type { AwaitingInput } from "@/lib/types";
 
 export function Controls({
+  sessionId, access, language, onRecording,
   awaiting,
   paused,
   onSubmit,
@@ -12,6 +16,7 @@ export function Controls({
   submitting,
   promptKey,
 }: {
+  sessionId: string; access?: GameAccessCredentials; language: Language; onRecording: (value:boolean)=>void;
   awaiting: AwaitingInput | null;
   paused: boolean;
   onSubmit: (value: Record<string, unknown>) => Promise<boolean>;
@@ -19,6 +24,7 @@ export function Controls({
   submitting: boolean;
   promptKey: string | null;
 }) {
+  const { t } = usePreferences();
   const [text, setText] = useState("");
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   // Lock against a logical turn key, not the parsed object's identity. An SSE
@@ -30,19 +36,22 @@ export function Controls({
     ? selectedTarget
     : null;
 
+  const acceptsSpeech = awaiting?.kind === "statement" || awaiting?.kind === "werewolf_negotiation";
+  const microphone = access && acceptsSpeech ? <MicrophoneInput key={promptKey} sessionId={sessionId} access={access} language={language} disabled={submitting||locked||paused} onText={value=>setText(awaiting?.kind === "werewolf_negotiation" ? value.slice(0,320) : value)} onRecording={onRecording} /> : null;
+
   if (paused) {
     return (
       <>
         <div className="controls-hint">⏸ Game paused — the orchestrator has suspended between turns.</div>
         <button className="btn" onClick={onContinue}>
-          Continue
+          {t("Continue")}
         </button>
       </>
     );
   }
 
   if (!awaiting) {
-    return <div className="controls-hint">The village is deciding what happens next...</div>;
+    return <div className="controls-hint">{t("The village is deciding what happens next...")}</div>;
   }
 
   if (awaiting.kind === "investigation" && awaiting.investigation) {
@@ -52,11 +61,12 @@ export function Controls({
   if (awaiting.kind === "statement") {
     return (
       <>
-        <div className="controls-hint">{awaiting.prompt}</div>
+        <div className="controls-hint">{t(awaiting.prompt)}</div>
+        {microphone}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="What do you want to say to the village?"
+          placeholder={t("What do you want to say to the village?")}
           disabled={submitting || locked}
         />
         <button
@@ -69,7 +79,7 @@ export function Controls({
             else setLockedPromptKey(null);
           }}
         >
-          Speak
+          {t("Speak")}
         </button>
       </>
     );
@@ -78,12 +88,13 @@ export function Controls({
   if (awaiting.kind === "werewolf_negotiation") {
     return (
       <div className="wolf-council-control">
-        <div className="wolf-council-eyebrow">PRIVATE WEREWOLF COUNCIL</div>
-        <div className="controls-hint">{awaiting.prompt}</div>
+        <div className="wolf-council-eyebrow">{t("PRIVATE WEREWOLF COUNCIL")}</div>
+        <div className="controls-hint">{t(awaiting.prompt)}</div>
+        {microphone}
         <textarea
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder="Persuade your teammate, explain the threat, or coordinate tomorrow’s deception..."
+          placeholder={t("Persuade your teammate, explain the threat, or coordinate tomorrow’s deception...")}
           maxLength={320}
           disabled={submitting || locked}
         />
@@ -117,7 +128,7 @@ export function Controls({
               }
             }}
           >
-            Pass this council turn
+            {t("Pass this council turn")}
           </button>
           <button
             className="btn wolf-council-submit"
@@ -134,7 +145,7 @@ export function Controls({
               }
             }}
           >
-            Send private plan
+            {t("Send private plan")}
           </button>
         </div>
         <small className="wolf-council-pass-note">Passing keeps your earlier target, if any, and lets the next werewolf act.</small>
@@ -145,7 +156,7 @@ export function Controls({
   // "vote" and "night_action" both resolve to picking a name from options.
   return (
     <>
-      <div className="controls-hint">{awaiting.prompt}</div>
+      <div className="controls-hint">{t(awaiting.prompt)}</div>
       <div className="vote-grid">
         {awaiting.options.map((option) => (
           <button

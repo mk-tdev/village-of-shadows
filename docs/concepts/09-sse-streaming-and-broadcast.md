@@ -146,7 +146,7 @@ eventually reconnect and re-fetch it:
 ```python
 orch.publish("roles_assigned", {"players": [p.model_dump() for p in game.players]})
 ```
-([nodes.py:250](../../backend/app/game/nodes.py#L250))
+([nodes.py:251](../../backend/app/game/nodes.py#L251))
 
 ```typescript
 source.addEventListener("roles_assigned", (e) => {
@@ -158,7 +158,7 @@ source.addEventListener("roles_assigned", (e) => {
   setGame(next);
 });
 ```
-([useGameStream.ts:175-182](../../frontend/lib/useGameStream.ts#L175-L182))
+([useGameStream.ts:184-191](../../frontend/lib/useGameStream.ts#L184-L191))
 
 Three fields (`current_node`, `phase`/`round`, now `players`) have hit this
 exact same shape of bug for the exact same reason: `begin_game` decoupled

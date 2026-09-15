@@ -153,6 +153,7 @@ def _briefing(game: GameState, seat, instruction: str) -> str:
         lines.append("Your private case memory (testimony can be disputed; physical facts cannot be rewritten):")
         lines.extend(view["case_memory"])
     lines.append(instruction)
+    lines.append("Speak and write all player-facing dialogue in Simplified Chinese (Mandarin when spoken). Keep player names and tool identifiers unchanged." if game.options.language == "zh" else "Speak and write player-facing dialogue in English. Keep player names and tool identifiers unchanged.")
     return "\n".join(lines)
 
 
@@ -615,10 +616,11 @@ async def day_discussion(state: dict, config: RunnableConfig) -> dict:
     orch = _sync(config, game)
     alive = _discussion_order(game)
 
-    if game.day_index >= len(alive):
+    if game.day_index >= len(alive) * game.options.discussion_rounds:
         return {"game": game}
 
-    speaker = alive[game.day_index]
+    speaker = alive[game.day_index % len(alive)]
+    discussion_pass = game.day_index // len(alive) + 1
     _emit_turn(orch, speaker.seat_id, speaker.name)
 
     event = game.village_event
@@ -630,20 +632,25 @@ async def day_discussion(state: dict, config: RunnableConfig) -> dict:
         return {"game": game}
 
     if speaker.controller == "human":
-        answer = interrupt({"kind": "statement", "seat_id": speaker.seat_id, "prompt": "What do you want to say to the village?", "options": []})
+        answer = interrupt({"kind": "statement", "turn_id": _turn_stamp(game, "day-discuss", game.day_index), "seat_id": speaker.seat_id, "prompt": (f"讨论 {discussion_pass}/{game.options.discussion_rounds}：你想对村民说什么？" if game.options.language == "zh" else f"Discussion {discussion_pass}/{game.options.discussion_rounds}: What do you want to say to the village?"), "options": []})
         await actions.apply_statement(orch, speaker.seat_id, answer.get("text", "(says nothing)"))
     else:
         await run_seat_turn(
             orch, speaker, phase="day-discuss",
             briefing=_briefing(game, speaker, (
-                f"It is day {game.round}. Give a short in-character spoken statement — accuse someone, "
+                f"It is day {game.round}, discussion pass {discussion_pass}/{game.options.discussion_rounds}. "
+                "Respond to a specific claim from another villager, ask a question, or revise your suspicion using new evidence. Avoid repeating your previous speech. "
+                "Give a short in-character spoken statement — accuse someone, "
                 "defend yourself, or share a suspicion. Call `submit_statement` with what you say aloud."
             )),
             turn_stamp=_turn_stamp(game, "day-discuss", game.day_index),
             commit_tool="submit_statement",
-            fallback={"text": "stays quiet, watching the others."},
+            fallback={"text": "保持沉默，观察着其他人。" if game.options.language == "zh" else "stays quiet, watching the others."},
         )
     game.day_index += 1
+    if game.day_index % len(alive) == 0 and game.day_index < len(alive) * game.options.discussion_rounds:
+        next_pass = game.day_index // len(alive) + 1
+        await _log_system(orch, f"讨论 {next_pass}/{game.options.discussion_rounds}：回应刚才的发言，再审视你的判断。" if game.options.language == "zh" else f"Discussion {next_pass}/{game.options.discussion_rounds}: respond to what you heard and reconsider your suspicions.")
     _emit_turn(orch, None, None)
     _maybe_pause(orch, game)
     return {"game": game}

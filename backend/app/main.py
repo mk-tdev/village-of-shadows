@@ -11,7 +11,7 @@ from app.game.graph import build_graph
 from app.game.seat_mind import build_seat_mind
 from app.mcp_server.server import mcp
 from app.routers import games, graph, guide, input, relationships, replays, stream, tournaments, voice
-from app.routers import forest
+from app.routers import forest, characters
 
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ app.include_router(relationships.router)
 app.include_router(replays.router)
 app.include_router(voice.router)
 app.include_router(forest.router)
+app.include_router(characters.router)
 app.mount("/mcp", mcp.streamable_http_app())
 
 

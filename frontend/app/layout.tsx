@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PreferencesProvider } from "@/components/Preferences";
 
 export const metadata: Metadata = {
   title: "Village of Shadows",
@@ -13,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><PreferencesProvider>{children}</PreferencesProvider></body>
     </html>
   );
 }

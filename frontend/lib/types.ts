@@ -9,6 +9,7 @@ export interface AgentConfig {
   display_name: string;
   personality: string;
   controller: Controller;
+  character_id?: string | null;
   provider?: Provider | null;
   model_name?: string | null;
   endpoint?: string | null;
@@ -38,6 +39,8 @@ export interface AgentBehavior {
 }
 
 export interface GameOptions {
+  language?: "en" | "zh";
+  discussion_rounds?: number;
   scenario?: "classic" | "missing-villager";
   version: number;
   role_pack: "standard" | "expanded";
@@ -80,6 +83,7 @@ export interface Player {
   name: string;
   personality: string;
   controller: Controller;
+  character_id?: string | null;
   provider?: Provider | null;
   model_name?: string | null;
   endpoint?: string | null;
@@ -263,6 +267,7 @@ export interface TimelineSeat {
   role: string | null;
   alive: boolean;
   controller: Controller;
+  character_id?: string | null;
   provider: Provider | null;
   model_name: string | null;
   memory_messages: number;
@@ -596,6 +601,7 @@ export interface GameArchive extends GameHistoryRecord {
     seat_id: string;
     name: string;
     controller: Controller;
+  character_id?: string | null;
     provider: Provider | null;
     model_name: string | null;
     role: Role | null;

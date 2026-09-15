@@ -34,7 +34,7 @@ def _route_werewolf_negotiation(state: GraphState) -> str:
 
 def _route_day_discussion(state: GraphState) -> str:
     game = state["game"]
-    return "day_discussion" if game.day_index < len(game.alive_players()) else "start_vote"
+    return "day_discussion" if game.day_index < len(game.alive_players()) * game.options.discussion_rounds else "start_vote"
 
 
 def _route_voting(state: GraphState) -> str:

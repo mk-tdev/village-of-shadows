@@ -240,6 +240,13 @@ export async function streamGameGuide(
   }
 }
 
+export async function updateCharacter(sessionId: string, access: GameAccessCredentials, characterId: string | null) {
+  const response = await fetch(`${API_BASE}/games/${sessionId}/character${accessParams(access, false)}`, {
+    method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({character_id: characterId}),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "Could not save character.");
+}
+
 function accessParams(access?: GameAccessCredentials, includeHost = true): string {
   if (!access) return "";
   const params = new URLSearchParams({
@@ -283,10 +290,11 @@ export async function fetchState(sessionId: string, access?: GameAccessCredentia
 export async function fetchCouncilVoice(
   sessionId: string,
   seq: number,
-  access?: GameAccessCredentials
+  access?: GameAccessCredentials,
+  signal?: AbortSignal
 ): Promise<Blob> {
   const res = await fetch(`${API_BASE}/games/${sessionId}/voice/${seq}${accessParams(access)}`, {
-    method: "POST",
+    method: "POST", signal,
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
@@ -544,4 +552,10 @@ export async function fetchReplay(shareId: string, secret?: string): Promise<Res
   const res = await fetch(`${API_BASE}/replays/${shareId}${query}`, { cache: "no-store" });
   if (!res.ok) throw new Error("This replay is invalid, expired, revoked, or requires its God Mode secret.");
   return res.json();
+}
+
+export async function transcribeCouncil(sessionId: string, recording: Blob, language: "en" | "zh", access: GameAccessCredentials, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(`${API_BASE}/games/${sessionId}/transcribe${accessParams(access)}&language=${language}`, {method:"POST",headers:{"Content-Type":recording.type},body:recording,signal});
+  if(!res.ok){const detail=await res.json().catch(()=>null);throw new Error(detail?.detail??"Transcription failed");}
+  const result=await res.json();return result.text;
 }

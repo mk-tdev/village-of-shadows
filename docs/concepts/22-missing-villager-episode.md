@@ -67,7 +67,7 @@ werewolf hunt otherwise continue unchanged. Consequences are public log events
 and therefore remain visible in ordinary replay exports.
 
 [missing_villager.py:154-169](../../backend/app/game/missing_villager.py#L154-L169)
-[nodes.py:500-509](../../backend/app/game/nodes.py#L500-L509)
+[nodes.py:501-510](../../backend/app/game/nodes.py#L501-L510)
 
 ## Pitfall caught in implementation
 

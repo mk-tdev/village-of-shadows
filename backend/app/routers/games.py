@@ -74,12 +74,16 @@ async def create_game(body: list[AgentConfig] | GameCreateRequest, request: Requ
         if c.controller == "ai" and not (c.provider and c.model_name):
             raise HTTPException(400, f"Seat {c.seat_id} needs a provider and model_name.")
 
+    from app.routers.characters import require_character
+    for config in configs:
+        if config.character_id:
+            await require_character(request.app.state.db_conn, config.character_id)
     session_id = str(uuid.uuid4())
     players = [
         Player(
             seat_id=c.seat_id, name=c.display_name, personality=c.personality,
             controller=c.controller, provider=c.provider, model_name=c.model_name,
-            endpoint=c.endpoint,
+            endpoint=c.endpoint, character_id=c.character_id,
             behavior=c.behavior,
             resilience=c.resilience,
         )
@@ -167,10 +171,12 @@ async def begin_game(session_id: str, request: Request, host_token: str | None =
         orch = registry.get(session_id)
     except KeyError:
         raise HTTPException(404, "No such game.")
-    if orch.started:
-        raise HTTPException(409, "Game has already begun.")
-    await persistence.begin_game(request.app.state.db_conn, session_id)
-    orch.start()
+    from app.routers.characters import lobby_lock
+    async with lobby_lock:
+        if orch.started:
+            raise HTTPException(409, "Game has already begun.")
+        await persistence.begin_game(request.app.state.db_conn, session_id)
+        orch.start()
     return {"ok": True}
 
 

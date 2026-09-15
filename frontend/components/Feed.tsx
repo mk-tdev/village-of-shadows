@@ -6,11 +6,13 @@ import { FeedEntry } from "./FeedEntry";
 import { CharacterPortrait } from "./CharacterPortrait";
 
 export function Feed({
+  speakingSeq = null,
   entries,
   godView,
   canSeeWerewolfCouncil,
   active,
 }: {
+  speakingSeq?: number | null;
   entries: LogEntry[];
   godView: boolean;
   canSeeWerewolfCouncil: boolean;
@@ -20,18 +22,21 @@ export function Feed({
 
   useEffect(() => {
     const el = feedRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [entries.length, active]);
+    if (el) {
+      const speaking = speakingSeq === null ? null : el.querySelector<HTMLElement>(`[data-seq="${speakingSeq}"]`);
+      if(speaking) el.scrollTop = speaking.offsetTop - el.offsetTop;
+      else el.scrollTop = el.scrollHeight;
+    }
+  }, [entries.length, active, speakingSeq]);
 
   return (
     <div className="feed" ref={feedRef}>
       {entries.map((entry) => (
-        <FeedEntry
-          key={entry.seq}
+        <div key={entry.seq} data-seq={entry.seq} className={`feed-line${entry.seq === speakingSeq ? " is-speaking" : ""}`}><FeedEntry
           entry={entry}
           godView={godView}
           canSeeWerewolfCouncil={canSeeWerewolfCouncil}
-        />
+        /></div>
       ))}
       {active && (
         <div className="entry entry-thinking">

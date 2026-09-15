@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "../Select";
+import { usePreferences, type Language } from "../Preferences";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -33,6 +35,7 @@ function readSavedSeals() {
 
 export default function ExplorationExperience() {
   const router = useRouter();
+  const { language, setLanguage, t } = usePreferences();
   const launchLock = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<VillageScene | null>(null);
@@ -53,7 +56,7 @@ export default function ExplorationExperience() {
   const [snapshot, setSnapshot] = useState<SceneSnapshot>({ point: SPAWN, bearing: 0, nearby: null, council: false, moving: false, encounter: "waiting", ward: 0 });
   const playing = mode === "playing";
   const target = LANDMARKS.find(l => l.id === snapshot.nearby);
-  const objectiveHint = snapshot.point.z > -22 ? "Follow the lamps north, past the well and chapel. The council fire is your destination." : "Find the empty wooden chair on this side of the fire. Press E to finish the intro, then choose your players and models.";
+  const objectiveHint = snapshot.point.z > -22 ? t("Follow the lamps north, past the well and chapel. The council fire is your destination.") : t("Find the empty wooden chair on this side of the fire. Press E to finish the intro, then choose your players and models.");
   const bearing = DIRECTIONS[Math.round(snapshot.bearing / 45) % 8];
   const location = snapshot.point.z > 7 ? "The village threshold" : snapshot.point.z > -12 ? "The old well" : snapshot.point.z > -28 ? "The silent chapel" : "The council clearing";
 
@@ -160,11 +163,18 @@ export default function ExplorationExperience() {
     <canvas ref={canvasRef} className={styles.canvas} tabIndex={0} aria-label="Explore the village. W A S D to walk, arrow left and right to turn, E to examine, F for lantern, J for journal. Drag to look or click nearby ground to walk." />
     <div className={styles.vignette} aria-hidden="true" /><div className={styles.grain} aria-hidden="true" />
     <header className={styles.header}>
-      <Link href="/" className={styles.brand}>Village of Shadows<span>The last light</span></Link>
+      <Link href="/" className={styles.brand}>{t("Village of Shadows")}<span>{t("The last light")}</span></Link>
       {mode !== "intro" && <div className={styles.compass} aria-label={`Facing ${bearing}`}><span>· · · ─────</span><b>{bearing}</b><span>───── · · ·</span><i>◆</i></div>}
       <nav aria-label="Exploration controls" className={styles.topControls}>
-        <button onClick={toggleSound} aria-pressed={sound}>{sound ? "Sound on" : "Sound off"}</button>
-        {mode !== "intro" && <button onClick={() => setMode("paused")}>Pause <kbd>Esc</kbd></button>}
+        <Select
+          className={styles.languagePicker}
+          ariaLabel={t("Language")}
+          value={language}
+          options={[{ value: "en", label: "English" }, { value: "zh", label: "简体中文" }]}
+          onChange={value => setLanguage(value as Language)}
+        />
+        <button onClick={toggleSound} aria-pressed={sound}>{sound ? t("Sound on") : t("Sound off")}</button>
+        {mode !== "intro" && <button onClick={() => setMode("paused")}>{t("Pause")} <kbd>Esc</kbd></button>}
       </nav>
     </header>
     {failed ? <section className={styles.intro}>
@@ -172,11 +182,11 @@ export default function ExplorationExperience() {
       <button className={styles.primary} onClick={() => window.location.reload()}>Try again <span>↻</span></button><Link className={styles.textLink} href="/setup">Enter the AI council →</Link>
     </section> : mode === "intro" ? <>
       <section className={styles.intro}>
-        <h1>Someone here<br />isn’t <em>human.</em></h1>
-        <p>The lamps are still burning. The doors are all locked.<br className={styles.desktopBreak} /> And somewhere in the village, a bell is ringing.</p>
-        <p className={styles.premise}>Find the council. Take your seat.<br />Keep your lantern close. Something hunts here.</p>
-        <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? "Lighting the lanterns…" : found.length ? "Continue the night" : "Enter the village"}<span>→</span></button>
-        <Link href="/setup" className={styles.textLink}>Go straight to player setup <span>↗</span></Link>
+        <h1>{language === "zh" ? <>这里有人<br />不是<em>人类。</em></> : <>Someone here<br />isn’t <em>human.</em></>}</h1>
+        <p>{language === "zh" ? "灯还亮着，门却全锁上了。村庄的某个角落，钟声正在响起。" : <>The lamps are still burning. The doors are all locked.<br className={styles.desktopBreak} /> And somewhere in the village, a bell is ringing.</>}</p>
+        <p className={styles.premise}>{t("Find the council. Take your seat.")}<br />{t("Keep your lantern close. Something hunts here.")}</p>
+        <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? "Lighting the lanterns…" : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
+        <Link href="/setup" className={styles.textLink}>{t("Go straight to player setup")} <span>↗</span></Link>
       </section>
       <footer className={styles.introFooter}><span><LanternIcon /> A playable horror prologue</span><span>Headphones recommended <i /> Take your time. Listen carefully.</span></footer>
     </> : <>
@@ -186,14 +196,14 @@ export default function ExplorationExperience() {
         {encounter === "hunting" && <div className={styles.ward}><span>{snapshot.ward > 0 ? "Hold the light on it" : "Face the creature · keep the lantern lit"}</span><meter min="0" max="1" value={snapshot.ward} aria-label="Lantern protection" /></div>}
       </aside>}
       <aside className={styles.objective} aria-label="Current objective">
-        <span className={styles.location}>{location}</span>
-        <h1>{snapshot.council ? "Take the empty chair" : "Find the council fire"}</h1>
+        <span className={styles.location}>{t(location)}</span>
+        <h1>{snapshot.council ? t("Take the empty chair") : t("Find the council fire")}</h1>
         <div className={styles.sealProgress}><span>{found.length} / 3 optional discoveries</span><span aria-hidden="true">{LANDMARKS.map(l => <i key={l.id} className={found.includes(l.id) ? styles.collected : ""}>•</i>)}</span></div>
-        <p>{objectiveHint}</p>
-        <button className={styles.journalButton} onClick={() => setMode("journal")}>Open journal <kbd>J</kbd></button>
+        <p>{t(objectiveHint)}</p>
+        <button className={styles.journalButton} onClick={() => setMode("journal")}>{t("Open journal")} <kbd>J</kbd></button>
       </aside>
       <div className={styles.interaction}>
-        {playing && (target || snapshot.council) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? "Sit down & choose players" : `Examine ${target?.id === "lantern" ? "the lantern" : target?.id === "well" ? "the old well" : "the chapel door"}`}</button> : <span className={styles.walkHint}>W A S D to walk <i /> Drag to look <i /> Click ground to walk</span>}
+        {playing && (target || snapshot.council) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : `Examine ${target?.id === "lantern" ? "the lantern" : target?.id === "well" ? "the old well" : "the chapel door"}`}</button> : <span className={styles.walkHint}>W A S D to walk <i /> Drag to look <i /> Click ground to walk</span>}
       </div>
       <div className={styles.lanternControl}><button onClick={() => setLantern(value => !value)} aria-pressed={lantern}><LanternIcon /><span>Lantern {lantern ? "lit" : "unlit"}</span><kbd>F</kbd></button></div>
       <div className={styles.movePad} aria-label="Movement controls"><button aria-label="Walk forward" onClick={() => sceneRef.current?.step("forward")}>↑</button><button aria-label="Turn left" onClick={() => sceneRef.current?.step("left")}>↶</button><button aria-label="Walk backward" onClick={() => sceneRef.current?.step("back")}>↓</button><button aria-label="Turn right" onClick={() => sceneRef.current?.step("right")}>↷</button></div>
@@ -221,14 +231,14 @@ export default function ExplorationExperience() {
     </Modal>}
 
     {!failed && mode === "clue" && clue && <Modal title={clue.name} onClose={resume}>
-      <span className={styles.chapter}>A keepsake discovered · {found.length} of 3</span><h2>{clue.name}.</h2><p className={styles.story}>{clue.text}</p><p className={styles.clueHint}>{objectiveHint}</p><button className={styles.primary} autoFocus onClick={resume}>Keep moving <span>→</span></button>
+      <span className={styles.chapter}>A keepsake discovered · {found.length} of 3</span><h2>{clue.name}.</h2><p className={styles.story}>{clue.text}</p><p className={styles.clueHint}>{t(objectiveHint)}</p><button className={styles.primary} autoFocus onClick={resume}>Keep moving <span>→</span></button>
     </Modal>}
 
     {!failed && mode === "complete" && <Modal title="Intro complete" onClose={() => {}}>
-      <span className={styles.chapter}>You found the council</span>
-      <h2>Your story starts here.</h2>
-      <p>The intro is complete. Choose each player and their AI model before starting the council.</p>
-      <p role="status">Taking your seat and opening player setup…</p>
+      <span className={styles.chapter}>{t("You found the council")}</span>
+      <h2>{t("Your story starts here.")}</h2>
+      <p>{t("The intro is complete. Choose each player and their AI model before starting the council.")}</p>
+      <p role="status">{t("Taking your seat and opening player setup\u2026")}</p>
       <Link className={styles.primary} href="/setup">Choose players &amp; models <span>→</span></Link>
     </Modal>}
 

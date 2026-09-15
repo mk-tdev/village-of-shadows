@@ -1,10 +1,12 @@
 "use client";
+import { usePreferences } from "./Preferences";
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import Image from "next/image";
 import { type CSSProperties, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { fullCharacterForSeat, roleArtifactFor } from "@/lib/portraits";
+import { useCharacterAssets } from "./CharacterAssets";
+import { roleArtifactFor } from "@/lib/portraits";
 import type { LogType, Role } from "@/lib/types";
 
 export interface CouncilPlayer {
@@ -140,8 +142,10 @@ function CssAtmosphere() {
   );
 }
 
-function sceneStyle(index: number): SceneStyle {
-  const seat = SEAT_LAYOUT[index % SEAT_LAYOUT.length];
+function sceneStyle(index: number, custom: boolean): SceneStyle {
+  const seat = index === 0 && custom
+    ? { x: 50, bottom: 22, scale: .84, depth: 0 }
+    : SEAT_LAYOUT[index % SEAT_LAYOUT.length];
   return {
     "--seat-x": `${seat.x}%`,
     "--seat-bottom": `${seat.bottom}%`,
@@ -176,7 +180,9 @@ function VillageCharacter({
   hiddenFromSeat: boolean;
   onSelect: () => void;
 }) {
-  const character = fullCharacterForSeat(player.seatId);
+  const { t } = usePreferences();
+  const assets = useCharacterAssets();
+  const character = assets.full(player.seatId);
   if (!character) return null;
 
   return (
@@ -189,21 +195,22 @@ function VillageCharacter({
         selected ? "is-selected" : "",
         player.alive ? "" : "is-fallen",
         player.you ? "is-human" : "is-agent",
-        hiddenFromSeat ? "is-seat-hidden" : "",
+        hiddenFromSeat && !assets.custom(player.seatId) ? "is-seat-hidden" : "",
       ].filter(Boolean).join(" ")}
-      style={sceneStyle(index)}
-      aria-label={`${player.name}. ${agentStateLabel(player, active, targeted)}`}
+      style={sceneStyle(index, assets.custom(player.seatId))}
+      aria-label={`${player.name}. ${t(agentStateLabel(player, active, targeted))}`}
       aria-pressed={selected}
       onClick={onSelect}
     >
       <span className="jungle-character-name">
         <strong>{player.name}</strong>
-        <small>{agentStateLabel(player, active, targeted)}</small>
+        <small>{t(agentStateLabel(player, active, targeted))}</small>
       </span>
       <span className="jungle-character-aura" aria-hidden="true" />
       <span className="jungle-character-figure">
         <Image
           src={character}
+          unoptimized
           alt=""
           fill
           priority={index < 4}
@@ -234,6 +241,7 @@ export function CouncilTable3D({
   event: CouncilEvent | null;
   cameraMode: CouncilCameraMode;
 }) {
+  const { t, language } = usePreferences();
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
   const [webglSupported] = useState(() => {
     if (typeof document === "undefined") return false;
@@ -312,15 +320,15 @@ export function CouncilTable3D({
       <div className="council-presence-hud" aria-live="polite">
         <span>
           {cameraMode === "immersive" && human
-            ? `IN THE CLEARING · ${human.name.toUpperCase()}`
+            ? `${language === "zh" ? "议会空地" : "IN THE CLEARING"} · ${human.name.toUpperCase()}`
             : cameraMode === "cinematic"
-              ? "AGENT FOCUS"
-              : "THE WHOLE VILLAGE"}
+              ? t("AGENT FOCUS")
+              : t("THE WHOLE VILLAGE")}
         </span>
         <small>
           {focusPlayer
-            ? `${focusPlayer.name} ${focusPlayer.seatId === activeSeatId ? "is speaking" : "is in focus"}`
-            : "Six AI villagers wait for someone to break the silence"}
+            ? `${focusPlayer.name} ${focusPlayer.seatId === activeSeatId ? t("is speaking") : t("is in focus")}`
+            : t("The villagers wait for someone to break the silence")}
         </small>
       </div>
 

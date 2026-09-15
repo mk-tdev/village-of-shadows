@@ -1,4 +1,7 @@
 "use client";
+import { CharacterAssetsProvider } from "./CharacterAssets";
+import { updateCharacter } from "@/lib/api";
+import { CharacterCreator } from "./CharacterCreator";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -15,6 +18,9 @@ import { DebugPanel } from "./DebugPanel";
 import { GameSummary } from "./GameSummary";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 import type { CouncilCameraMode } from "./CouncilTable3D";
+import { DisplayPreferences, usePreferences } from "./Preferences";
+import { CouncilAmbience } from "./CouncilAmbience";
+import { ChatPictureInPicture } from "./ChatPictureInPicture";
 import { VoiceCouncil } from "./VoiceCouncil";
 import { RitualConfirmModal } from "./RitualConfirmModal";
 import { CouncilPictureInPicture } from "./CouncilPictureInPicture";
@@ -36,6 +42,11 @@ export function GameView({
   initialAccess: GameAccessCredentials | null;
 }) {
   const router = useRouter();
+  const { language, t } = usePreferences();
+  const [speakingSeq, setSpeakingSeq] = useState<number|null>(null);
+  const [recording, setRecording] = useState(false);
+  const [showChatPip, setShowChatPip] = useState(false);
+  const feedPanelRef = useRef<HTMLDivElement|null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [access] = useState<GameAccessCredentials | null>(() => {
     if (initialAccess) return initialAccess;
@@ -58,6 +69,7 @@ export function GameView({
   const [confirmingStop, setConfirmingStop] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [beginning, setBeginning] = useState(false);
+  const [characterBusy, setCharacterBusy] = useState(false);
   const [councilOpen, setCouncilOpen] = useState(true);
   const [councilCamera, setCouncilCamera] = useState<CouncilCameraMode>("immersive");
   // The game-over overlay covers the board, so reading the technical
@@ -69,6 +81,7 @@ export function GameView({
   const councilRef = useRef<HTMLElement | null>(null);
   const [showCouncilPip, setShowCouncilPip] = useState(false);
   const gamePhase = game?.phase;
+  useEffect(()=>{const panel=feedPanelRef.current;if(!panel)return;const observer=new IntersectionObserver(([entry])=>setShowChatPip(!entry.isIntersecting && entry.boundingClientRect.top<0),{threshold:0});observer.observe(panel);return()=>observer.disconnect();},[gamePhase]);
   const gameWinner = game?.winner;
   const closeStopConfirmation = useCallback(() => {
     if (!stopping) setConfirmingStop(false);
@@ -123,7 +136,7 @@ export function GameView({
 
   if (errorMessage) {
     return (
-      <div className="app">
+      <div className="app"><DisplayPreferences />
         <p className="error-text">Something went wrong: {errorMessage}</p>
       </div>
     );
@@ -131,7 +144,7 @@ export function GameView({
 
   if (!game) {
     return (
-      <div className="app">
+      <div className="app"><DisplayPreferences />
         <p className="subtitle">{connected ? "Loading game..." : "Connecting..."}</p>
       </div>
     );
@@ -174,7 +187,7 @@ export function GameView({
       await submitInput(sessionId, {
         seat_id: game.awaiting.seat_id,
         kind: game.awaiting.kind,
-        value,
+        value: { ...value, ...(game.awaiting.turn_id ? { turn_id: game.awaiting.turn_id } : {}) },
       }, access ?? undefined);
       return true;
     } catch (err) {
@@ -212,7 +225,9 @@ export function GameView({
   };
 
   return (
-    <div className="app">
+    <CharacterAssetsProvider players={game.players}><div className="app"><DisplayPreferences />
+      {game.phase === "lobby" && humanPlayer && access && <CharacterCreator name={humanPlayer.name} characterId={humanPlayer.character_id}
+        disabled={beginning} onBusyChange={setCharacterBusy} onChange={id => updateCharacter(sessionId, access, id)} />}
       <header
         style={{
           display: "flex",
@@ -224,20 +239,20 @@ export function GameView({
         }}
       >
         <div>
-          <h1 className="village-title">Village of Shadows</h1>
-          <div className="subtitle">A multi-agent game of Werewolf, played out in real time</div>
+          <h1 className="village-title">{t("Village of Shadows")}</h1>
+          <div className="subtitle">{t("A multi-agent game of Werewolf, played out in real time")}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div className="badge">
             {isNight ? <MoonIcon /> : <SunIcon />}
-            {/* "Night" would be a lie before the graph has run anything --
+            {/* t("Night") would be a lie before the graph has run anything --
                 assign_roles hasn't dealt roles and start_night hasn't set the
                 phase yet. */}
-            <span>{game.phase === "lobby" ? "Not started" : game.phase === "investigation" ? "Investigation" : isNight ? "Night" : "Day"}</span>
+            <span>{game.phase === "lobby" ? t("Not started") : game.phase === "investigation" ? t("Investigation") : isNight ? t("Night") : t("Day")}</span>
           </div>
           <div className="badge">
             <EyeIcon />
-            <span>Round {game.round}</span>
+            <span>{t("Round")} {game.round}</span>
           </div>
           {canGodView ? <GodViewToggle on={godView} onToggle={() => setGodView((v) => !v)} /> : null}
           {canGodView && !game.winner && game.phase !== "lobby" && (
@@ -246,7 +261,7 @@ export function GameView({
               style={{ padding: "7px 14px", fontSize: 12.5 }}
               onClick={game.paused ? handleContinue : handlePause}
             >
-              {game.paused ? "▶ Continue" : "⏸ Pause"}
+              {game.paused ? t("▶ Continue") : t("⏸ Pause")}
             </button>
           )}
           {canGodView ? <button
@@ -258,8 +273,8 @@ export function GameView({
             }}
             disabled={stopping}
           >
-            {stopping ? "Stopping..." : "⏹ New Game"}
-          </button> : <Link className="btn btn-secondary" href="/">Leave game</Link>}
+            {stopping ? t("Stopping...") : t("⏹ New Game")}
+          </button> : <Link className="btn btn-secondary" href="/">{t("Leave game")}</Link>}
         </div>
       </header>
 
@@ -285,22 +300,26 @@ export function GameView({
         entries={game.log}
         players={game.players}
         onSpeaking={setSpeakingSeatId}
+        onLine={setSpeakingSeq}
+        paused={game.paused || recording}
       />
+
+      <CouncilAmbience duck={speakingSeatId !== null || recording} paused={game.paused || recording} />
 
       <section hidden={game.phase === "investigation"} ref={councilRef} className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
         <div className="council-3d-caption">
           <div>
-            <span>THE JUNGLE COUNCIL · LIVE</span>
+            <span>{t("THE JUNGLE COUNCIL · LIVE")}</span>
             <small>
               {speakingSeatId
                 ? `${game.players.find((player) => player.seat_id === speakingSeatId)?.name ?? "An agent"} speaks across the fire`
                 : active?.name
                   ? `${active.name} is deciding what to do`
                 : game.phase === "lobby"
-                  ? "You have entered a village inhabited by six independent AI agents"
+                  ? t("Your fellow players are gathered around the council fire")
                   : latestSceneEvent?.type === "death"
-                    ? "The jungle has claimed one of the villagers"
-                    : "Every agent is present in the clearing"}
+                    ? t("The jungle has claimed one of the villagers")
+                    : t("Every agent is present in the clearing")}
             </small>
           </div>
           <div className="council-view-controls">
@@ -312,7 +331,7 @@ export function GameView({
                   aria-pressed={councilCamera === "immersive"}
                   onClick={() => setCouncilCamera("immersive")}
                 >
-                  ◉ My place
+                  {t("◉ My place")}
                 </button>
                 <button
                   type="button"
@@ -320,7 +339,7 @@ export function GameView({
                   aria-pressed={councilCamera === "cinematic"}
                   onClick={() => setCouncilCamera("cinematic")}
                 >
-                  ◇ Close-up
+                  {t("◇ Close-up")}
                 </button>
                 <button
                   type="button"
@@ -328,7 +347,7 @@ export function GameView({
                   aria-pressed={councilCamera === "map"}
                   onClick={() => setCouncilCamera("map")}
                 >
-                  ⟐ Wide view
+                  {t("⟐ Wide view")}
                 </button>
               </div>
             )}
@@ -340,7 +359,7 @@ export function GameView({
               onClick={() => setCouncilOpen((open) => !open)}
             >
               <span aria-hidden="true">{councilOpen ? "▴" : "▾"}</span>
-              {councilOpen ? "Collapse" : "Enter clearing"}
+              {councilOpen ? t("Collapse") : t("Enter clearing")}
             </button>
           </div>
         </div>
@@ -360,6 +379,8 @@ export function GameView({
           )}
         </div>
       </section>
+
+      {showChatPip && <ChatPictureInPicture entries={game.log} speakingSeq={speakingSeq} onReturn={()=>feedPanelRef.current?.scrollIntoView({behavior:"smooth",block:"center"})} />}
 
       {showCouncilPip && game.phase !== "lobby" && !game.winner ? <CouncilPictureInPicture
         players={game.players}
@@ -389,9 +410,10 @@ export function GameView({
             below the fold on a shorter laptop screen -- which would be worse
             than the modal this replaced. Collapse it until there's something
             to show. */}
-        <div className={`feed-wrap${game.phase === "lobby" ? " feed-wrap-lobby" : ""}`}>
+        <div ref={feedPanelRef} className={`feed-wrap${game.phase === "lobby" ? " feed-wrap-lobby" : ""}`}>
           {game.phase !== "investigation" && <Feed
             entries={game.log}
+            speakingSeq={speakingSeq}
             godView={godView}
             canSeeWerewolfCouncil={humanCanSeeWerewolfCouncil}
             active={activeAiTurn}
@@ -408,17 +430,21 @@ export function GameView({
             {game.phase === "lobby" && canGodView ? (
               <>
                 <div className="controls-hint">
-                  Seats are configured and the event stream is already live. The graph hasn’t run
-                  a single node yet — start it and you’ll see every step from the first one.
+                  {t("Seats are configured and the event stream is already live. The graph hasn’t run a single node yet — start it and you’ll see every step from the first one.")}
                 </div>
-                <button className="btn" onClick={handleBegin} disabled={beginning}>
-                  {beginning ? "Starting..." : "▶ Start Game"}
+                <button className="btn" onClick={handleBegin} disabled={beginning || characterBusy}>
+                  {beginning ? t("Starting...") : t("▶ Start Game")}
                 </button>
               </>
             ) : game.phase === "lobby" ? (
-              <div className="controls-hint">Waiting for the room host to begin the game…</div>
+              <div className="controls-hint">{t("Waiting for the room host to begin the game…")}</div>
             ) : (
               <Controls
+                key={game.awaiting?.turn_id ?? "idle"}
+                sessionId={sessionId}
+                access={access ?? undefined}
+                language={game.options?.language ?? language}
+                onRecording={setRecording}
                 awaiting={game.awaiting}
                 paused={game.paused}
                 onSubmit={handleSubmit}
@@ -511,6 +537,6 @@ export function GameView({
         players={game.players}
       />
       <GameGuideChat sessionId={sessionId} access={access} active={!game.winner && game.phase !== "lobby"} />
-    </div>
+    </div></CharacterAssetsProvider>
   );
 }

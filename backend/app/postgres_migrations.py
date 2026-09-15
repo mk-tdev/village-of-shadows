@@ -56,4 +56,11 @@ async def init_schema(conn: DatabaseConnection) -> None:
         ):
             await conn.execute(f"ALTER TABLE game_participants ADD COLUMN IF NOT EXISTS {column} {kind}")
         await conn.execute("INSERT INTO schema_migrations (version) VALUES (3)")
+    await conn.execute("""CREATE TABLE IF NOT EXISTS character_assets (
+        id TEXT PRIMARY KEY,
+        image BYTEA NOT NULL,
+        portrait BYTEA NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""")
+    await conn.execute("INSERT INTO schema_migrations (version) VALUES (4) ON CONFLICT DO NOTHING")
     await conn.commit()

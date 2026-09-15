@@ -55,6 +55,8 @@ class ResiliencePolicy(BaseModel):
 
 
 class GameOptions(BaseModel):
+    language: Literal["en", "zh"] = "en"
+    discussion_rounds: int = Field(default=3, ge=1, le=5)
     version: int = Field(default=1, ge=1, le=10)
     scenario: Literal["classic", "missing-villager"] = "classic"
     role_pack: Literal["standard", "expanded"] = "standard"
@@ -90,6 +92,7 @@ class AgentConfig(BaseModel):
     display_name: str
     personality: str
     controller: Controller
+    character_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     provider: Provider | None = None
     model_name: str | None = None
     endpoint: str | None = None
@@ -102,6 +105,7 @@ class Player(BaseModel):
     name: str
     personality: str
     controller: Controller
+    character_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     provider: Provider | None = None
     model_name: str | None = None
     endpoint: str | None = None

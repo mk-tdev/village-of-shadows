@@ -1,3 +1,5 @@
+"use client";
+import { usePreferences } from "./Preferences";
 import type { AgentConfig, Provider } from "@/lib/types";
 import { DEMO_PROVIDER_OPTIONS, PROVIDER_MODEL_SUGGESTIONS } from "@/lib/seatDefaults";
 import { Select } from "./Select";
@@ -13,6 +15,7 @@ export function SeatRow({
   isHuman: boolean;
   onChange: (next: AgentConfig) => void;
 }) {
+  const { t } = usePreferences();
   return (
     <div className={`seat-row-wrap ${isHuman ? "you" : ""}`}>
       {/* Portrait identity is tied to the stable seat id, while names and
@@ -27,7 +30,7 @@ export function SeatRow({
 
       <div className="seat-row">
         <div>
-          <label className="field-label">Name</label>
+          <label className="field-label">{t("Name")}</label>
           <input
             type="text"
             value={seat.display_name}
@@ -35,7 +38,7 @@ export function SeatRow({
           />
         </div>
         <div>
-          <label className="field-label">Personality</label>
+          <label className="field-label">{t("Personality")}</label>
           <input
             type="text"
             value={seat.personality}
@@ -43,8 +46,8 @@ export function SeatRow({
           />
         </div>
         <div>
-          <label className="field-label">Controller</label>
-          <span className={`controller-badge ${isHuman ? "you" : "ai"}`}>{isHuman ? "YOU" : "AI"}</span>
+          <label className="field-label">{t("Controller")}</label>
+          <span className={`controller-badge ${isHuman ? "you" : "ai"}`}>{isHuman ? t("YOU") : "AI"}</span>
         </div>
         {isHuman ? (
           <>
@@ -54,7 +57,7 @@ export function SeatRow({
         ) : (
           <>
             <div>
-              <label className="field-label">Provider</label>
+              <label className="field-label">{t("Provider")}</label>
               <Select
                 value={seat.provider ?? "mock"}
                 options={DEMO_PROVIDER_OPTIONS}
@@ -75,7 +78,7 @@ export function SeatRow({
               />
             </div>
             <div>
-              <label className="field-label">Model</label>
+              <label className="field-label">{t("Model")}</label>
               <Combobox
                 value={seat.model_name ?? ""}
                 options={PROVIDER_MODEL_SUGGESTIONS[seat.provider ?? "mock"]}

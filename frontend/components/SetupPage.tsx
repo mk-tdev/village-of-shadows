@@ -1,6 +1,9 @@
 "use client";
+import { CharacterAssetsProvider } from "./CharacterAssets";
+import { CharacterCreator } from "./CharacterCreator";
 
 import { useMemo, useState } from "react";
+import { DisplayPreferences, usePreferences } from "./Preferences";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createGame, IS_LOCAL_API, preflightModels, waitForBackend } from "@/lib/api";
@@ -42,6 +45,7 @@ function LaunchStep({
 
 export default function SetupPage() {
   const router = useRouter();
+  const { language, t } = usePreferences();
   const [humanIndex, setHumanIndex] = useState(0);
   const [humanIndices, setHumanIndices] = useState<number[]>([0]);
   const [seats, setSeats] = useState<AgentConfig[]>(() => defaultSeats(0));
@@ -53,6 +57,7 @@ export default function SetupPage() {
   const [prediction, setPrediction] = useState("");
   const [options, setOptions] = useState<GameOptions>({
     version: 1,
+    discussion_rounds: 1,
     role_pack: "standard",
     village_events: false,
     cross_game_memory: false,
@@ -73,7 +78,9 @@ export default function SetupPage() {
   }, [seats]);
 
   const episodeCompatible = options.scenario !== "missing-villager" || (humanIndices.length === 1 && options.role_pack === "standard");
-  const canStart = episodeCompatible && !duplicateNames && seats.every((s) => s.display_name.trim().length > 0);
+  const [characterBusy, setCharacterBusy] = useState<Record<string, boolean>>({});
+  const anyCharacterBusy = Object.values(characterBusy).some(Boolean);
+  const canStart = !anyCharacterBusy && episodeCompatible && !duplicateNames && seats.every((s) => s.display_name.trim().length > 0);
   const starting = startPhase !== "idle";
 
   const wakeStepState: ProgressState = failedPhase === "waking"
@@ -207,7 +214,7 @@ export default function SetupPage() {
       }
       activePhase = "creating";
       setStartPhase("creating");
-      const created = await createGame(seats, options);
+      const created = await createGame(seats, { ...options, language });
       const { session_id } = created;
       const primary = created.human_seats.find((seat) => seat.seat_id === seats[humanIndex].seat_id) ?? created.human_seats[0];
       const credentials = {
@@ -244,32 +251,47 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="app">
+    <CharacterAssetsProvider players={seats}><div className="app"><DisplayPreferences />
       <header style={{ marginBottom: 22, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <Link className="setup-back-link" href="/">← Return to the village gates</Link>
-          <h1 className="village-title">Village of Shadows</h1>
-          <div className="subtitle">Configure the seven seats, then begin.</div>
+          <Link className="setup-back-link" href="/">{t("\u2190 Return to the village gates")}</Link>
+          <h1 className="village-title">{t("Village of Shadows")}</h1>
+          <div className="subtitle">{t("Configure the seven seats, then begin.")}</div>
         </div>
         <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/how-to-play">
-          How to play
+          {t("How to play")}
         </Link>
         <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/relationships">
-          Relationship archive
+          {t("Relationship archive")}
         </Link>
         <Link className="btn btn-secondary" style={{ padding: "7px 14px", fontSize: 12.5, flexShrink: 0 }} href="/history">
-          Game archive
+          {t("Game archive")}
         </Link>
       </header>
 
       <div className="setup-card">
+        <section className="discussion-length" aria-labelledby="discussion-length-title">
+          <h2 id="discussion-length-title">{t("Set the discussion length")}</h2>
+          <p>{t("Each round gives every living player one turn before voting. Choose one for a quick demo.")}</p>
+          <div className="discussion-presets">{[[1, "Quick demo"], [2, "Short discussion"], [3, "Full debate"]].map(([n, label]) => <button type="button" key={n} className="btn btn-secondary" aria-pressed={options.discussion_rounds === n} disabled={starting || anyCharacterBusy} onClick={() => setOptions({...options, discussion_rounds: Number(n)})}>{t(String(label))} · {n}</button>)}
+          <div className="discussion-round-picker">
+            <span>{t("Discussion rounds")}</span>
+            <Select
+              ariaLabel={t("Discussion rounds")}
+              value={String(options.discussion_rounds ?? 1)}
+              disabled={starting || anyCharacterBusy}
+              options={[1, 2, 3, 4, 5].map(n => ({ value: String(n), label: String(n) }))}
+              onChange={value => setOptions({...options, discussion_rounds: Number(value)})}
+            />
+          </div></div>
+        </section>
         <section className="primary-seat-picker" aria-labelledby="primary-seat-title">
           <div className="primary-seat-heading">
             <div>
-              <span>YOUR PLACE IN THE VILLAGE</span>
-              <h2 id="primary-seat-title">Which character do you want to play?</h2>
+              <span>{t("YOUR PLACE IN THE VILLAGE")}</span>
+              <h2 id="primary-seat-title">{t("Which character do you want to play?")}</h2>
             </div>
-            <small>Choose any of the seven seats. The other six remain AI unless you invite more people below.</small>
+            <small>{t("Choose any of the seven seats. The other six remain AI unless you invite more people below.")}</small>
           </div>
           <div className="primary-seat-grid" role="radiogroup" aria-label="Choose your character">
             {seats.map((seat, index) => {
@@ -278,6 +300,7 @@ export default function SetupPage() {
                 <button
                   key={seat.seat_id}
                   type="button"
+                  disabled={starting || anyCharacterBusy}
                   role="radio"
                   aria-checked={selected}
                   className={selected ? "is-selected" : ""}
@@ -286,7 +309,7 @@ export default function SetupPage() {
                   <span className="primary-seat-number">{String(index + 1).padStart(2, "0")}</span>
                   <strong>{seat.display_name || seat.seat_id}</strong>
                   <small>{seat.personality || "unwritten personality"}</small>
-                  <b>{selected ? "YOU PLAY HERE" : humanIndices.includes(index) ? "INVITED HUMAN" : "CHOOSE"}</b>
+                  <b>{selected ? t("YOU PLAY HERE") : humanIndices.includes(index) ? t("INVITED HUMAN") : t("CHOOSE")}</b>
                 </button>
               );
             })}
@@ -295,14 +318,14 @@ export default function SetupPage() {
 
         <details className="multi-human-picker">
           <summary>
-            <span>Invite more human players <b>optional</b></span>
-            <small>{humanIndices.length === 1 ? "Solo human game" : `${humanIndices.length} human seats selected`}</small>
+            <span>{t("Invite more human players")} <b>{t("optional")}</b></span>
+            <small>{humanIndices.length === 1 ? t("Solo human game") : `${humanIndices.length} human seats selected`}</small>
           </summary>
-          <div>{seats.map((seat, index) => <ThemedCheckbox key={seat.seat_id} checked={humanIndices.includes(index)} disabled={index === humanIndex} onChange={(checked) => toggleHuman(index, checked)} ariaLabel={`${seat.display_name} is a human player`}>{seat.display_name}{index === humanIndex ? " · you" : ""}</ThemedCheckbox>)}</div>
+          <div>{seats.map((seat, index) => <ThemedCheckbox key={seat.seat_id} checked={humanIndices.includes(index)} disabled={index === humanIndex || starting || anyCharacterBusy} onChange={(checked) => toggleHuman(index, checked)} ariaLabel={`${seat.display_name} is a human player`}>{seat.display_name}{index === humanIndex ? " · you" : ""}</ThemedCheckbox>)}</div>
           <p>Your seat is always human. Each additional selection receives a private, seat-bound join link; every unselected seat stays AI.</p>
         </details>
 
-        <label className="field-label">Set every AI seat to</label>
+        <label className="field-label">{t("Set every AI seat to")}</label>
         <div
           style={{
             display: "flex",
@@ -328,31 +351,31 @@ export default function SetupPage() {
         </div>
 
         {seats.map((seat, i) => (
-          <SeatRow
-            key={seat.seat_id}
-            seat={seat}
-            isHuman={seat.controller === "human"}
-            onChange={(next) => updateSeat(i, next)}
-          />
+          <div key={seat.seat_id}>
+            <SeatRow seat={seat} isHuman={seat.controller === "human"} onChange={(next) => updateSeat(i, next)} />
+            {seat.controller === "human" && <CharacterCreator name={seat.display_name} characterId={seat.character_id} disabled={starting || anyCharacterBusy}
+              onBusyChange={busy => setCharacterBusy(previous => ({...previous, [seat.seat_id]: busy}))}
+              onChange={id => setSeats(previous => previous.map(p => p.seat_id === seat.seat_id ? {...p, character_id: id} : p))} />}
+          </div>
         ))}
 
         <section className="world-rules-config">
-          <div><span>WORLD RULES · VERSION 1</span><h2>Choose how strange this village becomes</h2></div>
-          <ThemedCheckbox checked={options.scenario === "missing-villager"} onChange={(checked) => setOptions((current) => ({ ...current, scenario: checked ? "missing-villager" : "classic", ...(checked ? { role_pack: "standard" as const } : {}) }))}><span><b>Night of the Missing Villager</b><small>Follow a scream, inspect two clues, question three witnesses, and bring your evidence to the council. One human investigator, six AI villagers, standard roles.</small></span></ThemedCheckbox>
+          <label>{t("Council language")} · {language === "zh" ? "简体中文 / 普通话" : "English"}</label>
+          <div><span>{t("WORLD RULES \u00b7 VERSION 1")}</span><h2>{t("Choose how strange this village becomes")}</h2></div>
+          <ThemedCheckbox checked={options.scenario === "missing-villager"} onChange={(checked) => setOptions((current) => ({ ...current, scenario: checked ? "missing-villager" : "classic", ...(checked ? { role_pack: "standard" as const } : {}) }))}><span><b>{t("Night of the Missing Villager")}</b><small>{t("Follow a scream, inspect two clues, question three witnesses, and bring your evidence to the council. One human investigator, six AI villagers, standard roles.")}</small></span></ThemedCheckbox>
           {!episodeCompatible && <p role="alert" className="error-text">This episode needs one human seat and standard roles. Adjust those settings to continue.</p>}
-          <ThemedCheckbox checked={options.role_pack === "expanded"} onChange={(checked) => setOptions((current) => ({ ...current, role_pack: checked ? "expanded" : "standard" }))}><span><b>Expanded roles</b><small>Add Hunter, Mayor, and Jester with server-enforced rules.</small></span></ThemedCheckbox>
-          <ThemedCheckbox checked={options.village_events} onChange={(checked) => setOptions((current) => ({ ...current, village_events: checked }))}><span><b>Dynamic village events</b><small>Deterministic silence, sealed ballots, forced testimony, and discovered evidence.</small></span></ThemedCheckbox>
-          <ThemedCheckbox checked={options.cross_game_memory} onChange={(checked) => setOptions((current) => ({ ...current, cross_game_memory: checked }))}><span><b>Cross-game relationships</b><small>Opt in to inspectable memories from previous games. Roles are never carried forward.</small></span></ThemedCheckbox>
+          <ThemedCheckbox checked={options.role_pack === "expanded"} onChange={(checked) => setOptions((current) => ({ ...current, role_pack: checked ? "expanded" : "standard" }))}><span><b>{t("Expanded roles")}</b><small>{t("Add Hunter, Mayor, and Jester with server-enforced rules.")}</small></span></ThemedCheckbox>
+          <ThemedCheckbox checked={options.village_events} onChange={(checked) => setOptions((current) => ({ ...current, village_events: checked }))}><span><b>{t("Dynamic village events")}</b><small>{t("Deterministic silence, sealed ballots, forced testimony, and discovered evidence.")}</small></span></ThemedCheckbox>
+          <ThemedCheckbox checked={options.cross_game_memory} onChange={(checked) => setOptions((current) => ({ ...current, cross_game_memory: checked }))}><span><b>{t("Cross-game relationships")}</b><small>{t("Opt in to inspectable memories from previous games. Roles are never carried forward.")}</small></span></ThemedCheckbox>
         </section>
 
         <AgentLabPanel seats={seats} onChange={updateSeat} />
 
         <section className="learning-prediction" aria-labelledby="learning-prediction-title">
-          <span className="learning-kicker">LEARNING EXPERIMENT · OPTIONAL</span>
-          <h2 id="learning-prediction-title">Predict before you play</h2>
+          <span className="learning-kicker">{t("LEARNING EXPERIMENT \u00b7 OPTIONAL")}</span>
+          <h2 id="learning-prediction-title">{t("Predict before you play")}</h2>
           <p>
-            Which agent will gain trust, misread the evidence, or change the outcome — and why?
-            Your prediction stays in this browser and returns in the post-game debrief.
+            {t("Which agent will gain trust, misread the evidence, or change the outcome — and why? Your prediction stays in this browser and returns in the post-game debrief.")}
           </p>
           <textarea
             value={prediction}
@@ -364,7 +387,7 @@ export default function SetupPage() {
 
         {duplicateNames && (
           <p className="error-text" style={{ marginTop: 12 }}>
-            Seat names must be unique.
+            {t("Seat names must be unique.")}
           </p>
         )}
         {error && (
@@ -431,7 +454,7 @@ export default function SetupPage() {
 
         {preflightResults.length > 0 && (
           <div className="preflight-panel" aria-live="polite">
-            <div className="preflight-title">AI model readiness</div>
+            <div className="preflight-title">{t("AI model readiness")}</div>
             {preflightResults.map((result) => (
               <div className={`preflight-row ${result.ok ? "ok" : "failed"}`} key={result.seat_id}>
                 <span className="preflight-status" aria-hidden="true">{result.ok ? "✓" : "×"}</span>
@@ -456,9 +479,9 @@ export default function SetupPage() {
               ? "Checking every AI model..."
               : startPhase === "creating"
                 ? "Creating village..."
-                : "Test Models & Start Game"}
+                : t("Test Models & Start Game")}
         </button>
       </div>
-    </div>
+    </div></CharacterAssetsProvider>
   );
 }

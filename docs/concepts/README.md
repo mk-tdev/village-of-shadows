@@ -114,3 +114,9 @@ all general lessons that happened to surface here.
     branches, the council vote, and a bounded next-night consequence.
 23. [Native Unreal game client](23-unreal-game-client.md) — first-person forest,
     bounded character minds, persistent dialogue, voice transport, and the earlier council client.
+
+24. [Bilingual teaching council](24-bilingual-teaching-council.md) — repeated
+    discussion passes, synchronized AI narration, protected microphone transcription,
+    bilingual session settings, and floating teaching-demo panels.
+
+See also [classroom activities and the finals demo](../teaching/finals-classroom-activities.md).

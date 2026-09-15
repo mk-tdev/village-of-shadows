@@ -84,6 +84,9 @@ async def submit_input(session_id: str, body: InputRequest, request: Request = N
     if awaiting.seat_id != body.seat_id or awaiting.kind != body.kind:
         raise HTTPException(409, f"Expected input from seat {awaiting.seat_id} of kind {awaiting.kind}.")
 
+    if awaiting.kind == "statement" and "turn_id" in body.value and body.value["turn_id"] != awaiting.turn_id:
+        raise HTTPException(409, "This discussion turn has changed. Refresh and try again.")
+
     if awaiting.kind == "investigation":
         if body.value.get("turn_id") != awaiting.turn_id:
             raise HTTPException(409, "This investigation step has already changed. Refresh and try again.")
@@ -94,7 +97,7 @@ async def submit_input(session_id: str, body: InputRequest, request: Request = N
         await persistence.increment_participant_actions(
             request.app.state.db_conn, session_id, body.seat_id,
         )
-    if awaiting.kind == "investigation" and orch.state.awaiting is not awaiting:
-        raise HTTPException(409, "This investigation action was already accepted.")
+    if orch.state.awaiting is not awaiting:
+        raise HTTPException(409, "This action was already accepted.")
     orch.resume(body.value)
     return {"ok": True}

@@ -1,7 +1,8 @@
 "use client";
+import { usePreferences } from "./Preferences";
 
 import Image from "next/image";
-import { portraitForSeat } from "@/lib/portraits";
+import { useCharacterAssets } from "./CharacterAssets";
 import type { Player } from "@/lib/types";
 
 export function CouncilPictureInPicture({
@@ -17,17 +18,19 @@ export function CouncilPictureInPicture({
   caption: string;
   onReturn: () => void;
 }) {
+  const { t } = usePreferences();
+  const assets = useCharacterAssets();
   return (
     <aside className="council-pip" aria-label="Live council picture in picture">
-      <button className="council-pip-return" type="button" onClick={onReturn}>↗ Return to council</button>
+      <button className="council-pip-return" type="button" onClick={onReturn}>↗ {t("Return to council")}</button>
       <div className={`council-pip-scene is-${phase}`}>
         <Image src="/scenes/jungle-council.webp" alt="" fill sizes="300px" priority />
         <div className="council-pip-shade" />
         <div className="council-pip-cast" aria-hidden="true">
           {players.map((player) => {
-            const portrait = portraitForSeat(player.seat_id);
+            const portrait = assets.portrait(player.seat_id);
             return <span className={`${player.seat_id === activeSeatId ? "is-active" : ""}${player.alive ? "" : " is-fallen"}`} key={player.seat_id}>
-              {portrait ? <Image src={portrait} alt="" fill sizes="44px" /> : player.name.slice(0, 1)}
+              {portrait ? <Image unoptimized src={portrait} alt="" fill sizes="44px" /> : player.name.slice(0, 1)}
             </span>;
           })}
         </div>

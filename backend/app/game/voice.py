@@ -35,6 +35,8 @@ class VoiceUnavailableError(RuntimeError):
 
 def voice_for_seat(seat_id: str) -> str:
     """Give every seat a stable voice without storing another identifier."""
+    if seat_id.startswith("seat_") and seat_id[5:].isdigit():
+        return VOICE_PALETTE[int(seat_id[5:]) % len(VOICE_PALETTE)]
     digest = hashlib.sha256(seat_id.encode("utf-8")).digest()
     return VOICE_PALETTE[digest[0] % len(VOICE_PALETTE)]
 
@@ -45,7 +47,7 @@ def ancient_performance(line: CouncilLine) -> str:
         "Use natural human breath, restrained emotion, and a grave, intimate cadence. "
         "Sound weathered and believable, never like a cartoon, announcer, monster, or robot. "
         f"The speaker is {line.name}, whose manner is {line.personality or 'guarded'}. "
-        "Let suspicion and danger sit beneath the words. Keep the delivery clear and unhurried."
+        "Let suspicion and danger sit beneath the words. Keep the delivery clear and conversational. Read exactly the supplied text without additions. Use fluent Mandarin for Chinese text and fluent English for English text."
     )
 
 
@@ -79,6 +81,8 @@ async def _cached_audio(
 async def synthesize_openai(line: CouncilLine, voice: str, model: str) -> tuple[bytes, str]:
     if not settings.openai_api_key:
         raise VoiceUnavailableError("Lifelike council speech is not configured on this server.")
+    if len(line.text) > 4096:
+        raise VoiceUnavailableError("This statement is too long for one voice clip; its complete text remains available.")
     try:
         async with httpx.AsyncClient(timeout=45) as client:
             response = await client.post(
@@ -90,7 +94,7 @@ async def synthesize_openai(line: CouncilLine, voice: str, model: str) -> tuple[
                 json={
                     "model": model,
                     "voice": voice,
-                    "input": line.text[:4096],
+                    "input": line.text,
                     "instructions": ancient_performance(line),
                     "response_format": "mp3",
                     "speed": 0.94,

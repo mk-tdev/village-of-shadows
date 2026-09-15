@@ -187,7 +187,7 @@ source.addEventListener("decision", (e) => {
   });
 });
 ```
-([useGameStream.ts:287-305](../../frontend/lib/useGameStream.ts#L287-L305))
+([useGameStream.ts:296-314](../../frontend/lib/useGameStream.ts#L296-L314))
 
 Every `"decision"` event (published from `_record_decision` in
 `agent_turn.py` — see

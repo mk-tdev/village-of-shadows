@@ -1,4 +1,5 @@
 "use client";
+import { usePreferences } from "./Preferences";
 
 import { useState } from "react";
 import { DEFAULT_BEHAVIOR, DEFAULT_RESILIENCE } from "@/lib/seatDefaults";
@@ -15,6 +16,7 @@ export function AgentLabPanel({
   seats: AgentConfig[];
   onChange: (index: number, seat: AgentConfig) => void;
 }) {
+  const { t } = usePreferences();
   const aiIndices = seats.map((seat, index) => seat.controller === "ai" ? index : -1).filter((index) => index >= 0);
   const [seatIndex, setSeatIndex] = useState(aiIndices[0] ?? 0);
   const [presetName, setPresetName] = useState("My agent profile");
@@ -55,7 +57,7 @@ export function AgentLabPanel({
 
   return (
     <details className="agent-lab-panel">
-      <summary><span><b>Custom agent laboratory</b><small>Versioned personality, reasoning, memory and tool strategy</small></span><i>⌄</i></summary>
+      <summary><span><b>{t("Custom agent laboratory")}</b><small>{t("Versioned personality, reasoning, memory and tool strategy")}</small></span><i>⌄</i></summary>
       <div className="agent-lab-content">
         <div className="agent-lab-notice"><b>BASE RULES STAY LOCKED</b>These controls are additions to the role, privacy, identity, and safety prompts. They cannot remove them.</div>
         <label className="agent-lab-seat">Configure seat<Select value={String(seatIndex)} onChange={(value) => setSeatIndex(Number(value))} ariaLabel="Agent laboratory seat" options={aiIndices.map((index) => ({ value: String(index), label: seats[index].display_name }))} /></label>

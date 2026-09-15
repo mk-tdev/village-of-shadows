@@ -29,7 +29,7 @@ registry.register(orch)
 # docstring.
 return {"session_id": session_id}
 ```
-([routers/games.py:76-122](../../backend/app/routers/games.py#L76-L122))
+([routers/games.py:76-126](../../backend/app/routers/games.py#L76-L126))
 
 The orchestrator exists and is registered — `GET /state` and `GET /stream`
 both work against it immediately — but its background task never gets
@@ -76,7 +76,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:157-174](../../backend/app/routers/games.py#L157-L174))
+([routers/games.py:161-180](../../backend/app/routers/games.py#L161-L180))
 
 *Now* `orch.start()` calls `asyncio.create_task(self._run({"game":
 self.state}))` — but this time, the browser's SSE connection has already
@@ -113,7 +113,7 @@ await run_seat_turn(
     fallback={"pool": pool, "text": "I favor this target..."},
 )
 ```
-([nodes.py:329-382](../../backend/app/game/nodes.py#L329-L382))
+([nodes.py:330-383](../../backend/app/game/nodes.py#L330-L383))
 
 This used to be a call to `run_agent_turn`, which built a fresh two-message
 conversation and threw it away when the turn ended. It now goes through this
@@ -183,7 +183,7 @@ itself is otherwise unchanged: same tool-calling mechanism, same
 `MAX_TOOL_ITERATIONS` ceiling, same MCP round-trips.
 
 The leading system message is `_persona(wolf, game)`
-([nodes.py:563-580](../../backend/app/game/nodes.py#L563-L580)) — this seat's
+([nodes.py:564-581](../../backend/app/game/nodes.py#L564-L581)) — this seat's
 personality, its secret role, and (only because it's a werewolf) its
 teammate's name. It sits at the head of `history` from the seat's first turn
 onward rather than being rebuilt here. Everything *else* the wolf was told

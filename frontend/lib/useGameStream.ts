@@ -125,6 +125,15 @@ export function useGameStream(sessionId: string, access?: GameAccessCredentials)
       setGame(data);
     });
 
+    source.addEventListener("character_updated", (e) => {
+      const data = JSON.parse(e.data) as {seat_id: string; character_id: string | null};
+      const current = gameRef.current;
+      if (!current) return;
+      const next = {...current, players: current.players.map(p => p.seat_id === data.seat_id ? {...p, character_id: data.character_id} : p)};
+      gameRef.current = next;
+      setGame(next);
+    });
+
     source.addEventListener("private_notes", (e) => {
       const data: { events: PrivateNoteEvent[] } = JSON.parse((e as MessageEvent).data);
       setPrivateNotes(data.events);

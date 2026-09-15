@@ -1,7 +1,9 @@
+"use client";
+import { useCharacterAssets } from "./CharacterAssets";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import type { Role } from "@/lib/types";
-import { portraitAnimationDelay, portraitForSeat, roleArtifactFor } from "@/lib/portraits";
+import { portraitAnimationDelay, roleArtifactFor } from "@/lib/portraits";
 
 type PortraitVariant = "card" | "feed" | "setup";
 
@@ -20,7 +22,7 @@ export function CharacterPortrait({
   dead?: boolean;
   variant?: PortraitVariant;
 }) {
-  const portrait = portraitForSeat(seatId);
+  const portrait = useCharacterAssets().portrait(seatId);
   const style = {
     "--portrait-delay": portraitAnimationDelay(seatId),
   } as CSSProperties;
@@ -36,6 +38,7 @@ export function CharacterPortrait({
           <Image
             className="portrait-image"
             src={portrait}
+            unoptimized
             alt=""
             fill
             sizes={variant === "feed" ? "32px" : variant === "setup" ? "64px" : "58px"}

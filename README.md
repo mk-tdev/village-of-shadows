@@ -405,3 +405,19 @@ Start here:
 Built by [Muthukumar](https://www.linkedin.com/in/muthukumar-dev/).
 
 </div>
+
+## Learning and teaching
+
+The [five classroom activities and finals demonstration](docs/teaching/finals-classroom-activities.md)
+cover model comparison, evidence-based voting, inspecting agent memory, branching replays,
+and tracing a turn through the orchestration graph.
+
+Council setup supports English or Simplified Chinese dialogue and 1–5 discussion passes
+before each vote (default 3). Compact/Wide and interface-language preferences are saved
+in the browser. The game language is fixed when the host creates the council.
+
+AI voices use `OPENAI_TTS_MODEL` (default `gpt-4o-mini-tts`); microphone transcription uses
+`OPENAI_TRANSCRIBE_MODEL` (default `gpt-4o-transcribe`). Both require the server's
+`OPENAI_API_KEY`. Voices and music are opt-in. Microphone recordings are sent to OpenAI
+only after the player stops recording; the transcript can be reviewed before submission.
+The app does not persist microphone recordings. Public statement audio is cached.

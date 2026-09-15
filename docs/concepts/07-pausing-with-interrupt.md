@@ -28,7 +28,7 @@ registry.register(orch)
 # Deliberately not orch.start() here -- see GameOrchestrator.started's
 # docstring.
 ```
-([routers/games.py:102-108](../../backend/app/routers/games.py#L102-L108))
+([routers/games.py:106-112](../../backend/app/routers/games.py#L106-L112))
 
 `create_game` builds and registers the orchestrator, but never calls
 `orch.start()`. If it did — which is what this project's first version
@@ -60,7 +60,7 @@ async def begin_game(session_id: str) -> dict:
     orch.start()
     return {"ok": True}
 ```
-([routers/games.py:157-174](../../backend/app/routers/games.py#L157-L174))
+([routers/games.py:161-180](../../backend/app/routers/games.py#L161-L180))
 
 `GameState.phase` starts at `"lobby"` and stays there until `begin_game`
 actually calls `orch.start()`. The frontend's game page already opens its
@@ -97,7 +97,7 @@ async def pause_game(session_id: str) -> dict:
     orch.request_pause()
     return {"ok": True}
 ```
-([games.py:327-339](../../backend/app/routers/games.py#L327-L339))
+([games.py:333-345](../../backend/app/routers/games.py#L333-L345))
 
 `POST /pause` doesn't stop anything immediately — it just sets a plain
 boolean on the orchestrator. Whatever seat's turn is currently mid-flight
@@ -145,7 +145,7 @@ def _maybe_pause(orch, game: GameState) -> None:
     game.paused = False
     orch.publish("resumed", {})
 ```
-([nodes.py:147-178](../../backend/app/game/nodes.py#L147-L178))
+([nodes.py:147-179](../../backend/app/game/nodes.py#L147-L179))
 
 `_maybe_pause` is called at the tail end of **every** node in `nodes.py` (12
 call sites). Most of the time `pause_requested` is `False` and it's a no-op.
@@ -241,7 +241,7 @@ shift and steal an answer meant for an earlier call.
 always *after* any human `interrupt()` call earlier in that same node body
 (e.g. werewolf_negotiation's human branch) -- never before it."""
 ```
-([nodes.py:160-162](../../backend/app/game/nodes.py#L160-L162))
+([nodes.py:161-163](../../backend/app/game/nodes.py#L161-L163))
 
 This was caught by careful reasoning about LangGraph's position-based
 resume matching *before* writing the code — and then confirmed with a
