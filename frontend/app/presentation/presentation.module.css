@@ -47,6 +47,8 @@
 
 .navLink {
   border: 1px solid rgba(127, 182, 202, 0.35);
+  cursor: pointer;
+  font: inherit;
   border-radius: 999px;
   padding: 0.5rem 0.75rem;
   background: rgba(16, 35, 47, 0.72);
@@ -175,6 +177,18 @@
   line-height: 0.95;
   letter-spacing: -0.05em;
   text-wrap: balance;
+}
+
+.page[data-language="zh"] .copy h1 {
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+  font-size: clamp(2.35rem, 5.2vw, 5rem);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+}
+
+.page[data-language="zh"] .body,
+.page[data-language="zh"] .copy li {
+  line-height: 1.65;
 }
 
 .body {
