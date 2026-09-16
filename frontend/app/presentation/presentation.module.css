@@ -125,6 +125,68 @@
   outline-offset: 0.15rem;
 }
 
+.deckArrows {
+  position: fixed;
+  z-index: 22;
+  bottom: 1rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(127, 182, 202, 0.3);
+  border-radius: 999px;
+  background: rgba(7, 16, 23, 0.86);
+  box-shadow: 0 0.9rem 2.5rem rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(16px);
+  transform: translateX(-50%);
+}
+
+.deckArrows button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(240, 191, 117, 0.48);
+  border-radius: 50%;
+  background: rgba(16, 35, 47, 0.9);
+  color: #f0bf75;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.deckArrows button:hover:not(:disabled),
+.deckArrows button:focus-visible {
+  background: #f0bf75;
+  color: #071017;
+  transform: scale(1.06);
+}
+
+.deckArrows button:focus-visible {
+  outline: 2px solid #f5efe6;
+  outline-offset: 0.12rem;
+}
+
+.deckArrows button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.deckArrows svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.deckArrows span {
+  min-width: 3.8rem;
+  color: #a9b4b9;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
 .slide {
   position: relative;
   display: grid;
@@ -334,7 +396,8 @@
   }
 
   .nav,
-  .progressRail {
+  .progressRail,
+  .deckArrows {
     display: none;
   }
 

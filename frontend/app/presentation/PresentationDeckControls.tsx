@@ -5,6 +5,7 @@ import styles from "./presentation.module.css";
 
 type PresentationDeckControlsProps = {
   slides: string[];
+  language: "en" | "zh";
 };
 
 function isEditableTarget(target: EventTarget | null) {
@@ -15,8 +16,7 @@ function isEditableTarget(target: EventTarget | null) {
     target.isContentEditable ||
     tagName === "input" ||
     tagName === "textarea" ||
-    tagName === "select" ||
-    tagName === "button"
+    tagName === "select"
   );
 }
 
@@ -57,7 +57,22 @@ function scrollToSlide(index: number, slideCount: number) {
   window.history.replaceState(null, "", `#slide-${safeIndex + 1}`);
 }
 
-export default function PresentationDeckControls({ slides }: PresentationDeckControlsProps) {
+function ArrowIcon({ direction }: { direction: "previous" | "next" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d={direction === "previous" ? "M14.5 5 7.5 12l7 7" : "m9.5 5 7 7-7 7"}
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+export default function PresentationDeckControls({ slides, language }: PresentationDeckControlsProps) {
   const [activeSlide, setActiveSlide] = useState(0);
 
   useEffect(() => {
@@ -109,25 +124,51 @@ export default function PresentationDeckControls({ slides }: PresentationDeckCon
       window.removeEventListener("resize", updateActiveSlide);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [slides.length]);
+  }, [slides]);
+
+  const previousLabel = language === "zh" ? "上一页" : "Previous slide";
+  const nextLabel = language === "zh" ? "下一页" : "Next slide";
 
   return (
-    <div className={styles.progressRail} aria-label="Presentation slides">
-      {slides.map((slide, index) => (
-        <a
-          key={slide}
-          href={`#slide-${index + 1}`}
-          aria-current={activeSlide === index ? "true" : undefined}
-          aria-label={`Go to slide ${index + 1}: ${slide}`}
-          title={`${index + 1}. ${slide}`}
-          onClick={(event) => {
-            event.preventDefault();
-            scrollToSlide(index, slides.length);
-          }}
+    <>
+      <div className={styles.progressRail} aria-label={language === "zh" ? "演示文稿页面" : "Presentation slides"}>
+        {slides.map((slide, index) => (
+          <a
+            key={slide}
+            href={`#slide-${index + 1}`}
+            aria-current={activeSlide === index ? "true" : undefined}
+            aria-label={language === "zh" ? `前往第 ${index + 1} 页：${slide}` : `Go to slide ${index + 1}: ${slide}`}
+            title={`${index + 1}. ${slide}`}
+            onClick={(event) => {
+              event.preventDefault();
+              scrollToSlide(index, slides.length);
+            }}
+          >
+            <span>{index + 1}</span>
+          </a>
+        ))}
+      </div>
+      <div className={styles.deckArrows} aria-label={language === "zh" ? "演示文稿翻页控制" : "Presentation navigation controls"}>
+        <button
+          type="button"
+          onClick={() => scrollToSlide(activeSlide - 1, slides.length)}
+          disabled={activeSlide === 0}
+          aria-label={previousLabel}
+          title={previousLabel}
         >
-          <span>{index + 1}</span>
-        </a>
-      ))}
-    </div>
+          <ArrowIcon direction="previous" />
+        </button>
+        <span aria-live="polite">{String(activeSlide + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
+        <button
+          type="button"
+          onClick={() => scrollToSlide(activeSlide + 1, slides.length)}
+          disabled={activeSlide === slides.length - 1}
+          aria-label={nextLabel}
+          title={nextLabel}
+        >
+          <ArrowIcon direction="next" />
+        </button>
+      </div>
+    </>
   );
 }

@@ -377,7 +377,7 @@ export default function PresentationContent() {
         </div>
       </nav>
 
-      <PresentationDeckControls slides={slides.map((slide) => slide.title)} />
+      <PresentationDeckControls slides={slides.map((slide) => slide.title)} language={language} />
 
       {slides.map((slide, index) => (
         <section
