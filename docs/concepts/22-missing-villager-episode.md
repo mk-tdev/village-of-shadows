@@ -80,3 +80,24 @@ like a successful run. All three episode nodes now use `RunnableConfig`.
 The integration tests exercise the full compiled graph, scoped knowledge,
 stale and out-of-order input, pause replay, a counterfactual evidence choice,
 and both next-night outcomes against PostgreSQL.
+
+## Smooth investigation and visible learning concepts
+
+The episode now stays mounted while an accepted input waits for the next
+LangGraph interrupt. Previously both `Controls` and the episode were keyed by
+`turn_id`: each choice unmounted the whole casebook, briefly replaced it with a
+waiting line, then rebuilt it. That collapsed the page and moved the reading
+position. The investigation now uses a stable component key, retains its last
+view during the handoff, and disables that view until the server supplies a new
+turn. The submission lock is scoped to the turn ID, so duplicate clicks cannot
+resubmit an accepted action. Ordinary council controls retain their per-turn keys.
+
+See [GameView.tsx](../../frontend/components/GameView.tsx),
+[Controls.tsx](../../frontend/components/Controls.tsx), and
+[MissingVillagerInvestigation.tsx](../../frontend/components/MissingVillagerInvestigation.tsx).
+
+The casebook has a bounded scrolling region and new evidence fades in (disabled
+for reduced motion). Each chapter connects the interaction to a learning concept:
+human interrupt/resume, observation versus inference, and partial observability.
+The final prompt asks the learner to predict the effect of withholding evidence.
+These are teaching prompts, not a claim that the scripted witnesses are LLM agents.

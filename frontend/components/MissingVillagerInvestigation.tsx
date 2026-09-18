@@ -11,8 +11,10 @@ export function MissingVillagerInvestigation({ awaiting, submitting, onSubmit }:
   submitting: boolean;
   onSubmit: (value: Record<string, unknown>) => Promise<boolean>;
 }) {
-  const [locked, setLocked] = useState(false);
-  const inFlight = useRef(false);
+  const [lockedTurn, setLockedTurn] = useState<string | null>(null);
+  const locked = lockedTurn === awaiting.turn_id;
+  const inFlight = useRef<string | null>(null);
+  const notebookRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const [audioError, setAudioError] = useState(false);
   useEffect(() => () => { const context = audioRef.current; if (context && context.state !== "closed") void context.close().catch(() => {}); }, []);
@@ -48,16 +50,20 @@ export function MissingVillagerInvestigation({ awaiting, submitting, onSubmit }:
     } catch { setAudioError(true); }
   }
   const view = awaiting.investigation!;
+  useEffect(() => {
+    const notebook = notebookRef.current;
+    if (notebook) notebook.scrollTo({ top: notebook.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  }, [view.clues.length, view.interviews.length]);
   const chapter = view.stage === "arrival" ? 0 : view.stage === "house" ? 1 : 2;
   const present = view.choices.filter((choice) => choice.id.startsWith("present:"));
   const choices = view.choices.filter((choice) => !choice.id.startsWith("present:"));
   async function act(action: string) {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setLocked(true);
+    if (inFlight.current === awaiting.turn_id) return;
+    inFlight.current = awaiting.turn_id ?? "pending";
+    setLockedTurn(awaiting.turn_id ?? "pending");
     if (!await onSubmit({ action, turn_id: awaiting.turn_id })) {
-      inFlight.current = false;
-      setLocked(false);
+      inFlight.current = null;
+      setLockedTurn(null);
     }
   }
   return (
@@ -72,13 +78,19 @@ export function MissingVillagerInvestigation({ awaiting, submitting, onSubmit }:
           {CHAPTERS.map((label, index) => <li key={label} aria-current={index === chapter ? "step" : undefined}><span>{index < chapter ? "✓" : `0${index + 1}`}</span>{label}</li>)}
         </ol>
       </header>
+      <aside className={styles.lesson} aria-label="Learning concepts">
+        <span className={styles.eyebrow}>WHAT THIS TEACHES</span>
+        <h3>{chapter === 0 ? "Human-in-the-loop orchestration" : chapter === 1 ? "Evidence is not a conclusion" : "Partial observability and conflicting accounts"}</h3>
+        <p>{chapter === 0 ? "LangGraph waits at an interrupt. Your choice resumes the saved investigation state; the next choice creates another checkpoint." : chapter === 1 ? "The casebook separates observed physical facts from interpretations. Each inspection updates your saved discoveries without making them public." : "Witnesses offer claims, not verified facts. Your private context differs from the council’s. Choosing what to present changes the information available to the agents."}</p>
+        <small>{chapter === 0 ? "Try explaining: what changes when you follow the scream?" : chapter === 1 ? "Ask: does this clue support more than one explanation?" : "Predict: would withholding one clue change the council’s vote?"}</small>
+      </aside>
       <div className={styles.body}>
         <div className={styles.heading}><span>{chapter === 0 ? "THE BELLKEEPER’S HOUSE" : chapter === 1 ? "SEARCH THE ROOM" : "PRIVATE QUESTIONS"}</span><small>{chapter === 1 ? `${view.clues.length}/2 traces examined` : chapter === 2 ? `${view.questioned}/3 witnesses questioned` : "Before the first council"}</small></div>
         {chapter === 1 && <div className={styles.room} aria-hidden="true"><div className={styles.window} /><div className={styles.lantern} /><div className={styles.ash} /><span>The flame moves. There is no wind.</span></div>}
-        <div className={styles.choices}>
+        <div className={`${styles.choices} ${styles.actionSpace}`}>
           {choices.map((choice) => <button key={choice.id} disabled={locked || submitting} onClick={() => void act(choice.id)}><strong>{choice.label}</strong><span>{choice.detail}</span><b aria-hidden="true">↗</b></button>)}
         </div>
-        {(view.clues.length > 0 || view.interviews.length > 0) && <div className={styles.notebook}>
+        {(view.clues.length > 0 || view.interviews.length > 0) && <div className={styles.notebook} ref={notebookRef} tabIndex={0} role="region" aria-label="Your casebook">
           <h3>Your casebook <small>Private until you speak</small></h3>
           {view.clues.map((clue) => <article key={clue.id}><span className={styles.fact}>OBSERVED · {clue.location}</span><h4>{clue.title}</h4><p>{clue.text}</p></article>)}
           {view.interviews.map((account, index) => <article key={`${account.name}:${account.question}`} className={styles.account}><span>WITNESS ACCOUNT · UNVERIFIED</span><h4>{account.name} <small>on {account.question}</small></h4><p {...(index === view.interviews.length - 1 ? { "aria-live": "polite" as const } : {})}>“{account.text}”</p></article>)}
@@ -88,7 +100,7 @@ export function MissingVillagerInvestigation({ awaiting, submitting, onSubmit }:
           <p>Only the clues you present become public. You can recount the private interviews in your speaking turn. The village’s vote decides the bellkeeper’s fate.</p>
           <div className={styles.choices}>{present.map((choice) => <button key={choice.id} disabled={locked || submitting} onClick={() => void act(choice.id)}><strong>{choice.label}</strong><span>{choice.detail}</span><b aria-hidden="true">→</b></button>)}</div>
         </div>}
-        {locked && <p className={styles.saving} role="status">Following your lead…</p>}
+        <p className={styles.saving} role="status">{locked || submitting ? "Following your lead…" : "Your progress is saved. Choose your next lead."}</p>
       </div>
     </section>
   );

@@ -25,6 +25,10 @@ export function Controls({
   promptKey: string | null;
 }) {
   const { t } = usePreferences();
+  // Keep the episode mounted across the accepted-input → next-interrupt gap.
+  // Its stale buttons remain disabled until the server supplies the next turn.
+  const [lastInvestigation, setLastInvestigation] = useState<AwaitingInput | null>(null);
+  if (awaiting?.kind === "investigation" && awaiting !== lastInvestigation) setLastInvestigation(awaiting);
   const [text, setText] = useState("");
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   // Lock against a logical turn key, not the parsed object's identity. An SSE
@@ -50,13 +54,11 @@ export function Controls({
     );
   }
 
-  if (!awaiting) {
-    return <div className="controls-hint">{t("The village is deciding what happens next...")}</div>;
+  const investigation = awaiting?.kind === "investigation" ? awaiting : !awaiting ? lastInvestigation : null;
+  if (investigation?.investigation) {
+    return <MissingVillagerInvestigation awaiting={investigation} submitting={submitting || !awaiting} onSubmit={onSubmit} />;
   }
-
-  if (awaiting.kind === "investigation" && awaiting.investigation) {
-    return <MissingVillagerInvestigation key={awaiting.turn_id} awaiting={awaiting} submitting={submitting} onSubmit={onSubmit} />;
-  }
+  if (!awaiting) return <div className="controls-hint">{t("The village is deciding what happens next...")}</div>;
 
   if (awaiting.kind === "statement") {
     return (

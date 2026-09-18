@@ -559,3 +559,20 @@ export async function transcribeCouncil(sessionId: string, recording: Blob, lang
   if(!res.ok){const detail=await res.json().catch(()=>null);throw new Error(detail?.detail??"Transcription failed");}
   const result=await res.json();return result.text;
 }
+
+export type CheckpointEntry = { id: string; created_at: string | null; step: number | null; source: string | null; next: string[]; writes: string[] };
+export type CheckpointInspection = {
+  available: boolean; thread_id: string; history: CheckpointEntry[]; selected: CheckpointEntry | null;
+  values: Record<string, unknown>; previous_values: Record<string, unknown>;
+  tasks: { name: string; error: string | null; interrupts: unknown[] }[];
+  seats: { seat_id: string; name: string; controller: string }[];
+};
+export async function fetchCheckpointInspection(sessionId: string, access?: GameAccessCredentials, seatId?: string, checkpointId?: string, signal?: AbortSignal): Promise<CheckpointInspection> {
+  const params = new URLSearchParams();
+  if (access?.hostToken) params.set("host_token", access.hostToken);
+  if (seatId) params.set("seat_id", seatId);
+  if (checkpointId) params.set("checkpoint_id", checkpointId);
+  const response = await fetch(`${API_BASE}/games/${sessionId}/inspector?${params}`, { signal, cache: "no-store" });
+  if (!response.ok) throw new Error(`State inspection unavailable (${response.status})`);
+  return response.json();
+}

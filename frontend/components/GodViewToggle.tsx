@@ -3,9 +3,9 @@ import { usePreferences } from "./Preferences";
 export function GodViewToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   const {t}=usePreferences();
   return (
-    <div className="toggle-wrap" onClick={onToggle}>
+    <button type="button" className="toggle-wrap" aria-pressed={on} onClick={onToggle} style={{ border: 0, background: "transparent", color: "inherit", font: "inherit", padding: 0 }}>
       <span>{t("God view")}</span>
-      <div className={`toggle ${on ? "on" : ""}`} />
-    </div>
+      <span aria-hidden="true" className={`toggle ${on ? "on" : ""}`} />
+    </button>
   );
 }

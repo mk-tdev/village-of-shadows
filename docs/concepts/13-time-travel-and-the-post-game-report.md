@@ -160,3 +160,40 @@ the outcome and educational takeaways immediately visible, while long tables
 and forensic evidence use native expandable sections. The report owns its
 scroll container, so inspecting every checkpoint no longer makes the game page
 itself several screens longer.
+
+## Live checkpoint inspector
+
+The host's God Mode engineering panel now includes **Inside LangGraph**. It reads
+actual `aget_state_history` and `aget_state` snapshots, rather than reconstructing
+state from SSE animations. Select the main game thread or a seat's independent
+memory thread, choose one of the latest 30 checkpoints, and inspect its values,
+next nodes and task interrupts. **Changes** compares values with that checkpoint's
+parent. Browsing history never resumes, rewinds or mutates the running graph.
+
+[State inspector backend](../../backend/app/game/state_inspector.py) and
+[inspector UI](../../frontend/components/StateInspector.tsx).
+
+**Agent context** shows saved persona, latest briefing, stored messages, commit
+tool, arguments and result. Human seats normally have no AI memory thread. The
+host-only endpoint authorizes the room before reading checkpoints and validates
+seat membership. Checkpoint IDs are resolved within the server-chosen thread;
+clients cannot supply arbitrary thread IDs. Provider credentials, endpoints and
+internal reasoning blocks are excluded from the inspection projection. Observable
+messages and submitted explanations are not a model's hidden chain-of-thought.
+
+**Follow latest** polls every two seconds without overlapping requests. Selecting
+a historical checkpoint stops following; Refresh rereads the selected state.
+Snapshots are saved supersteps, not in-flight token-by-token state. Each thread
+is read independently; switching agents does not imply an atomic snapshot of all
+agents at one instant. The pane retains its size and scroll position while data
+refreshes. No checkpoint means the graph has not run, the human has no AI thread,
+or checkpoint history was reclaimed.
+
+For a finals demo: inspect the investigation interrupt on the game thread, make
+one choice, then inspect `game.missing_villager.discovered` in Changes. Complete
+the investigation, allow an AI turn, select that agent, and show its briefing and
+messages. Compare another agent to explain why shared models can have different
+private contexts and decisions.
+
+Use **Expand inspector** for a presentation or a narrow screen. Its modal view
+keeps floating chat/council previews behind the state explorer; Escape closes it.

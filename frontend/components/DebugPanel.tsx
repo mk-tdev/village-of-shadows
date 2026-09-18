@@ -17,6 +17,7 @@ import { GraphFlow } from "./GraphFlow";
 import { SeatMindFlow } from "./SeatMindFlow";
 import { PerspectiveViewer } from "./PerspectiveViewer";
 import { AgentConfigurationPanel } from "./AgentConfigurationPanel";
+import { StateInspector } from "./StateInspector";
 import { GraphInspectorModal } from "./GraphInspectorModal";
 
 const ACTIVITY_ICON: Record<ActivityEntry["kind"], string> = {
@@ -186,6 +187,7 @@ export function DebugPanel({
 
       {godView ? (
         <>
+          <StateInspector sessionId={sessionId} access={access} />
           <AgentConfigurationPanel players={players} />
           <PerspectiveViewer sessionId={sessionId} players={players} access={access} />
           <div className="belief-panel">

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from app import persistence
@@ -505,3 +505,26 @@ async def replace_room_seat_with_ai(
     # SSE subscriber.
     orch.publish("roles_assigned", {"players": []})
     return {"ok": True, "seat_id": seat_id, "controller": "ai", "provider": "mock", "model_name": "mock-v1"}
+
+
+@router.get("/{session_id}/inspector")
+async def get_checkpoint_inspector(
+    session_id: str, request: Request, response: Response, host_token: str | None = None,
+    seat_id: str | None = None, checkpoint_id: str | None = None,
+) -> dict:
+    """Actual LangGraph state, scoped to this host's game and optional seat."""
+    await _viewer(request, session_id, host_token=host_token, require_host=True)
+    config = await persistence.get_game_config(request.app.state.db_conn, session_id)
+    if config is None:
+        raise HTTPException(404, "No such game.")
+    response.headers["Cache-Control"] = "private, no-store"
+    from app.game.state_inspector import inspect_thread
+    from app.game.seat_mind import mind_config
+    seats = config['seats']
+    if seat_id is not None and not any(s['seat_id'] == seat_id for s in seats):
+        raise HTTPException(404, "No such seat in this game.")
+    graph = request.app.state.seat_mind if seat_id else request.app.state.graph
+    thread_id = mind_config(session_id, seat_id)['configurable']['thread_id'] if seat_id else session_id
+    result = await inspect_thread(graph, thread_id, checkpoint_id)
+    result['seats'] = [{'seat_id': s['seat_id'], 'name': s['display_name'], 'controller': s['controller']} for s in seats]
+    return result

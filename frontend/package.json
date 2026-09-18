@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:exploration": "node --test tests/exploration.test.mjs tests/creature-asset.test.mjs",
-    "build:werewolf": "node scripts/build-werewolf.mjs"
+    "build:werewolf": "node scripts/build-werewolf.mjs",
+    "test:inspector": "node --test tests/state-changes.test.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",

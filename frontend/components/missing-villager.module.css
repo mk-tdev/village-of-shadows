@@ -42,3 +42,18 @@
 .listen { background: #15201fbb; border: 1px solid #78806b; border-radius: 4px; color: #d7c5a5; font-size: 11px; padding: 9px 12px; cursor: pointer; }
 .listen:focus-visible { outline: 2px solid #edc085; outline-offset: 3px; }
 .lantern { width: 13px; height: 27px; border-radius: 50%; background: radial-gradient(ellipse at 50% 70%,#fff6b6 0%,#ebad49 30%,#e7691355 60%,transparent 72%); box-shadow: 0 0 25px 10px #f79a3a22; }
+
+/* Keep reading position stable while evidence grows inside the casebook. */
+.case { overflow-anchor: none; }
+.hero p { min-height: 76px; }
+.lesson { margin: 22px 28px 0; padding: 18px; border: 1px solid #48615a; border-radius: 8px; background: #172421; }
+.lesson h3 { font: 20px Georgia,serif; margin: 8px 0; }
+.lesson p { font-size: 13px; line-height: 1.7; color: #c4c8bf; }
+.lesson small { color: #d3ad79; line-height: 1.6; display: block; }
+.actionSpace { min-height: 190px; align-content: start; }
+.notebook { max-height: 420px; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.notebook article { animation: evidence-arrives 220ms ease-out; }
+.saving { min-height: 20px; }
+@keyframes evidence-arrives { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media(prefers-reduced-motion:reduce) { .notebook article { animation: none; } }
+@media(max-width:600px) { .lesson { margin-inline: 16px; } .actionSpace { min-height: 190px; } }

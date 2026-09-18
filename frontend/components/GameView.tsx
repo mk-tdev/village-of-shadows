@@ -440,7 +440,7 @@ export function GameView({
               <div className="controls-hint">{t("Waiting for the room host to begin the game…")}</div>
             ) : (
               <Controls
-                key={game.awaiting?.turn_id ?? "idle"}
+                key={game.phase === "investigation" ? "investigation" : game.awaiting?.turn_id ?? "idle"}
                 sessionId={sessionId}
                 access={access ?? undefined}
                 language={game.options?.language ?? language}
