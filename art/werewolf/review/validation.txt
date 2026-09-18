@@ -1,0 +1,51 @@
+FAIL: plan-metadata.json: complete reviewed-space coverage is required
+FAIL: Function: missing artifact floorPlan
+FAIL: Function: missing artifact reflectedCeilingPlan
+FAIL: Function: missing artifact openingContactSheet
+FAIL: Function: at least one existing wall elevation is required
+FAIL: props.json: generation must use Meshy model meshy-5
+FAIL: props.json: current official Meshy pricing verification is required
+FAIL: props.json: positive creditsPerTexturedTask is required
+FAIL: props.json: hardCreditCeiling must be positive and no greater than the room credit budget
+FAIL: props.json: maxChargedAttemptsPerAsset must equal 2
+FAIL: prop watchman-werewolf: function is required
+FAIL: prop watchman-werewolf: description is required
+FAIL: prop watchman-werewolf: class must be reusable or hero
+FAIL: prop watchman-werewolf: attachmentFace is invalid
+FAIL: prop watchman-werewolf: semanticFront is invalid
+FAIL: prop watchman-werewolf: targetPolycount must be 100-300000
+FAIL: prop watchman-werewolf: image prompt and generator are required
+FAIL: prop watchman-werewolf: approved reference image is missing
+FAIL: prop watchman-werewolf: reference image requires explicit approval
+FAIL: room-layout.json: meter units and at least one shell surface are required
+FAIL: room-layout.json: instance count for watchman-werewolf does not match intendedInstances
+FAIL: openings.json: primary arrival opening or functional exception is required
+FAIL: Function gate: explicit approval is required
+FAIL: Function gate: existing evidence is required
+FAIL: Function gate: strangestElement review is required
+FAIL: final-report.json: gates.function must be true
+FAIL: Form gate: explicit approval is required
+FAIL: final-report.json: gates.form must be true
+FAIL: Form gate: prop watchman-werewolf requires an accepted, hashed Meshy GLB
+FAIL: Form gate: formChecks.floorPlanParity must be true
+FAIL: Form gate: formChecks.primaryArrival must be true
+FAIL: Form gate: formChecks.symmetry must be true
+FAIL: Form gate: formChecks.shell must be true
+FAIL: Form gate: formChecks.manifold must be true
+FAIL: Form gate: formChecks.booleans must be true
+FAIL: Form gate: formChecks.collisions must be true
+FAIL: Form gate: formChecks.support must be true
+FAIL: Form gate: formChecks.attachmentOrientation must be true
+FAIL: Form gate: formChecks.ceilingAttachmentOrientation must be true
+FAIL: Form gate: formChecks.seatingOrientation must be true
+FAIL: Form gate: formChecks.focalDistribution must be true
+FAIL: Form gate: formChecks.heroClearance must be true
+FAIL: Form gate: formChecks.colonnades must be true
+FAIL: Form gate: formChecks.screenClearance must be true
+FAIL: Form gate: formChecks.scale must be true
+FAIL: Form gate: formChecks.camera must be true
+FAIL: Form gate: formChecks.ceilingCoverage must be true
+FAIL: Form gate: formChecks.environmentCoverage must be true
+FAIL: Form gate: formChecks.provenance must be true
+FAIL: Form gate: four existing 120-degree corner renders are required
+FAIL: Form gate: center-up and two ceiling-oblique renders are required

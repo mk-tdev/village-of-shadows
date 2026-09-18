@@ -109,3 +109,17 @@ test("the council seat can be reached without picking up any keepsakes", () => {
   assert.ok(atCouncil(point));
   assert.ok(canWalk(COUNCIL_SEAT));
 });
+
+
+const { wolfAnimation, wolfClipTime } = await import('../lib/exploration/wolf-animation.ts');
+test('Blender clips follow phase timing, pause deterministically, and freeze reduced motion', () => {
+  const sample = wolfAnimation({ phase: 'pouncing', time: .55 }, false);
+  assert.equal(sample.name, 'Attack_Lunge');
+  assert.equal(wolfClipTime(sample, 2), 1);
+  assert.equal(wolfClipTime(sample, 2), 1);
+  assert.equal(wolfAnimation({ phase: 'hunting', time: 1 }, false).name, 'Threat_Roar');
+  assert.equal(wolfAnimation({ phase: 'hunting', time: 3 }, false).name, 'Hunt_Stride');
+  for (const phase of ['transforming', 'pouncing', 'feeding', 'hunting', 'fleeing']) {
+    assert.equal(wolfClipTime(wolfAnimation({ phase, time: .1 }, true), 2), wolfClipTime(wolfAnimation({ phase, time: .8 }, true), 2));
+  }
+});

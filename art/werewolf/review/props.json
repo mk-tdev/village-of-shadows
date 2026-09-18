@@ -1,0 +1,32 @@
+{
+  "schema": "game-room.prop-manifest.v1",
+  "roomId": "watchman-blender",
+  "generation": {
+    "provider": "local-blender",
+    "hardCreditCeiling": 0,
+    "paidCalls": 0
+  },
+  "assets": [
+    {
+      "id": "watchman-werewolf",
+      "source": "../../../frontend/public/exploration/werewolf.glb",
+      "method": "Original project mesh refined in Blender",
+      "approvalStatus": "pending",
+      "dimensionsMeters": [
+        2.2,
+        1.4,
+        3.0
+      ],
+      "semanticFront": "Blender -Y; runtime +Z",
+      "attachmentFace": "feet",
+      "polygonTarget": 140000,
+      "rejectionCriteria": [
+        "eyes obscured",
+        "visible disconnected skin",
+        "unreadable silhouette",
+        "broken jaw or limb deformation",
+        "GLB over 14 MiB"
+      ]
+    }
+  ]
+}

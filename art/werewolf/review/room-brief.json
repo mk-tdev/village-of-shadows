@@ -1,0 +1,75 @@
+{
+  "schema": "game-room.room-brief.v1",
+  "roomId": "watchman-blender",
+  "family": "custom",
+  "purpose": "Creature-only Blender authoring study for the existing watchman encounter",
+  "runtimeSurface": "Three.js /explore; production asset unchanged pending review",
+  "boundsMeters": [
+    2.2,
+    1.4,
+    3.0
+  ],
+  "hero": {
+    "id": "watchman-werewolf",
+    "role": "Transforming horror antagonist",
+    "reservedBoundsMeters": [
+      2.2,
+      1.4,
+      3.0
+    ]
+  },
+  "symmetry": {
+    "mode": "none",
+    "order": 1,
+    "appliesTo": [],
+    "exceptions": []
+  },
+  "circulation": {
+    "description": "Existing village paths/collision unchanged; review stage is not gameplay geometry",
+    "minimumClearanceMeters": 2.4
+  },
+  "productionCamera": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "location": [
+      0,
+      -4,
+      1.65
+    ],
+    "target": [
+      0,
+      0,
+      1.65
+    ],
+    "verticalFovDegrees": 65
+  },
+  "performanceBudget": {
+    "maxSceneTriangles": 140000,
+    "maxVLowBytes": 14680064,
+    "maxHighTextureBytes": 8388608
+  },
+  "creditBudget": {
+    "maximumCredits": 0,
+    "approvalRequired": true
+  },
+  "environment": {
+    "type": "none",
+    "identity": "",
+    "source": "",
+    "assignmentKey": ""
+  },
+  "artifacts": {
+    "floorPlan": "",
+    "reflectedCeilingPlan": "",
+    "planMetadata": "plan-metadata.json",
+    "wallElevations": [],
+    "visualTarget": "renders/three-quarter.png",
+    "openingContactSheet": ""
+  },
+  "scopeExceptions": [
+    "No architectural changes: shell/opening/ceiling studies not applicable to the isolated creature.",
+    "Review renders show authoring camera, not evidence of runtime integration."
+  ]
+}

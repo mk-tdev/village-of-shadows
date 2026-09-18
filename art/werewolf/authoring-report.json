@@ -1,0 +1,39 @@
+{
+  "blender": "5.2.2 LTS",
+  "input_sha256": "da34a0adc4db1f2da4cdb528180a29d411e2e40ac01459717e654b1721f5763a",
+  "bones": [
+    "Hips",
+    "Spine",
+    "Chest",
+    "Neck",
+    "Head",
+    "Jaw",
+    "ArmL",
+    "ForearmL",
+    "HandL",
+    "ArmR",
+    "ForearmR",
+    "HandR",
+    "ThighL",
+    "ShinL",
+    "FootL",
+    "ThighR",
+    "ShinR",
+    "FootR"
+  ],
+  "actions": [
+    "Attack_Lunge",
+    "Feeding",
+    "Hunt_Stride",
+    "Threat_Idle",
+    "Threat_Roar",
+    "Transformation_Convulsion"
+  ],
+  "source_mesh_triangles": 72932,
+  "runtime_exported": true,
+  "form_approval": "User: proceed (2026-09-17)",
+  "materials_need_baking_before_gltf": false,
+  "output_sha256": "f83a91d43af150bb3e6d8ffe2cda794c403416ce3ffbce728236c6fb54e6f662",
+  "output_bytes": 13473960,
+  "portable_materials": "1024px baked dermis normal; fur geometry and PBR roughness; other procedural bumps omitted"
+}

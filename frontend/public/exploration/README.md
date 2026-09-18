@@ -64,3 +64,13 @@ sub-bass, slow pitch drift and a low heartbeat pulse. It swells during the
 encounter and recedes near the council fire, alongside spatial creature
 recordings, wind and fire. It begins only on a gesture; sound-off and pause
 suspend it. This is a procedural score, not a licensed music recording.
+
+
+## Blender refinement (feature branch)
+
+The encounter now loads `werewolf-blender.glb`, exported from the editable
+`art/werewolf/watchman-werewolf.blend` source. It includes six authored clips and
+an embedded baked dermis normal map. The original `werewolf.glb` remains the
+procedural authoring input. See `art/werewolf/README.md` for regeneration,
+provenance, budgets and review status. Blender is required to re-author/export
+this version, but is not needed to run the app.

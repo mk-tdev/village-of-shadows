@@ -1,0 +1,88 @@
+{
+  "schema": "game-room.room-final-report.v1",
+  "roomId": "watchman-blender",
+  "gates": {
+    "function": false,
+    "form": true,
+    "runtime": false
+  },
+  "formChecks": {
+    "floorPlanParity": false,
+    "primaryArrival": false,
+    "symmetry": false,
+    "shell": false,
+    "manifold": false,
+    "booleans": false,
+    "collisions": false,
+    "support": false,
+    "attachmentOrientation": false,
+    "ceilingAttachmentOrientation": false,
+    "seatingOrientation": false,
+    "focalDistribution": false,
+    "heroClearance": false,
+    "colonnades": false,
+    "screenClearance": false,
+    "scale": false,
+    "camera": false,
+    "ceilingCoverage": false,
+    "environmentCoverage": false,
+    "provenance": false
+  },
+  "reviewRenders": {
+    "corners": [],
+    "ceiling": [],
+    "environment": {}
+  },
+  "runtimeChecks": {
+    "vlow": false,
+    "textureTiers": false,
+    "lightmap": false,
+    "lightingManifest": false,
+    "performance": false,
+    "browserCapture": "",
+    "errors": [],
+    "assetAudit": {
+      "triangles": 72278,
+      "bytes": 13473960,
+      "embeddedNormalMaps": 1,
+      "clips": 6,
+      "automatedTests": 15
+    },
+    "localVerification": {
+      "url": "http://127.0.0.1:4001/explore",
+      "observed": [
+        "Scene ready and entered through normal controls",
+        "Feeding and retreat rendered",
+        "Replay showed frontal hunting roar and lantern protection",
+        "Pause and resume controls worked"
+      ],
+      "checks": [
+        "15 exploration tests passed",
+        "TypeScript passed",
+        "ESLint passed",
+        "Production webpack build passed",
+        "96 documentation citations checked; zero stale"
+      ],
+      "humanApproval": "pending",
+      "deployment": "not requested"
+    }
+  },
+  "postmortem": {
+    "observations": [
+      "Source skin had disconnected vertices per triangle: smoothing without welding created holes.",
+      "Initial source eye placement intersected the brow; recessed sockets added.",
+      "Blender is installed and source/pose renders are reproducible."
+    ],
+    "corrections": [
+      "Welded body vertices before smoothing.",
+      "Recessed sockets and rounded thin ear edges.",
+      "Separated review-only lights and floor from authored creature.",
+      "Ground the animated body foot vertices instead of relying on a fixed joint offset."
+    ],
+    "remainingRisks": [
+      "Human Runtime approval not yet requested; no deployment in scope.",
+      "Detailed fur remains stylized geometry rather than scanned or strand-based fur."
+    ]
+  },
+  "proposedLessons": []
+}

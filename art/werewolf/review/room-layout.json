@@ -1,0 +1,8 @@
+{
+  "schema": "game-room.layout.v1",
+  "roomId": "watchman-blender",
+  "units": "meters",
+  "surfaces": [],
+  "instances": [],
+  "productionCamera": {"location": [0, 0, 0], "target": [0, 0, 0], "verticalFovDegrees": 60}
+}

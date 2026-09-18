@@ -1,0 +1,6 @@
+{
+  "schema": "game-room.opening-schedule.v1",
+  "roomId": "watchman-blender",
+  "primaryArrival": {"openingId": "", "exception": ""},
+  "openings": []
+}

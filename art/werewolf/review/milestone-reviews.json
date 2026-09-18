@@ -1,0 +1,34 @@
+{
+  "schema": "game-room.milestone-reviews.v1",
+  "roomId": "watchman-blender",
+  "function": {
+    "status": "pending",
+    "approvedBy": "",
+    "approvedAt": "",
+    "evidence": [],
+    "strangestElement": "",
+    "notes": "Creature-only local refinement authorized on a feature branch. No paid generation or room composition."
+  },
+  "form": {
+    "status": "approved",
+    "approvedBy": "User",
+    "approvedAt": "2026-09-17",
+    "evidence": [
+      "renders/front.png",
+      "renders/profile.png",
+      "renders/three-quarter.png",
+      "renders/roar-detail.png",
+      "../watchman-werewolf.blend"
+    ],
+    "strangestElement": "Original long fur ribbons and pointed ear silhouette still need artistic review.",
+    "notes": "User replied proceed after the creature review render and Form approval request. Export and local integration authorized."
+  },
+  "runtime": {
+    "status": "pending",
+    "approvedBy": "",
+    "approvedAt": "",
+    "evidence": [],
+    "strangestElement": "",
+    "notes": "Local runtime verification underway; no deployment requested or approved."
+  }
+}
