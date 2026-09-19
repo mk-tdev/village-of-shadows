@@ -4140,6 +4140,28 @@ input:focus {
   color: #f7dfb8;
   background: rgba(11, 14, 17, 0.45);
 }
+.landing-language-switch {
+  min-width: 46px;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(139, 196, 212, 0.5);
+  border-radius: 999px;
+  background: rgba(5, 16, 23, 0.62);
+  color: #dcecef;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+.landing-language-switch:hover,
+.landing-language-switch:focus-visible {
+  border-color: var(--landing-blue);
+  background: rgba(24, 64, 76, 0.66);
+  color: white;
+  outline: none;
+}
 .landing-hero-content {
   position: relative;
   z-index: 10;
@@ -4562,6 +4584,7 @@ input:focus {
   .landing-mark strong { font-size: 9px; }
   .landing-nav-links > a:not(.landing-nav-enter) { display: none; }
   .landing-nav-links .landing-nav-enter { padding: 8px 11px; font-size: 9px; }
+  .landing-language-switch { min-width: 42px; height: 31px; padding-inline: 9px; font-size: 10px; }
   .landing-hero { min-height: 900px; }
   .landing-hero-content { width: calc(100% - 34px); padding-top: 74px; }
   .landing-hero h1 { font-size: clamp(58px, 19vw, 86px); }

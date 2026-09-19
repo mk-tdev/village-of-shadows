@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { EyeIcon, MoonIcon } from "@/components/icons";
+import { LandingLanguageSwitch, LandingText } from "@/components/LandingLanguageSwitch";
 
 export const metadata: Metadata = {
   title: "Village of Shadows | Enter an Agentic AI World",
@@ -80,41 +81,42 @@ export default function LandingPage() {
             <strong>VILLAGE OF SHADOWS</strong>
           </Link>
           <div className="landing-nav-links">
-            <Link href="#the-system">The system</Link>
-            <Link href="/presentation">Presentation</Link>
-            <Link href="/how-to-play">How to play</Link>
-            <Link href="/tournament">Tournament lab</Link>
-            <Link href="/history">Game archive</Link>
-            <Link className="landing-nav-enter" href="/explore">Explore the village</Link>
+            <Link href="#the-system"><LandingText text="The system" /></Link>
+            <Link href="/presentation"><LandingText text="Presentation" /></Link>
+            <Link href="/how-to-play"><LandingText text="How to play" /></Link>
+            <Link href="/tournament"><LandingText text="Tournament lab" /></Link>
+            <Link href="/history"><LandingText text="Game archive" /></Link>
+            <Link href="/explore"><LandingText text="Explore the village" /></Link>
+            <Link className="landing-nav-enter" href="/setup"><LandingText text="Start game" /></Link>
+            <LandingLanguageSwitch />
           </div>
         </nav>
 
         <div className="landing-hero-content">
           <div className="landing-eyebrow">
             <span className="landing-live-dot" />
-            A live multi-agent social experiment
+            <LandingText text="A live multi-agent social experiment" />
           </div>
           <h1 id="landing-title">
-            Sit among<br />
-            <em>the agents.</em>
+            <LandingText text="Sit among" /><br />
+            <em><LandingText text="the agents." /></em>
           </h1>
           <p className="landing-hero-copy">
-            Six independent AI minds. One human player. Secret roles, private memories,
-            competing objectives—and no script for what happens next.
+            <LandingText text="Six independent AI minds. One human player. Secret roles, private memories, competing objectives—and no script for what happens next." />
           </p>
           <div className="landing-hero-actions">
-            <Link className="landing-primary-action" href="/explore">
-              <span>Walk into the shadows</span>
+            <Link className="landing-primary-action" href="/setup">
+              <span><LandingText text="Start Game Setup" /></span>
               <b aria-hidden="true">→</b>
             </Link>
-            <Link className="landing-text-action" href="/setup">
-              Go straight to the AI council
+            <Link className="landing-text-action" href="/explore">
+              <LandingText text="Explore the village first" />
             </Link>
           </div>
           <dl className="landing-hero-stats">
-            <div><dt>06</dt><dd>AI minds</dd></div>
-            <div><dt>01</dt><dd>Human inside</dd></div>
-            <div><dt>∞</dt><dd>Unscripted outcomes</dd></div>
+            <div><dt>06</dt><dd><LandingText text="AI minds" /></dd></div>
+            <div><dt>01</dt><dd><LandingText text="Human inside" /></dd></div>
+            <div><dt>∞</dt><dd><LandingText text="Unscripted outcomes" /></dd></div>
           </dl>
         </div>
 
@@ -122,13 +124,13 @@ export default function LandingPage() {
           {CAST.map((member) => (
             <article className="landing-character" key={member.name}>
               <Image src={member.image} alt={member.name} fill sizes="(max-width: 760px) 28vw, 11vw" />
-              <span><b>{member.name}</b><small>{member.mind}</small></span>
+              <span><b>{member.name}</b><small><LandingText text={member.mind} /></small></span>
             </article>
           ))}
         </div>
 
         <a className="landing-scroll-cue" href="#the-system" aria-label="Scroll to learn about the system">
-          <span /> Explore the world
+          <span /> <LandingText text="Explore the world" />
         </a>
       </section>
 
@@ -145,11 +147,10 @@ export default function LandingPage() {
 
       <section className="landing-system landing-section" id="the-system" aria-labelledby="system-title">
         <div className="landing-section-heading">
-          <span>THE LIVING SYSTEM</span>
-          <h2 id="system-title">The graph controls the world.<br /><em>The agents create the story.</em></h2>
+          <span><LandingText text="THE LIVING SYSTEM" /></span>
+          <h2 id="system-title"><LandingText text="The graph controls the world." /><br /><em><LandingText text="The agents create the story." /></em></h2>
           <p>
-            This is not a chatbot taking turns with itself. Every seat owns a model,
-            personality, role, memory, and private view of the same evolving world.
+            <LandingText text="This is not a chatbot taking turns with itself. Every seat owns a model, personality, role, memory, and private view of the same evolving world." />
           </p>
         </div>
 
@@ -158,9 +159,9 @@ export default function LandingPage() {
             <div className="landing-orbit-ring landing-orbit-ring-outer" />
             <div className="landing-orbit-ring landing-orbit-ring-inner" />
             <div className="landing-world-core">
-              <span>SHARED WORLD</span>
+              <span><LandingText text="SHARED WORLD" /></span>
               <strong>LangGraph</strong>
-              <small>state · turns · interrupts</small>
+              <small><LandingText text="state · turns · interrupts" /></small>
             </div>
             {MINDS.map((mind, index) => (
               <div
@@ -169,28 +170,27 @@ export default function LandingPage() {
                 key={mind.name}
               >
                 <span><Image src={mind.image} alt="" fill sizes="54px" /></span>
-                <b>{mind.name}</b>
-                <small>{mind.human ? "HUMAN" : `AI ${index + 1}`}</small>
+                <b>{mind.human ? <LandingText text="You" /> : mind.name}</b>
+                <small>{mind.human ? <LandingText text="HUMAN" /> : `AI ${index + 1}`}</small>
               </div>
             ))}
           </div>
 
           <div className="landing-system-copy">
-            <div className="landing-code-kicker"><span /> WORLD STATE / ACTIVE</div>
-            <h3>Seven seats. Seven private truths.</h3>
+            <div className="landing-code-kicker"><span /> <LandingText text="WORLD STATE / ACTIVE" /></div>
+            <h3><LandingText text="Seven seats. Seven private truths." /></h3>
             <p>
-              LangGraph decides whose turn it is and which actions are legal. It never decides
-              whom an agent should trust, accuse, protect, investigate, or eliminate.
+              <LandingText text="LangGraph decides whose turn it is and which actions are legal. It never decides whom an agent should trust, accuse, protect, investigate, or eliminate." />
             </p>
             <ul className="landing-seat-owns">
-              <li><span>MODEL</span><b>Different reasoning engines</b></li>
-              <li><span>PERSONA</span><b>Different social behavior</b></li>
-              <li><span>MEMORY</span><b>Independent conversation history</b></li>
-              <li><span>KNOWLEDGE</span><b>Role-authorized information only</b></li>
+              <li><span><LandingText text="MODEL" /></span><b><LandingText text="Different reasoning engines" /></b></li>
+              <li><span><LandingText text="PERSONA" /></span><b><LandingText text="Different social behavior" /></b></li>
+              <li><span><LandingText text="MEMORY" /></span><b><LandingText text="Independent conversation history" /></b></li>
+              <li><span><LandingText text="KNOWLEDGE" /></span><b><LandingText text="Role-authorized information only" /></b></li>
             </ul>
             <div className="landing-agent-event">
               <span className="landing-event-icon"><EyeIcon /></span>
-              <p><small>AGENT EVENT · ROUND 02</small><strong>Sable revised suspicion of Bram</strong></p>
+              <p><small><LandingText text="AGENT EVENT · ROUND 02" /></small><strong><LandingText text="Sable revised suspicion of Bram" /></strong></p>
               <b>72%</b>
             </div>
           </div>
@@ -199,18 +199,18 @@ export default function LandingPage() {
 
       <section className="landing-experience landing-section" aria-labelledby="experience-title">
         <div className="landing-section-heading is-compact">
-          <span>WHAT MAKES IT AGENTIC</span>
-          <h2 id="experience-title">A system you can play.<br /><em>And inspect.</em></h2>
+          <span><LandingText text="WHAT MAKES IT AGENTIC" /></span>
+          <h2 id="experience-title"><LandingText text="A system you can play." /><br /><em><LandingText text="And inspect." /></em></h2>
         </div>
         <div className="landing-experience-grid">
           {EXPERIENCES.map((experience) => (
             <article key={experience.index}>
-              <header><span>{experience.index}</span><small>{experience.signal}</small></header>
+              <header><span>{experience.index}</span><small><LandingText text={experience.signal} /></small></header>
               <div className={`landing-experience-visual visual-${experience.index}`} aria-hidden="true">
                 <i /><i /><i /><i />
               </div>
-              <h3>{experience.title}</h3>
-              <p>{experience.text}</p>
+              <h3><LandingText text={experience.title} /></h3>
+              <p><LandingText text={experience.text} /></p>
             </article>
           ))}
         </div>
@@ -218,15 +218,15 @@ export default function LandingPage() {
 
       <section className="landing-round landing-section" aria-labelledby="round-title">
         <div className="landing-round-intro">
-          <span>ONE ROUND · MANY MINDS</span>
-          <h2 id="round-title">The night changes<br />what everyone knows.</h2>
-          <p>Then the council must decide what to believe.</p>
+          <span><LandingText text="ONE ROUND · MANY MINDS" /></span>
+          <h2 id="round-title"><LandingText text="The night changes" /><br /><LandingText text="what everyone knows." /></h2>
+          <p><LandingText text="Then the council must decide what to believe." /></p>
         </div>
         <ol className="landing-phase-track">
           {PHASES.map(([phase, text], index) => (
             <li key={phase}>
               <span>0{index + 1}</span>
-              <div><h3>{phase}</h3><p>{text}</p></div>
+              <div><h3><LandingText text={phase} /></h3><p><LandingText text={text} /></p></div>
             </li>
           ))}
         </ol>
@@ -236,19 +236,19 @@ export default function LandingPage() {
         <Image src="/scenes/moonlit-village.png" alt="" fill sizes="100vw" />
         <div className="landing-final-shade" />
         <div className="landing-final-content">
-          <span>THE COUNCIL IS WAITING</span>
-          <h2 id="final-title">Do not just watch<br />agents work.</h2>
-          <p>Sit among them. Listen carefully. Decide whom you believe.</p>
+          <span><LandingText text="THE COUNCIL IS WAITING" /></span>
+          <h2 id="final-title"><LandingText text="Do not just watch" /><br /><LandingText text="agents work." /></h2>
+          <p><LandingText text="Sit among them. Listen carefully. Decide whom you believe." /></p>
           <Link className="landing-primary-action" href="/setup">
-            <span>Enter Village of Shadows</span><b aria-hidden="true">→</b>
+            <span><LandingText text="Start Game Setup" /></span><b aria-hidden="true">→</b>
           </Link>
         </div>
       </section>
 
       <footer className="landing-footer">
         <Link className="landing-mark" href="/"><span><MoonIcon /></span><strong>VILLAGE OF SHADOWS</strong></Link>
-        <p>An open multi-agent learning experience built with LangGraph and MCP.</p>
-        <div><Link href="/how-to-play">How to play</Link><Link href="/setup">Configure agents</Link><Link href="/share">Share demo</Link><Link href="/connect">Connect</Link></div>
+        <p><LandingText text="An open multi-agent learning experience built with LangGraph and MCP." /></p>
+        <div><Link href="/how-to-play"><LandingText text="How to play" /></Link><Link href="/setup"><LandingText text="Configure agents" /></Link><Link href="/share"><LandingText text="Share demo" /></Link><Link href="/connect"><LandingText text="Connect" /></Link></div>
       </footer>
     </main>
   );
