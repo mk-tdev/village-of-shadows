@@ -241,7 +241,7 @@ export function CouncilTable3D({
   event: CouncilEvent | null;
   cameraMode: CouncilCameraMode;
 }) {
-  const { t, language } = usePreferences();
+  const { t } = usePreferences();
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
   const [webglSupported] = useState(() => {
     if (typeof document === "undefined") return false;
@@ -320,7 +320,7 @@ export function CouncilTable3D({
       <div className="council-presence-hud" aria-live="polite">
         <span>
           {cameraMode === "immersive" && human
-            ? `${language === "zh" ? "议会空地" : "IN THE CLEARING"} · ${human.name.toUpperCase()}`
+            ? `IN THE CLEARING · ${human.name.toUpperCase()}`
             : cameraMode === "cinematic"
               ? t("AGENT FOCUS")
               : t("THE WHOLE VILLAGE")}

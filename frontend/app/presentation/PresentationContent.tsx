@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePreferences } from "@/components/Preferences";
 import PresentationDeckControls from "./PresentationDeckControls";
 import styles from "./presentation.module.css";
 
@@ -20,7 +19,7 @@ type Slide = {
 
 const englishSlides: Slide[] = [
   {
-    eyebrow: "Boundless Agents / AI + Education",
+    eyebrow: "Multi-Agent AI / Learning by Doing",
     title: "Learn agentic AI from inside the system",
     body:
       "Village of Shadows is a playable AI learning lab. The learner enters a shared world with six autonomous agents, then studies why the system behaved as it did.",
@@ -133,7 +132,7 @@ const englishSlides: Slide[] = [
   },
   {
     eyebrow: "Complete task chain",
-    title: "The finals demo is live, changeable, and verifiable",
+    title: "The live demo is changeable and verifiable",
     body:
       "A judge can change the seat, model, personality, or action and still observe the complete boundary from learner input to verified result.",
     bullets: [
@@ -187,7 +186,7 @@ const englishSlides: Slide[] = [
 
 const chineseSlides: Slide[] = [
   {
-    eyebrow: "无界智能体 / AI + 教育",
+    eyebrow: "多智能体 AI / 实践学习",
     title: "从系统内部学习智能体 AI",
     body: "暗影村庄是一座可玩的 AI 学习实验室。学习者与六个自主智能体进入同一个世界，并在游戏后研究系统为何如此行动。",
     bullets: [
@@ -293,8 +292,8 @@ const chineseSlides: Slide[] = [
   },
   {
     eyebrow: "完整任务闭环",
-    title: "决赛演示可运行、可改变、可验证",
-    body: "评委可以改变座位、模型、性格或动作，并继续观察从学习者输入到验证结果的完整系统边界。",
+    title: "现场演示可运行、可改变、可验证",
+    body: "学习者可以改变座位、模型、性格或动作，并继续观察从输入到验证结果的完整系统边界。",
     bullets: [
       "输入：配置座位、模型、性格与学习预测。",
       "处理：私有上下文 + 记忆 + 模型决策。",
@@ -340,6 +339,8 @@ const chineseSlides: Slide[] = [
   },
 ];
 
+const slideSets = { en: englishSlides, zh: chineseSlides } as const;
+
 const links = {
   en: [
     { href: "https://village-of-shadows.vercel.app/", label: "Live demo" },
@@ -354,30 +355,21 @@ const links = {
 };
 
 export default function PresentationContent() {
-  const { language, setLanguage } = usePreferences();
-  const slides = language === "zh" ? chineseSlides : englishSlides;
-  const localizedLinks = links[language];
+  const slides = slideSets.en;
+  const localizedLinks = links.en;
 
   return (
-    <main className={styles.page} data-language={language}>
-      <nav className={styles.nav} aria-label={language === "zh" ? "演示文稿导航" : "Presentation navigation"}>
-        <Link href="/" className={styles.brand}>{language === "zh" ? "暗影村庄" : "Village of Shadows"}</Link>
+    <main className={styles.page} data-language="en">
+      <nav className={styles.nav} aria-label="Presentation navigation">
+        <Link href="/" className={styles.brand}>Village of Shadows</Link>
         <div className={styles.navLinks}>
           {localizedLinks.map((link) => (
             <Link key={link.href} href={link.href} className={styles.navLink}>{link.label}</Link>
           ))}
-          <button
-            type="button"
-            className={styles.navLink}
-            onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
-            aria-label={language === "zh" ? "Switch presentation to English" : "将演示文稿切换为中文"}
-          >
-            {language === "zh" ? "EN" : "中文"}
-          </button>
         </div>
       </nav>
 
-      <PresentationDeckControls slides={slides.map((slide) => slide.title)} language={language} />
+      <PresentationDeckControls slides={slides.map((slide) => slide.title)} />
 
       {slides.map((slide, index) => (
         <section
@@ -396,7 +388,7 @@ export default function PresentationContent() {
           <figure className={`${styles.visual} ${slide.imageFit === "contain" ? styles.containVisual : ""}`}>
             <Image
               src={slide.image ?? "/presentation/game-poster.webp"}
-              alt={slide.imageAlt ?? (language === "zh" ? "暗影村庄演示画面" : "Village of Shadows presentation screenshot")}
+              alt={slide.imageAlt ?? "Village of Shadows presentation screenshot"}
               fill
               priority={index === 0}
               sizes="(max-width: 900px) 92vw, 50vw"
@@ -405,7 +397,7 @@ export default function PresentationContent() {
           </figure>
 
           <footer className={styles.footer}>
-            <span>{language === "zh" ? "GOAI 2026 决赛 · AI + 教育" : "GOAI 2026 Finals · AI + Education"}</span>
+            <span>Village of Shadows · Multi-Agent AI Learning Lab</span>
             <span>{String(index + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
           </footer>
         </section>

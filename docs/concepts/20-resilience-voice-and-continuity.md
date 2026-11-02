@@ -29,8 +29,8 @@ New statements never cancel the line already playing. If neural speech is not
 configured or fails, text remains available with Retry/Skip controls; there is
 no automatic browser-voice fallback. Pause, skip, replay, and pace controls do
 not modify game state. The interface labels narration as AI-generated.
-See [bilingual teaching council](24-bilingual-teaching-council.md) for microphone
-input, English/Chinese dialogue, and the queue's cancellation guarantees.
+See [teaching council](23-teaching-council.md) for microphone input,
+English dialogue, and the queue's cancellation guarantees.
 
 ## Continuity must not smuggle old secrets into a new world
 

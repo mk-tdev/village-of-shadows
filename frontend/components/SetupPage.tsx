@@ -45,7 +45,7 @@ function LaunchStep({
 
 export default function SetupPage() {
   const router = useRouter();
-  const { language, t } = usePreferences();
+  const { t } = usePreferences();
   const [humanIndex, setHumanIndex] = useState(0);
   const [humanIndices, setHumanIndices] = useState<number[]>([0]);
   const [seats, setSeats] = useState<AgentConfig[]>(() => defaultSeats(0));
@@ -214,7 +214,7 @@ export default function SetupPage() {
       }
       activePhase = "creating";
       setStartPhase("creating");
-      const created = await createGame(seats, { ...options, language });
+      const created = await createGame(seats, { ...options, language: "en" });
       const { session_id } = created;
       const primary = created.human_seats.find((seat) => seat.seat_id === seats[humanIndex].seat_id) ?? created.human_seats[0];
       const credentials = {
@@ -360,7 +360,6 @@ export default function SetupPage() {
         ))}
 
         <section className="world-rules-config">
-          <label>{t("Council language")} · {language === "zh" ? "简体中文 / 普通话" : "English"}</label>
           <div><span>{t("WORLD RULES \u00b7 VERSION 1")}</span><h2>{t("Choose how strange this village becomes")}</h2></div>
           <ThemedCheckbox checked={options.scenario === "missing-villager"} onChange={(checked) => setOptions((current) => ({ ...current, scenario: checked ? "missing-villager" : "classic", ...(checked ? { role_pack: "standard" as const } : {}) }))}><span><b>{t("Night of the Missing Villager")}</b><small>{t("Follow a scream, inspect two clues, question three witnesses, and bring your evidence to the council. One human investigator, six AI villagers, standard roles.")}</small></span></ThemedCheckbox>
           {!episodeCompatible && <p role="alert" className="error-text">This episode needs one human seat and standard roles. Adjust those settings to continue.</p>}

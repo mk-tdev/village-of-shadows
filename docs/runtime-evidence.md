@@ -1,7 +1,7 @@
 # Runtime evidence
 
-This document records reproducible verification for the GOAI 2026 semi-final
-build. It is intentionally based on commands that can be rerun from a clean
+This document records reproducible verification for the current public build.
+It is intentionally based on commands that can be rerun from a clean
 checkout, not screenshots of an unrepeatable environment.
 
 ## Verification commands

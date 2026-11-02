@@ -189,7 +189,7 @@ agents at one instant. The pane retains its size and scroll position while data
 refreshes. No checkpoint means the graph has not run, the human has no AI thread,
 or checkpoint history was reclaimed.
 
-For a finals demo: inspect the investigation interrupt on the game thread, make
+For a short project demo: inspect the investigation interrupt on the game thread, make
 one choice, then inspect `game.missing_villager.discovered` in Changes. Complete
 the investigation, allow an AI turn, select that agent, and show its briefing and
 messages. Compare another agent to explain why shared models can have different

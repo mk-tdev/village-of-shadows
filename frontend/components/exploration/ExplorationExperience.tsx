@@ -1,7 +1,6 @@
 "use client";
 
-import { Select } from "../Select";
-import { usePreferences, type Language } from "../Preferences";
+import { usePreferences } from "../Preferences";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -35,7 +34,7 @@ function readSavedSeals() {
 
 export default function ExplorationExperience() {
   const router = useRouter();
-  const { language, setLanguage, t } = usePreferences();
+  const { t } = usePreferences();
   const launchLock = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<VillageScene | null>(null);
@@ -166,13 +165,6 @@ export default function ExplorationExperience() {
       <Link href="/" className={styles.brand}>{t("Village of Shadows")}<span>{t("The last light")}</span></Link>
       {mode !== "intro" && <div className={styles.compass} aria-label={`Facing ${bearing}`}><span>· · · ─────</span><b>{bearing}</b><span>───── · · ·</span><i>◆</i></div>}
       <nav aria-label="Exploration controls" className={styles.topControls}>
-        <Select
-          className={styles.languagePicker}
-          ariaLabel={t("Language")}
-          value={language}
-          options={[{ value: "en", label: "English" }, { value: "zh", label: "简体中文" }]}
-          onChange={value => setLanguage(value as Language)}
-        />
         <button onClick={toggleSound} aria-pressed={sound}>{sound ? t("Sound on") : t("Sound off")}</button>
         {mode !== "intro" && <button onClick={() => setMode("paused")}>{t("Pause")} <kbd>Esc</kbd></button>}
       </nav>
@@ -182,8 +174,8 @@ export default function ExplorationExperience() {
       <button className={styles.primary} onClick={() => window.location.reload()}>Try again <span>↻</span></button><Link className={styles.textLink} href="/setup">Enter the AI council →</Link>
     </section> : mode === "intro" ? <>
       <section className={styles.intro}>
-        <h1>{language === "zh" ? <>这里有人<br />不是<em>人类。</em></> : <>Someone here<br />isn’t <em>human.</em></>}</h1>
-        <p>{language === "zh" ? "灯还亮着，门却全锁上了。村庄的某个角落，钟声正在响起。" : <>The lamps are still burning. The doors are all locked.<br className={styles.desktopBreak} /> And somewhere in the village, a bell is ringing.</>}</p>
+        <h1>Someone here<br />isn’t <em>human.</em></h1>
+        <p>The lamps are still burning. The doors are all locked.<br className={styles.desktopBreak} /> And somewhere in the village, a bell is ringing.</p>
         <p className={styles.premise}>{t("Find the council. Take your seat.")}<br />{t("Keep your lantern close. Something hunts here.")}</p>
         <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? "Lighting the lanterns…" : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
         <Link href="/setup" className={styles.textLink}>{t("Go straight to player setup")} <span>↗</span></Link>

@@ -11,7 +11,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-state%20%2B%20checkpoints-336791?style=flat-square)](https://www.postgresql.org/)
 [![Tests](https://img.shields.io/badge/backend%20tests-70%20passing-2e7d32?style=flat-square)](#testing)
 
-[Live demo](https://village-of-shadows.vercel.app/) · [Web presentation](https://village-of-shadows.vercel.app/presentation) · [How to play](https://village-of-shadows.vercel.app/how-to-play) · [Connect](https://village-of-shadows.vercel.app/connect)
+[Live demo](https://village-of-shadows.vercel.app/) · [Project overview](https://village-of-shadows.vercel.app/presentation) · [How to play](https://village-of-shadows.vercel.app/how-to-play) · [Connect](https://village-of-shadows.vercel.app/connect)
 
 <img src="frontend/public/presentation/game-poster.webp" alt="Village of Shadows cinematic landing experience" width="100%" />
 
@@ -23,13 +23,11 @@ The game is not a scripted chatbot demo. Each AI seat has its own model, persona
 
 > Sometimes the best way to understand agents is to give them identities, incomplete information, competing objectives, memory, and tools - and then sit down at the table with them.
 
-## 🏆 GOAI 2026 semi-final project
+## 🎓 A personal agentic-AI learning project
 
-Village of Shadows advanced to the **GOAI 2026 Boundless Agents / AI + Education semi-final** as:
+Village of Shadows began as a personal project for learning how multi-agent systems behave when orchestration, private information, persistent memory, tool use, and human decisions all meet inside one running application.
 
-**Village of Shadows: A Multi-Agent AI Learning Lab**
-
-The semi-final version focuses on a measurable learning loop:
+The project follows a practical learning loop:
 
 1. The learner configures AI agents and predicts their behavior.
 2. The learner participates in a complete multi-agent game scenario.
@@ -38,11 +36,11 @@ The semi-final version focuses on a measurable learning loop:
 5. The post-game Learning Debrief maps observed behavior to agentic-AI concepts.
 6. The learner can replay, branch, or change models/personalities and compare outcomes.
 
-The project is positioned as a **formative educational simulation**. It does not replace teachers, exams, grades, school evaluations, or professional educational services.
+It is an open-source, formative learning simulation—not a replacement for teachers, exams, grades, school evaluations, or professional educational services.
 
-## 🎥 What judges/reviewers should try
+## 🎥 Try the project
 
-For the fastest review path:
+For the fastest path through the experience:
 
 1. Open the [live demo](https://village-of-shadows.vercel.app/).
 2. Enter the village and go to setup.
@@ -408,13 +406,13 @@ Built by [Muthukumar](https://www.linkedin.com/in/muthukumar-dev/).
 
 ## Learning and teaching
 
-The [five classroom activities and finals demonstration](docs/teaching/finals-classroom-activities.md)
+The [five classroom activities and short demonstration guide](docs/teaching/classroom-activities.md)
 cover model comparison, evidence-based voting, inspecting agent memory, branching replays,
 and tracing a turn through the orchestration graph.
 
-Council setup supports English or Simplified Chinese dialogue and 1–5 discussion passes
-before each vote (default 3). Compact/Wide and interface-language preferences are saved
-in the browser. The game language is fixed when the host creates the council.
+Council setup supports 1–5 discussion passes before each vote (default 3).
+Compact/Wide layout preferences are saved in the browser. The public interface
+and game dialogue use English.
 
 AI voices use `OPENAI_TTS_MODEL` (default `gpt-4o-mini-tts`); microphone transcription uses
 `OPENAI_TRANSCRIBE_MODEL` (default `gpt-4o-transcribe`). Both require the server's

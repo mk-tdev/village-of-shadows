@@ -5,7 +5,6 @@ import styles from "./presentation.module.css";
 
 type PresentationDeckControlsProps = {
   slides: string[];
-  language: "en" | "zh";
 };
 
 function isEditableTarget(target: EventTarget | null) {
@@ -72,7 +71,7 @@ function ArrowIcon({ direction }: { direction: "previous" | "next" }) {
   );
 }
 
-export default function PresentationDeckControls({ slides, language }: PresentationDeckControlsProps) {
+export default function PresentationDeckControls({ slides }: PresentationDeckControlsProps) {
   const [activeSlide, setActiveSlide] = useState(0);
 
   useEffect(() => {
@@ -126,18 +125,18 @@ export default function PresentationDeckControls({ slides, language }: Presentat
     };
   }, [slides]);
 
-  const previousLabel = language === "zh" ? "上一页" : "Previous slide";
-  const nextLabel = language === "zh" ? "下一页" : "Next slide";
+  const previousLabel = "Previous slide";
+  const nextLabel = "Next slide";
 
   return (
     <>
-      <div className={styles.progressRail} aria-label={language === "zh" ? "演示文稿页面" : "Presentation slides"}>
+      <div className={styles.progressRail} aria-label="Presentation slides">
         {slides.map((slide, index) => (
           <a
             key={slide}
             href={`#slide-${index + 1}`}
             aria-current={activeSlide === index ? "true" : undefined}
-            aria-label={language === "zh" ? `前往第 ${index + 1} 页：${slide}` : `Go to slide ${index + 1}: ${slide}`}
+            aria-label={`Go to slide ${index + 1}: ${slide}`}
             title={`${index + 1}. ${slide}`}
             onClick={(event) => {
               event.preventDefault();
@@ -148,7 +147,7 @@ export default function PresentationDeckControls({ slides, language }: Presentat
           </a>
         ))}
       </div>
-      <div className={styles.deckArrows} aria-label={language === "zh" ? "演示文稿翻页控制" : "Presentation navigation controls"}>
+      <div className={styles.deckArrows} aria-label="Presentation navigation controls">
         <button
           type="button"
           onClick={() => scrollToSlide(activeSlide - 1, slides.length)}

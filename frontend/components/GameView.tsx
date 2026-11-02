@@ -19,7 +19,6 @@ import { GameSummary } from "./GameSummary";
 import { MoonIcon, SunIcon, EyeIcon } from "./icons";
 import type { CouncilCameraMode } from "./CouncilTable3D";
 import { DisplayPreferences, usePreferences } from "./Preferences";
-import { CouncilAmbience } from "./CouncilAmbience";
 import { ChatPictureInPicture } from "./ChatPictureInPicture";
 import { VoiceCouncil } from "./VoiceCouncil";
 import { RitualConfirmModal } from "./RitualConfirmModal";
@@ -303,8 +302,6 @@ export function GameView({
         onLine={setSpeakingSeq}
         paused={game.paused || recording}
       />
-
-      <CouncilAmbience duck={speakingSeatId !== null || recording} paused={game.paused || recording} />
 
       <section hidden={game.phase === "investigation"} ref={councilRef} className={`council-3d-shell${councilOpen ? "" : " is-collapsed"}`} aria-label="Live cinematic village">
         <div className="council-3d-caption">

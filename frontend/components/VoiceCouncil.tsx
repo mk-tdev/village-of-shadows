@@ -85,7 +85,7 @@ export function VoiceCouncil({sessionId,access,entries,players,onSpeaking,onLine
   function retry(){const line=failedLine.current;clearPlayback();failedLine.current=null;setFailed(false);if(line)queue.current.unshift(line);void pump();}
   function replay(){const line=lastLine.current;if(!line)return;clearPlayback();failedLine.current=null;setFailed(false);queue.current.unshift(line);void pump();}
   return <section className="voice-council" aria-label={t("AI-generated voices")}>
-    <div><span>{t("AI-generated voices")} · English / 普通话</span><strong role="status">{t(enabled ? status : "Voices are off")}{enabled&&queued>0?` · ${queued}`:""}</strong></div>
+    <div><span>{t("AI-generated voices")} · English</span><strong role="status">{t(enabled ? status : "Voices are off")}{enabled&&queued>0?` · ${queued}`:""}</strong></div>
     <button onClick={enabled?disable:enable}>{t(enabled?"Disable voices":"Enable AI voices")}</button>
     {enabled&&<><button onClick={skip}>{t("Skip line")}</button><button onClick={replay}>{t("Replay line")}</button>{failed&&<button onClick={retry}>{t("Retry audio")}</button>}<select aria-label={t("Voice pace")} value={pace} onChange={e=>{const value=Number(e.target.value);setPace(value);paceRef.current=value;if(audio.current)audio.current.playbackRate=value;}}>{[.85,1,1.15,1.3].map(value=><option value={value} key={value}>{value}×</option>)}</select></>}
     {current&&<div className="voice-caption" aria-live="off"><b>{t("Listening now")} · {players.find(p=>p.seat_id===current.seat_id)?.name}</b><p>{current.text}</p></div>}

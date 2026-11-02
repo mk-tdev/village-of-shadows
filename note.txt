@@ -1,0 +1,14 @@
+Finals
+
+Youtube Links
+English: https://youtu.be/KY4v_1zJXW0
+Chinese: https://youtu.be/Spw0kTbIvLQ
+
+Github
+https://github.com/mk-tdev/village-of-shadows
+
+Demo Link:
+https://village-of-shadows.vercel.app
+
+Online Web Presentation Link
+https://village-of-shadows.vercel.app/presentation

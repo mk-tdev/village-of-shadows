@@ -1,8 +1,7 @@
 # Data Sources and Compliance Statement
 
 **Project:** Village of Shadows
-**Version:** GOAI 2026 semi-final build
-**Track:** Boundless Agents — AI + Education
+**Version:** Current public build
 **Maintainer:** Muthukumar Arunachalam
 **Public repository:** https://github.com/mk-tdev/village-of-shadows
 

@@ -30,10 +30,4 @@ node_modules
 .env
 *.db
 
-# Unreal generated build artifacts
-unreal/**/Binaries/
-unreal/**/Intermediate/
-unreal/**/Saved/
-unreal/**/DerivedDataCache/
-unreal/**/*.xcworkspace/
-unreal/**/*.xcodeproj/
+**/__pycache__/

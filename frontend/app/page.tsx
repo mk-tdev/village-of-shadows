@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { EyeIcon, MoonIcon } from "@/components/icons";
-import { LandingLanguageSwitch, LandingText } from "@/components/LandingLanguageSwitch";
+import { LandingText } from "@/components/LandingLanguageSwitch";
 
 export const metadata: Metadata = {
   title: "Village of Shadows | Enter an Agentic AI World",
@@ -88,7 +88,6 @@ export default function LandingPage() {
             <Link href="/history"><LandingText text="Game archive" /></Link>
             <Link href="/explore"><LandingText text="Explore the village" /></Link>
             <Link className="landing-nav-enter" href="/setup"><LandingText text="Start game" /></Link>
-            <LandingLanguageSwitch />
           </div>
         </nav>
 

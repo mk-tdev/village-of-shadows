@@ -112,11 +112,8 @@ all general lessons that happened to surface here.
 22. [The missing-villager episode](22-missing-villager-episode.md) — connect
     authored evidence and private witness accounts to agent memory, checkpoint
     branches, the council vote, and a bounded next-night consequence.
-23. [Native Unreal game client](23-unreal-game-client.md) — first-person forest,
-    bounded character minds, persistent dialogue, voice transport, and the earlier council client.
+23. [Teaching council](23-teaching-council.md) — repeated discussion passes,
+    synchronized AI narration, protected microphone transcription, and floating
+    teaching-demo panels.
 
-24. [Bilingual teaching council](24-bilingual-teaching-council.md) — repeated
-    discussion passes, synchronized AI narration, protected microphone transcription,
-    bilingual session settings, and floating teaching-demo panels.
-
-See also [classroom activities and the finals demo](../teaching/finals-classroom-activities.md).
+See also [classroom activities and the short demo](../teaching/classroom-activities.md).
