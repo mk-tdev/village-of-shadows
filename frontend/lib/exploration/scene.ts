@@ -1,49 +1,65 @@
 import * as THREE from "three";
-import { COUNCIL, COUNCIL_SEAT, COTTAGES, LANDMARKS, SPAWN, atCouncil, movePlayer, nearbyLandmark, type Point } from "./world";
+import { COUNCIL, COUNCIL_SEAT, LANDMARKS, SPAWN, atCouncil, districtAt, movePlayer, nearbyLandmark, surfaceAt, type Obstacle, type Point, type Surface } from "./world";
 import { advanceEncounter, canStartEncounter, encounterActive, newEncounter, VICTIM, type EncounterPhase } from "./encounter";
 import { createCreatureEncounter } from "./creature";
 import { createKeepsakes } from "./props";
 import { createCouncilFire } from "./fire";
+import { createAssets } from "./assets";
+import { buildArchitecture } from "./architecture";
+import { buildNature } from "./nature";
+import { buildDressing, COUNCIL_CHAIRS, COUNCIL_SEAT_HEIGHT } from "./dressing";
+import { createAtmosphere, FOG_COLOR, MOON_DIRECTION } from "./atmosphere";
+import { createPost } from "./post";
+import { createCast, handLantern, patrol, seated, standing, type CharacterName, type Villager, type Character } from "./characters";
 
-export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number };
+export type NearbyVillager = { id: string; name: string; line: string };
+export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number; district: string; villager: NearbyVillager | null; loading: number };
 export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[] };
 type SceneEvents = {
   ready: () => void;
   snapshot: (state: SceneSnapshot) => void;
   action: (key: "interact" | "journal" | "pause" | "lantern") => void;
-  step: (running: boolean) => void;
+  step: (running: boolean, surface: Surface) => void;
   omen: () => void;
   encounter: (phase: EncounterPhase) => void;
   spatial: (player: Point, yaw: number, wolf: Point) => void;
+  thunder: (delay: number, strength: number) => void;
   error: () => void;
 };
 
-const seeded = (i: number, salt = 1) => ((Math.sin(i * 127.1 + salt * 311.7) * 43758.5453) % 1 + 1) % 1;
+const LIGHT_POOL = 6;
 
 /** Owns only the local scene and transient movement. React owns progression/UI. */
 export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const quality: "high" | "low" = coarse || (navigator.hardwareConcurrency ?? 8) < 6 ? "low" : "high";
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
+  const pixelRatio = Math.min(window.devicePixelRatio, quality === "high" ? 1.5 : 1);
+  renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.35;
+  renderer.toneMappingExposure = 1.2;
+  renderer.info.autoReset = false;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#303e45");
-  scene.fog = new THREE.FogExp2("#303e45", .044);
-  const camera = new THREE.PerspectiveCamera(64, 1, .08, 85);
+  scene.background = null;
+  scene.fog = new THREE.FogExp2(FOG_COLOR, .028);
+  scene.environmentIntensity = .32;
+  const camera = new THREE.PerspectiveCamera(62, 1, .08, 420);
   camera.rotation.order = "YXZ";
-  const clock = new THREE.Timer();
-  clock.connect(document);
+  const timer = new THREE.Timer();
+  timer.connect(document);
   let settings: SceneSettings = { playing: false, lantern: true, reducedMotion: false, brightness: 1, found: [] };
   let point = { ...SPAWN };
+  let velocity = { x: 0, z: 0 };
   let yaw = 0;
   let pitch = -.035;
   let sitting: { from: Point; yaw: number; pitch: number; progress: number; resolve: () => void } | null = null;
-  let seated = false;
-  let elapsed = 0;
+  let seated_ = false;
+  let elapsed = 0, world = 0;
   let lastSnapshot = 0;
   let footDistance = 0;
+  let bob = 0;
   let animation = 0;
   let destroyed = false;
   let walkTarget: Point | null = null;
@@ -51,289 +67,105 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   let omenUntil = 0;
   let encounter = newEncounter();
   let wolfPosition: Point = { ...VICTIM };
+  let loadProgress = 0;
   const keys = new Set<string>();
-  const textures: THREE.Texture[] = [];
-  const materials: THREE.Material[] = [];
-  const standard = (color: string, roughness = .92) => {
-    const material = new THREE.MeshStandardMaterial({ color, roughness });
-    materials.push(material);
-    return material;
-  };
-  const wood = standard("#777b76");
-  const roof = standard("#444e50");
-  const beam = standard("#242927");
-  const stone = standard("#646d6d");
-  const iron = standard("#171d1c", .55);
-  const earth = standard("#303c36");
-  const warm = new THREE.MeshStandardMaterial({ color: "#d99843", emissive: "#ff9a32", emissiveIntensity: 1.15 });
-  const windowGlow = new THREE.MeshStandardMaterial({ color: "#7a552d", emissive: "#d48a35", emissiveIntensity: .65 });
-  materials.push(warm, windowGlow);
+
   const loading = new THREE.LoadingManager();
-  loading.onLoad = () => { if (!destroyed) events.ready(); };
-  const textureLoader = new THREE.TextureLoader(loading);
-  const timber = textureLoader.load("/exploration/weathered-timber.png", () => {
-    if (destroyed) timber.dispose();
-  }, undefined, () => { /* Geometry/material color remains a usable offline fallback. */ });
-  timber.colorSpace = THREE.SRGBColorSpace;
-  timber.wrapS = timber.wrapT = THREE.RepeatWrapping;
-  timber.repeat.set(1.5, 1);
-  timber.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  textures.push(timber);
-  wood.map = timber;
-  wood.bumpMap = timber;
-  wood.bumpScale = .13;
-  roof.map = timber;
-  roof.bumpMap = timber;
-  roof.bumpScale = .2;
+  loading.onProgress = (_url, loaded, total) => { loadProgress = total ? loaded / total : 0; };
+  loading.onLoad = () => { if (!destroyed) { loadProgress = 1; events.ready(); } };
+  const assets = createAssets(renderer, loading);
+  assets.environment(env => { scene.environment = env; });
 
-  function box(parent: THREE.Object3D, size: [number, number, number], position: [number, number, number], material: THREE.Material) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-    mesh.position.set(...position);
-    mesh.castShadow = mesh.receiveShadow = true;
-    parent.add(mesh);
-    return mesh;
-  }
-  function cylinder(parent: THREE.Object3D, top: number, bottom: number, height: number, position: [number, number, number], material: THREE.Material, segments = 8) {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(top, bottom, height, segments), material);
-    mesh.position.set(...position);
-    mesh.castShadow = mesh.receiveShadow = true;
-    parent.add(mesh);
-    return mesh;
-  }
-
-  scene.add(new THREE.HemisphereLight("#a8c6d5", "#363b2e", 1.7));
-  const moonLight = new THREE.DirectionalLight("#b4ccdb", 2.1);
-  moonLight.position.set(-14, 25, -20);
+  // Moonlight follows the player so a tight shadow frustum stays sharp across the larger map.
+  scene.add(new THREE.HemisphereLight("#9fb6c4", "#2a2e26", .55));
+  const moonLight = new THREE.DirectionalLight("#b9cede", 1.9);
   moonLight.castShadow = true;
-  moonLight.shadow.mapSize.set(1024, 1024);
-  Object.assign(moonLight.shadow.camera, { left: -25, right: 25, top: 35, bottom: -35, near: 1, far: 80 });
-  moonLight.shadow.bias = -.001;
-  scene.add(moonLight);
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(1.35, 24, 16), new THREE.MeshBasicMaterial({ color: "#899ba2", fog: false }));
-  moon.position.set(9, 21, -58);
-  scene.add(moon);
+  moonLight.shadow.mapSize.setScalar(quality === "high" ? 2048 : 1024);
+  Object.assign(moonLight.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 140 });
+  moonLight.shadow.bias = -.0006; moonLight.shadow.normalBias = .04;
+  scene.add(moonLight, moonLight.target);
 
-  // Soft atmosphere sprites break up the flat horizon without post-processing.
-  const hazeCanvas = document.createElement("canvas");
-  hazeCanvas.width = hazeCanvas.height = 128;
-  const hazeContext = hazeCanvas.getContext("2d")!;
-  const gradient = hazeContext.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gradient.addColorStop(0, "rgba(172,194,199,.45)");
-  gradient.addColorStop(.35, "rgba(142,165,174,.15)");
-  gradient.addColorStop(1, "rgba(142,165,174,0)");
-  hazeContext.fillStyle = gradient; hazeContext.fillRect(0, 0, 128, 128);
-  const hazeTexture = new THREE.CanvasTexture(hazeCanvas); textures.push(hazeTexture);
-  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: hazeTexture, color: "#a1b7bf", transparent: true, depthWrite: false, fog: false, opacity: .5 }));
-  halo.position.set(9, 21, -57); halo.scale.set(22, 22, 1); scene.add(halo);
-  const fogBanks: THREE.Sprite[] = [];
-  for (let i = 0; i < 12; i++) {
-    const bank = new THREE.Sprite(new THREE.SpriteMaterial({ map: hazeTexture, color: "#8eaaae", transparent: true, depthWrite: false, opacity: .23 }));
-    bank.position.set((seeded(i, 31) - .5) * 15, .6 + seeded(i, 32) * 1.5, 14 - i * 5);
-    bank.scale.set(19, 3 + seeded(i, 33) * 3, 1); scene.add(bank); fogBanks.push(bank);
-  }
-
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 115), earth);
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.set(0, -.07, -10);
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  const paving = standard("#b0b8b5", .65);
-  const pavingTexture = textureLoader.load("/exploration/wet-cobblestone.png", () => {
-    if (destroyed) pavingTexture.dispose();
-  }, undefined, () => {});
-  pavingTexture.colorSpace = THREE.SRGBColorSpace;
-  pavingTexture.wrapS = pavingTexture.wrapT = THREE.RepeatWrapping;
-  pavingTexture.repeat.set(2.6, 22);
-  pavingTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  textures.push(pavingTexture);
-  paving.map = pavingTexture; paving.bumpMap = pavingTexture; paving.bumpScale = .16;
-  const path = new THREE.Mesh(new THREE.PlaneGeometry(8, 66), paving);
-  path.rotation.x = -Math.PI / 2; path.position.set(0, -.018, -8); path.receiveShadow = true; scene.add(path);
-
-  // Instancing keeps dense cobbles and forest detail inexpensive to render.
-  const cobbles = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 1), stone, 750);
-  const transform = new THREE.Object3D();
-  const tint = new THREE.Color();
-  for (let i = 0; i < 750; i++) {
-    const z = 24 - seeded(i, 2) * 64;
-    const x = (seeded(i, 3) - .5) * 7.6 + Math.sin(z * .1) * .5;
-    transform.position.set(x, -.025, z);
-    transform.rotation.set(0, seeded(i, 5) * 7, 0);
-    transform.scale.set(.08 + seeded(i, 6) * .16, .03 + seeded(i, 7) * .035, .12 + seeded(i, 8) * .16);
-    transform.updateMatrix();
-    cobbles.setMatrixAt(i, transform.matrix);
-    cobbles.setColorAt(i, tint.setHSL(.54, .045, .22 + seeded(i, 9) * .12));
-  }
-  cobbles.receiveShadow = true;
-  scene.add(cobbles);
-
-  function cottage(h: typeof COTTAGES[number], chapel = false) {
-    const group = new THREE.Group();
-    group.position.set(h.x, 0, h.z);
-    scene.add(group);
-    box(group, [h.w + .3, .5, h.d + .3], [0, .2, 0], stone);
-    box(group, [h.w, h.h, h.d], [0, h.h / 2, 0], wood);
-    const rise = h.w * .47;
-    const length = Math.hypot(h.w / 2 + .55, rise);
-    for (const side of [-1, 1]) {
-      const panel = box(group, [length, .24, h.d + 1.1], [side * (h.w / 4 + .16), h.h + rise / 2, 0], roof);
-      panel.rotation.z = -side * Math.atan2(rise, h.w / 2 + .55);
-      for (const z of [-h.d / 2 - .02, h.d / 2 + .02]) {
-        box(group, [.2, h.h, .2], [side * h.w / 2, h.h / 2, z], beam);
-      }
-    }
-    // Seal the triangular gables with textured faces.
-    const shape = new THREE.Shape();
-    shape.moveTo(-h.w / 2, 0); shape.lineTo(h.w / 2, 0); shape.lineTo(0, rise); shape.closePath();
-    const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: h.d, bevelEnabled: false }), wood);
-    gable.position.set(0, h.h, -h.d / 2);
-    group.add(gable);
-    for (let y = .7; y < h.h; y += 1.05) {
-      box(group, [h.w + .08, .075, h.d + .08], [0, y, 0], beam);
-    }
-    box(group, [1.25, 2.3, .14], [0, 1.15, h.d / 2 + .08], beam);
-    for (const side of [-1, 1]) {
-      box(group, [.86, 1.05, .12], [side * h.w * .29, 2.2, h.d / 2 + .09], windowGlow);
-      box(group, [.09, 1.12, .17], [side * h.w * .29, 2.2, h.d / 2 + .18], beam);
-      box(group, [.95, .09, .17], [side * h.w * .29, 2.2, h.d / 2 + .18], beam);
-    }
-    const inward = h.x < 0 ? 1 : -1;
-    box(group, [.13, 1.05, .85], [inward * (h.w / 2 + .08), 2.1, 0], windowGlow);
-    box(group, [.2, 1.15, .09], [inward * (h.w / 2 + .14), 2.1, 0], beam);
-    box(group, [.2, .09, .98], [inward * (h.w / 2 + .14), 2.1, 0], beam);
-    box(group, [.65, 2.4, .8], [-h.w * .28, h.h + rise, -1], stone);
-    if (chapel) {
-      box(group, [2.1, 4.3, 2.1], [0, h.h + 2.9, 0], stone);
-      for (const x of [-.8, .8]) for (const z of [-.8, .8]) box(group, [.2, 2.3, .2], [x, h.h + 5.6, z], beam);
-      const steeple = new THREE.Mesh(new THREE.ConeGeometry(1.8, 3.5, 4), roof);
-      steeple.position.set(0, h.h + 8.2, 0); steeple.rotation.y = Math.PI / 4; group.add(steeple);
-      cylinder(group, .27, .55, .6, [0, h.h + 5.3, 0], iron);
-    }
-  }
-  COTTAGES.forEach(h => cottage(h));
-  cottage({ x: -7, z: -25, w: 6, d: 8, h: 5.8 }, true);
-  box(scene, [.15, 2.8, 1.6], [-3.92, 1.4, -24], beam);
-
-  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(.12, .38, 1, 6), beam, 240);
-  const branches = new THREE.InstancedMesh(new THREE.CylinderGeometry(.025, .1, 1, 5), beam, 480);
-  for (let i = 0; i < 240; i++) {
-    const x = (i % 2 ? -1 : 1) * (12 + seeded(i, 11) * 22);
-    const z = 30 - seeded(i, 12) * 100;
-    const h = 7 + seeded(i, 13) * 12;
-    transform.position.set(x, h / 2, z); transform.rotation.set(.04, 0, (seeded(i, 14) - .5) * .15); transform.scale.set(1, h, 1); transform.updateMatrix(); trunks.setMatrixAt(i, transform.matrix);
-    for (let b = 0; b < 2; b++) {
-      transform.position.set(x + (b ? 1 : -1), h * (.57 + b * .15), z);
-      transform.rotation.set(.4, seeded(i, 15) * 6, b ? -.7 : .8); transform.scale.set(1, 3.2, 1); transform.updateMatrix(); branches.setMatrixAt(i * 2 + b, transform.matrix);
-    }
-  }
-  scene.add(trunks, branches);
-  for (const [x, z] of [[-4.4, 18], [4.6, -1], [-4.6, -11], [4.8, -26]]) {
-    const tree = cylinder(scene, .2, .55, 15, [x, 7.5, z], wood, 9);
-    tree.rotation.z = x * .008;
-    for (let i = 0; i < 5; i++) {
-      const limb = cylinder(scene, .02, .16, 4.5, [x + (i % 2 ? 1 : -1), 6 + i * 1.6, z], beam, 6);
-      limb.rotation.z = i % 2 ? -.8 : .8; limb.rotation.x = i * .7;
-    }
-  }
-
-  // Broken fences frame the path without blocking the walkable lane.
-  const fence = new THREE.InstancedMesh(new THREE.BoxGeometry(.11, 1, .12), wood, 140);
-  for (let i = 0; i < 140; i++) {
-    transform.position.set((i % 2 ? -1 : 1) * 4.2, .45, 23 - Math.floor(i / 2) * .8);
-    transform.rotation.set(0, 0, (seeded(i, 16) - .5) * .32); transform.scale.set(1, .6 + seeded(i, 17) * .6, 1); transform.updateMatrix(); fence.setMatrixAt(i, transform.matrix);
-  }
-  scene.add(fence);
-  for (const side of [-1, 1]) box(scene, [.1, .1, 55], [side * 4.2, .58, -4], wood);
-
-  const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(.09, 1, 3), standard("#414137"), 1100);
-  for (let i = 0; i < 1100; i++) {
-    const height = .15 + seeded(i, 41) * .45;
-    transform.position.set((i % 2 ? -1 : 1) * (3.7 + seeded(i, 42) * 6), height / 2, 24 - seeded(i, 43) * 64);
-    transform.rotation.set((seeded(i, 44) - .5) * .4, seeded(i, 45) * 6, (seeded(i, 46) - .5) * .6);
-    transform.scale.set(1, height, 1); transform.updateMatrix(); grass.setMatrixAt(i, transform.matrix);
-  }
-  scene.add(grass);
-
-  const lamps: { light: THREE.PointLight; base: number }[] = [];
-  function lantern(x: number, z: number, lit = true) {
-    cylinder(scene, .045, .08, 2.8, [x, 1.4, z], iron);
-    box(scene, [.48, .06, .06], [x + .2, 2.75, z], iron);
-    cylinder(scene, .2, .23, .08, [x + .42, 2.15, z], iron);
-    cylinder(scene, .23, .18, .09, [x + .42, 2.65, z], iron);
-    cylinder(scene, .085, .085, .37, [x + .42, 2.39, z], warm);
-    for (const dx of [-.15, .15]) box(scene, [.025, .46, .025], [x + .42 + dx, 2.4, z], iron);
-    if (lit) {
-      const light = new THREE.PointLight("#ffac54", 15, 10, 1.65);
-      light.position.set(x + .42, 2.4, z); scene.add(light); lamps.push({ light, base: 15 });
-    }
-  }
-  lantern(-2.6, 13); lantern(3.6, 1); lantern(-3.4, -12); lantern(-1.8, -24);
-  const well = new THREE.Mesh(new THREE.CylinderGeometry(.95, 1.05, .95, 16, 1, true), stone);
-  well.position.set(2.5, .45, -3); scene.add(well);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(.98, .15, 6, 20), stone);
-  rim.rotation.x = Math.PI / 2; rim.position.set(2.5, .96, -3); scene.add(rim);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(.85, 24), new THREE.MeshStandardMaterial({ color: "#030a0b", roughness: .13, metalness: .7 }));
-  water.rotation.x = -Math.PI / 2; water.position.set(2.5, .12, -3); scene.add(water);
-  for (const x of [1.35, 3.65]) box(scene, [.12, 2.6, .15], [x, 1.3, -3], wood);
-  box(scene, [2.6, .15, .17], [2.5, 2.6, -3], wood);
-  cylinder(scene, .015, .015, 2.6, [2.5, 1.3, -3], beam);
-
-  const keepsakes = createKeepsakes(scene, wood);
-
-  // The council is the final destination, visually legible through the fog.
+  const architecture = buildArchitecture(scene, assets);
+  const wind = { value: 0 };
+  const nature = buildNature(scene, assets, wind, quality);
+  const dressing = buildDressing(scene, assets, architecture.materials);
+  const atmosphere = createAtmosphere(scene, [...architecture.glows, ...dressing.lampPoints.map(position => ({ position, color: new THREE.Color("#ffae5a"), size: 2.2 }))], architecture.chimneys);
+  const keepsakes = createKeepsakes(scene, architecture.materials.door);
   const fire = createCouncilFire(scene, COUNCIL.z);
-  for (let i = 0; i < 7; i++) {
-    const a = i / 7 * Math.PI * 2;
-    const x = Math.sin(a) * 3.8; const z = COUNCIL.z + Math.cos(a) * 3.8;
-    const chair=new THREE.Group();chair.position.set(x,0,z);chair.rotation.y=a;scene.add(chair);
-    box(chair,[.68,.10,.62],[0,.49,0],wood);
-    for(const side of [-1,1]) {
-      box(chair,[.075,1.12,.075],[side*.27,.56,.25],wood);
-      box(chair,[.075,.47,.075],[side*.27,.235,-.24],wood);
-    }
-    box(chair,[.63,.16,.08],[0,1.02,.25],wood);
-    box(chair,[.63,.10,.065],[0,.77,.25],wood);
-  }
+  const cast = createCast(assets);
+  const creature = createCreatureEncounter(scene, loading, cast, events.error);
+  const post = createPost(renderer, scene, camera, quality);
 
-  function character(name: string, x: number, z: number, color = "#9da8a2") {
-    const texture = textureLoader.load(`/characters/full/${name}.webp`, () => {
-      if (destroyed) texture.dispose();
-    }, undefined, () => {});
-    texture.colorSpace = THREE.SRGBColorSpace; textures.push(texture);
-    const person = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, color, transparent: true, alphaTest: .08 }));
-    person.position.set(x, 1.17, z); person.scale.set(1.56, 2.34, 1); scene.add(person); return person;
-  }
-  ["mara", "tomas", "elin", "bram", "sable", "corvin"].forEach((name, i) => {
-    const angle = (i + 1) / 7 * Math.PI * 2;
-    character(name, Math.sin(angle) * 4.1, COUNCIL.z + Math.cos(angle) * 4.1);
+  // Pooled lamp lights: many lamp sites, only the nearest few are real lights.
+  const pool = Array.from({ length: LIGHT_POOL }, () => {
+    const light = new THREE.PointLight("#ffac54", 0, 13, 1.7); scene.add(light);
+    return { light, site: -1, target: 0 };
   });
+  const dynamicLights: (() => THREE.Vector3 | null)[] = [];
+  function assignLights() {
+    const sites = [...dressing.lampPoints.map(p => p.clone()), ...dynamicLights.map(f => f()).filter((p): p is THREE.Vector3 => !!p)];
+    const ranked = sites.map((p, i) => ({ i, d: p.distanceToSquared(camera.position) })).sort((a, b) => a.d - b.d).slice(0, LIGHT_POOL);
+    const wanted = new Set(ranked.map(r => r.i));
+    for (const slot of pool) if (!wanted.has(slot.site)) slot.target = 0;
+    for (const r of ranked) {
+      if (pool.some(s => s.site === r.i && s.target > 0)) continue;
+      const free = pool.find(s => s.target === 0 && s.light.intensity < .5) ?? pool.find(s => s.target === 0);
+      if (free) { free.site = r.i; free.target = 15; free.light.position.copy(sites[r.i]); }
+    }
+    return sites;
+  }
+  let lightSites: THREE.Vector3[] = [];
 
-  // A distant silhouette is a brief environmental event, not a combat enemy.
-  const watcher = character("corvin", -2.5, -16, "#142125");
-  watcher.visible = false;
-  const creature = createCreatureEncounter(scene, loading, events.error);
+  // Villagers: the council around the fire and a few souls still out in the dark.
+  const villagers: Villager[] = [];
+  const COUNCIL_CAST: CharacterName[] = ["villager_woman_a", "villager_man_b", "huntress_woman", "woodsman_man", "hooded_woman", "hooded_man"];
+  const handMaterials = { iron: assets.track(new THREE.MeshStandardMaterial({ color: "#1b1d1c", roughness: .5, metalness: .8 })), glow: assets.track(new THREE.MeshStandardMaterial({ color: "#ffb45e", emissive: "#ffae52", emissiveIntensity: 4 })) };
+  // Kept below the bloom threshold so the lantern in hand never floods the frame.
+  const heldGlow = assets.track(new THREE.MeshStandardMaterial({ color: "#2a1a0c", emissive: "#c47a35", emissiveIntensity: 1 }));
+  const tint = (c: Character, color: string) => c.materials.forEach(m => m.color.multiply(new THREE.Color(color)));
+  let omenFigure: Character | null = null;
+  void (async () => {
+    try {
+      const council = await Promise.all(COUNCIL_CAST.map(name => cast.spawn(name, 1.72)));
+      council.forEach((c, i) => {
+        const chair = COUNCIL_CHAIRS[i + 1];
+        scene.add(c.root);
+        villagers.push(seated(c, { ...chair, height: COUNCIL_SEAT_HEIGHT }, i));
+      });
+      const [lamplighter, keeper, smith, mourner, woodsman, omen] = await Promise.all([
+        cast.spawn("hooded_man", 1.8), cast.spawn("villager_woman_a", 1.66), cast.spawn("villager_man_b", 1.82),
+        cast.spawn("hooded_woman", 1.7), cast.spawn("woodsman_man", 1.78), cast.spawn("hooded_man", 1.95),
+      ]);
+      if (destroyed) return;
+      tint(lamplighter, "#6f6a60"); tint(keeper, "#9c8f86"); tint(smith, "#8a8178"); tint(mourner, "#55524e"); tint(woodsman, "#7d7b70");
+      lamplighter.attach("hand_r", handLantern(handMaterials), new THREE.Vector3(0, -.12, 0));
+      const walker = patrol(lamplighter, [{ x: 18.5, z: -2.5 }, { x: 25, z: -2.5 }, { x: 25, z: 3.5 }, { x: 18.5, z: 3.5 }], { id: "lamplighter", name: "the lamplighter", line: "“Every lamp I light, another goes dark behind me. Go to the fire. Don’t stop for anyone who calls your name.”" });
+      if (walker.light) dynamicLights.push(walker.light);
+      villagers.push(
+        walker,
+        standing(keeper, { x: 19.9, z: -9.3, yaw: .25 }, "Idle_FoldArms_Loop", { id: "tavernkeeper", name: "the tavern keeper", line: "“We barred the door at sunset. I only opened it to count who was missing. It was more than one.”" }),
+        standing(smith, { x: 28.6, z: -1.8, yaw: Math.PI / 2 }, "Interact", { id: "smith", name: "the smith", line: "“Silver. I’ve been melting down every spoon in the village. Ask yourself why the watchman refused his.”" }, "Idle_No_Loop"),
+        standing(mourner, { x: -20.4, z: -22.9, yaw: Math.PI }, "Crouch_Idle_Loop", { id: "mourner", name: "the mourner", line: "“They dug it for him this morning. He walked past it at noon, whistling.”" }, "Idle_LookAround"),
+        standing(woodsman, { x: -13.4, z: -46.5, yaw: -.6 }, "Idle_LookAround", { id: "woodsman", name: "the woodsman", line: "“Tracks come out of the forest on four feet. They go back in on two.”" }),
+      );
+      [lamplighter, keeper, smith, mourner, woodsman].forEach(c => scene.add(c.root));
+      // The omen: a tall hooded figure glimpsed between houses for a moment.
+      omenFigure = omen; tint(omen, "#1a1d1f"); omen.root.position.set(-5.2, 0, -16.5); omen.root.rotation.y = .35; omen.play("Idle_Loop", 0); omen.root.visible = false; scene.add(omen.root);
+    } catch { /* Villagers are atmosphere; the route still works without them. */ }
+  })();
+  const villagerObstacles = (): Obstacle[] => villagers.filter(v => !v.id.startsWith("council")).map(v => ({ ...v.position(), radius: .35 }));
 
-  const lamp = new THREE.PointLight("#ffd08b", 14, 12, 1.6);
+  // First-person lantern.
+  const lamp = new THREE.PointLight("#ffd08b", 12, 12, 1.6);
   scene.add(lamp);
-  const hand = new THREE.Group();
-  cylinder(hand, .1, .13, .08, [0, -.2, 0], iron);
-  cylinder(hand, .13, .1, .07, [0, .2, 0], iron);
-  cylinder(hand, .045, .045, .3, [0, 0, 0], warm);
-  for (const x of [-.09, .09]) box(hand, [.018, .4, .018], [x, 0, 0], iron);
-  const handle = new THREE.Mesh(new THREE.TorusGeometry(.095, .012, 6, 20, Math.PI), iron); handle.position.y = .23; hand.add(handle);
-  camera.add(hand); hand.position.set(.41, -.44, -.85); hand.scale.setScalar(.62); scene.add(camera);
-
-  const rainPositions = new Float32Array(500 * 3);
-  for (let i = 0; i < 500; i++) { rainPositions[i * 3] = (seeded(i, 20) - .5) * 35; rainPositions[i * 3 + 1] = seeded(i, 21) * 15; rainPositions[i * 3 + 2] = (seeded(i, 22) - .5) * 55; }
-  const rainGeometry = new THREE.BufferGeometry(); rainGeometry.setAttribute("position", new THREE.BufferAttribute(rainPositions, 3));
-  const rain = new THREE.Points(rainGeometry, new THREE.PointsMaterial({ color: "#d0dce0", size: .024, transparent: true, opacity: .25 }));
-  scene.add(rain);
+  const hand = handLantern({ iron: handMaterials.iron, glow: heldGlow }); hand.scale.setScalar(.85);
+  camera.add(hand); hand.position.set(.27, -.27, -.62); scene.add(camera);
 
   function resize() {
     const { width, height } = canvas.getBoundingClientRect();
     if (!width || !height) return;
-    renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
+    renderer.setSize(width, height, false); post.setSize(width, height, pixelRatio);
+    camera.aspect = width / height; camera.updateProjectionMatrix();
   }
   const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
   function clearInput() { keys.clear(); walkTarget = null; }
@@ -372,7 +204,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const hit = new THREE.Vector3();
   function pointerup(event: PointerEvent) {
-    if (dragging && Math.hypot(event.clientX - dragging.startX, event.clientY - dragging.startY) < 7 && settings.playing) {
+    if (dragging && Math.hypot(event.clientX - dragging.startX, event.clientY - dragging.startY) < 7 && settings.playing && document.pointerLockElement !== canvas) {
       const rect = canvas.getBoundingClientRect();
       raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), camera);
       if (raycaster.ray.intersectPlane(groundPlane, hit) && Math.hypot(hit.x - point.x, hit.z - point.z) < 14) walkTarget = { x: hit.x, z: hit.z };
@@ -387,11 +219,16 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   canvas.addEventListener("pointerdown", pointerdown); window.addEventListener("pointermove", pointermove);
   canvas.addEventListener("pointerup", pointerup); canvas.addEventListener("pointercancel", cancelPointer); canvas.addEventListener("webglcontextlost", contextlost);
 
+  const playerEye = new THREE.Vector3();
+  let lightClock = 0;
+  let nearestVillager: Villager | null = null;
   function frame() {
     if (destroyed) return;
     animation = requestAnimationFrame(frame);
-    clock.update();
-    const dt = Math.min(clock.getDelta(), .05);
+    timer.update();
+    renderer.info.reset();
+    const dt = Math.min(timer.getDelta(), .05);
+    world += dt; // ambient clock: fire, wind and sky keep breathing on the intro screen
     if (settings.playing) elapsed += dt;
     let moving = false;
     const running = keys.has("shift");
@@ -402,21 +239,25 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       const strafe = Number(keys.has("d")) - Number(keys.has("a"));
       let dx = -Math.sin(yaw) * forward + Math.cos(yaw) * strafe;
       let dz = -Math.cos(yaw) * forward - Math.sin(yaw) * strafe;
-      let speed = running ? 4.5 : 2.5;
+      let speed = running ? 4.6 : 2.4;
       if (walkTarget) {
         dx = walkTarget.x - point.x; dz = walkTarget.z - point.z;
         if (Math.hypot(dx, dz) < .15) { walkTarget = null; dx = dz = 0; }
         else speed = Math.min(speed, Math.hypot(dx, dz) / dt);
       }
       const length = Math.hypot(dx, dz);
-      if (length > 0) {
-        const next = movePlayer(point, dx / length * speed * dt, dz / length * speed * dt, creature.obstacles());
+      // Light acceleration gives footsteps weight without feeling floaty.
+      const want = length > 0 ? { x: dx / length * speed, z: dz / length * speed } : { x: 0, z: 0 };
+      const k = 1 - Math.exp(-dt * (length > 0 ? 10 : 14));
+      velocity = { x: velocity.x + (want.x - velocity.x) * k, z: velocity.z + (want.z - velocity.z) * k };
+      if (Math.hypot(velocity.x, velocity.z) > .02) {
+        const next = movePlayer(point, velocity.x * dt, velocity.z * dt, [...creature.obstacles(), ...villagerObstacles()]);
         const distance = Math.hypot(next.x - point.x, next.z - point.z);
-        moving = distance > .001; footDistance += distance; point = next;
-        if (!moving) walkTarget = null;
-        if (footDistance > (running ? 1.5 : 1.15)) { events.step(running); footDistance = 0; }
+        moving = distance > .001; footDistance += distance; bob += distance; point = next;
+        if (!moving) { walkTarget = null; velocity = { x: 0, z: 0 }; }
+        if (footDistance > (running ? 1.45 : .95)) { events.step(running, surfaceAt(point)); footDistance = 0; }
       }
-      if (point.z < 10 && !omenSeen) { omenSeen = true; omenUntil = elapsed + 2; events.omen(); }
+      if (point.z < 10 && !omenSeen) { omenSeen = true; omenUntil = elapsed + 2.2; events.omen(); }
     }
     const wolfDx = wolfPosition.x - point.x, wolfDz = wolfPosition.z - point.z;
     const wolfDistance = Math.hypot(wolfDx, wolfDz);
@@ -433,51 +274,116 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       const speed = warding ? (wolfDistance < 3 ? -1 : 0) : 2.3;
       wolfPosition = movePlayer(wolfPosition, -wolfDx / wolfDistance * dt * speed, -wolfDz / wolfDistance * dt * speed);
     }
-    creature.pose(encounter.phase === "waiting" ? {...encounter,time:elapsed} : encounter, wolfPosition, point, settings.reducedMotion);
-    watcher.visible = settings.playing && elapsed < omenUntil && !settings.reducedMotion;
-    if(sitting) {
-      sitting.progress=Math.min(1,sitting.progress+dt/(settings.reducedMotion?.12:1.25));
-      const t=THREE.MathUtils.smoothstep(sitting.progress,0,1);
-      point={x:THREE.MathUtils.lerp(sitting.from.x,COUNCIL_SEAT.x,t),z:THREE.MathUtils.lerp(sitting.from.z,COUNCIL_SEAT.z,t)};
-      yaw=THREE.MathUtils.lerp(sitting.yaw,0,t);pitch=THREE.MathUtils.lerp(sitting.pitch,-.06,t);
-      if(sitting.progress===1) {seated=true;const resolve=sitting.resolve;sitting=null;resolve();}
+    creature.pose(encounter.phase === "waiting" ? { ...encounter, time: elapsed } : encounter, wolfPosition, point, settings.reducedMotion);
+    if (omenFigure) {
+      omenFigure.root.visible = settings.playing && elapsed < omenUntil && !settings.reducedMotion;
+      if (omenFigure.root.visible) { omenFigure.mixer.update(dt); omenFigure.lookAt(camera.position, dt); }
     }
-    const eyeHeight=seated?1.05:sitting?THREE.MathUtils.lerp(1.68,1.05,THREE.MathUtils.smoothstep(sitting.progress,0,1)):1.68;
-    camera.position.set(point.x, eyeHeight + (moving && !settings.reducedMotion ? Math.sin(elapsed * (running ? 12 : 8)) * .025 : 0), point.z);
-    camera.rotation.set(pitch, yaw, 0);
+    if (sitting) {
+      sitting.progress = Math.min(1, sitting.progress + dt / (settings.reducedMotion ? .12 : 1.25));
+      const t = THREE.MathUtils.smoothstep(sitting.progress, 0, 1);
+      point = { x: THREE.MathUtils.lerp(sitting.from.x, COUNCIL_SEAT.x, t), z: THREE.MathUtils.lerp(sitting.from.z, COUNCIL_SEAT.z, t) };
+      yaw = THREE.MathUtils.lerp(sitting.yaw, 0, t); pitch = THREE.MathUtils.lerp(sitting.pitch, -.06, t);
+      if (sitting.progress === 1) { seated_ = true; const resolve = sitting.resolve; sitting = null; resolve(); }
+    }
+    const eyeHeight = seated_ ? 1.05 : sitting ? THREE.MathUtils.lerp(1.68, 1.05, THREE.MathUtils.smoothstep(sitting.progress, 0, 1)) : 1.68;
+    const bobOn = moving && !settings.reducedMotion;
+    const stride = bob * (running ? 2.2 : 2.9);
+    camera.position.set(point.x + (bobOn ? Math.cos(stride * .5) * .018 : 0), eyeHeight + (bobOn ? Math.abs(Math.sin(stride * .5)) * (running ? .05 : .03) - .015 : 0), point.z);
+    camera.rotation.set(pitch, yaw, bobOn ? Math.sin(stride * .5) * .006 : 0);
+    const targetFov = running && moving && !settings.reducedMotion ? 68 : 62;
+    if (Math.abs(camera.fov - targetFov) > .05) { camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
     hand.visible = settings.lantern;
-    hand.rotation.z = moving && !settings.reducedMotion ? Math.sin(elapsed * 5) * .04 : 0;
-    lamp.position.copy(camera.position); lamp.position.y -= .45;
-    lamp.intensity = settings.lantern ? 14 + (settings.reducedMotion ? 0 : Math.sin(elapsed * 7) * .5) : 0;
-    lamps.forEach(({ light, base }, i) => { light.intensity = base + (settings.reducedMotion ? 0 : Math.sin(elapsed * 5 + i) * 1.2); });
-    keepsakes.forEach((item, i) => { item.visible = !settings.found.includes(LANDMARKS[i].id); });
-    fire.update(elapsed, camera, settings.reducedMotion);
-    rain.visible = !settings.reducedMotion;
-    rain.position.set(point.x, -(elapsed * 2 % 8), point.z);
-    fogBanks.forEach((bank, i) => { if (!settings.reducedMotion) bank.position.x = Math.sin(elapsed * .045 + i * 2) * 4; });
-    if (elapsed - lastSnapshot > .12 || lastSnapshot === 0) {
-      events.spatial(point, yaw, wolfPosition);
-      events.snapshot({ point: { ...point }, bearing: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearby: encounterActive(encounter.phase) ? null : nearbyLandmark(point, settings.found)?.id ?? null, council: !encounterActive(encounter.phase) && atCouncil(point), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6 });
-      lastSnapshot = elapsed || -.001;
+    hand.rotation.z = bobOn ? Math.sin(stride * .5) * .05 : 0;
+    hand.position.y = -.27 + (bobOn ? Math.abs(Math.sin(stride * .5)) * .02 : 0);
+    lamp.position.copy(camera.position); lamp.position.y -= .25; lamp.position.x -= Math.sin(yaw) * .6; lamp.position.z -= Math.cos(yaw) * .6;
+    lamp.intensity = settings.lantern ? 12 + (settings.reducedMotion ? 0 : Math.sin(world * 7) * .5 + Math.sin(world * 13.3) * .3) : 0;
+    heldGlow.emissiveIntensity = settings.lantern ? 1 : 0;
+
+    // Moon shadows centred on the player, snapped to texels to avoid shimmering.
+    const texel = 64 / moonLight.shadow.mapSize.x;
+    const cx = Math.round(point.x / texel) * texel, cz = Math.round(point.z / texel) * texel;
+    moonLight.target.position.set(cx, 0, cz);
+    moonLight.position.set(cx + MOON_DIRECTION.x * 70, MOON_DIRECTION.y * 70, cz + MOON_DIRECTION.z * 70);
+
+    lightClock -= dt;
+    if (lightClock <= 0) { lightSites = assignLights(); lightClock = .3; }
+    pool.forEach((slot, i) => {
+      if (slot.site >= 0 && lightSites[slot.site]) slot.light.position.copy(lightSites[slot.site]);
+      const flicker = settings.reducedMotion ? 0 : Math.sin(world * 5 + i * 1.7) * 1.1 + Math.sin(world * 11.3 + i) * .5;
+      const goal = slot.target > 0 ? slot.target + flicker : 0;
+      slot.light.intensity += (goal - slot.light.intensity) * Math.min(1, dt * 5);
+    });
+
+    playerEye.copy(camera.position);
+    nearestVillager = null;
+    let nearestD = 2.4;
+    for (const v of villagers) {
+      v.update(dt * (settings.playing || !elapsed ? 1 : 0), world, playerEye, settings.reducedMotion);
+      const p = v.position(), d = Math.hypot(p.x - point.x, p.z - point.z);
+      if (v.line && d < nearestD) { nearestD = d; nearestVillager = v; }
     }
-    renderer.render(scene, camera);
+
+    wind.value = settings.reducedMotion ? 0 : world;
+    keepsakes.forEach((item, i) => { item.visible = !settings.found.includes(LANDMARKS[i].id); });
+    fire.update(world, camera, settings.reducedMotion);
+    dressing.update(world, settings.reducedMotion);
+    const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); });
+    moonLight.intensity = 1.9 + flash * 9;
+    const danger = ["hunting", "pouncing"].includes(encounter.phase) ? 1 : ["feeding", "transforming"].includes(encounter.phase) ? .45 : 0;
+    post.grade.danger.value += (danger - post.grade.danger.value) * Math.min(1, dt * 2);
+    post.grade.time.value = world;
+    post.grade.grain.value = settings.reducedMotion ? .3 : 1;
+
+    if (world - lastSnapshot > .12) {
+      events.spatial(point, yaw, wolfPosition);
+      const active = encounterActive(encounter.phase);
+      events.snapshot({
+        point: { ...point }, bearing: ((-yaw * 180 / Math.PI) % 360 + 360) % 360,
+        nearby: active ? null : nearbyLandmark(point, settings.found)?.id ?? null,
+        council: !active && atCouncil(point), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6,
+        district: districtAt(point), villager: active || !nearestVillager ? null : { id: nearestVillager.id, name: nearestVillager.name, line: nearestVillager.line },
+        loading: loadProgress,
+      });
+      lastSnapshot = world;
+    }
+    post.render(dt);
   }
   frame();
+  // Dev-only camera hook for visual QA scripts; stripped from production builds.
+  if (process.env.NODE_ENV !== "production") {
+    (window as unknown as { __village?: unknown }).__village = {
+      teleport(x: number, z: number, y = 0, p = -.035) { point = { x, z }; yaw = y; pitch = p; velocity = { x: 0, z: 0 }; },
+      breakdown() {
+        const rows: [string, number, number, boolean][] = [];
+        scene.traverse(o => {
+          if (!(o instanceof THREE.Mesh) || !o.visible) return;
+          const g = o.geometry, tris = (g.index ? g.index.count : g.getAttribute("position").count) / 3;
+          const n = o instanceof THREE.InstancedMesh ? o.count : 1;
+          rows.push([`${o.type}:${(o.material as THREE.Material).name || (o.material as THREE.Material).type}:${o.name || o.parent?.name || ""}`, Math.round(tris), Math.round(tris * n), o.castShadow]);
+        });
+        const noImage: string[] = [];
+        scene.traverse(o => { if (o instanceof THREE.Mesh) for (const m of [o.material].flat()) for (const [k, v] of Object.entries(m)) if (v instanceof THREE.Texture && !v.image) noImage.push(`${m.name || m.type}.${k}`); });
+        return { top: rows.sort((a, b) => b[2] - a[2]).slice(0, 25), noImage: [...new Set(noImage)].slice(0, 20) };
+      },
+      info: () => ({ fps: 0, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }),
+    };
+  }
 
   return {
     configure(next: SceneSettings) {
       settings = next;
-      renderer.toneMappingExposure = 1.35 * next.brightness;
+      renderer.toneMappingExposure = 1.2 * next.brightness;
       if (!next.playing) { clearInput(); dragging = null; unlock(); }
     },
     sit() {
-      if (seated) return Promise.resolve();
+      if (seated_) return Promise.resolve();
       if (sitting || !atCouncil(point) || encounterActive(encounter.phase)) return Promise.reject(new Error("Reach the empty council chair first."));
-      settings.playing=false;clearInput();unlock();
-      return new Promise<void>(resolve => { sitting={from:{...point},yaw:Math.atan2(Math.sin(yaw),Math.cos(yaw)),pitch,progress:0,resolve}; });
+      settings.playing = false; clearInput(); unlock();
+      return new Promise<void>(resolve => { sitting = { from: { ...point }, yaw: Math.atan2(Math.sin(yaw), Math.cos(yaw)), pitch, progress: 0, resolve }; });
     },
-    reset() { seated=false; sitting=null; point = { ...SPAWN }; yaw = 0; pitch = -.035; elapsed = 0; lastSnapshot = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
-    retryEncounter() { point = { x: 0, z: 3.8 }; yaw = 0; pitch = -.035; encounter = newEncounter(); wolfPosition = { ...VICTIM }; lastSnapshot = 0; events.encounter("waiting"); clearInput(); },
+    reset() { seated_ = false; sitting = null; point = { ...SPAWN }; velocity = { x: 0, z: 0 }; yaw = 0; pitch = -.035; elapsed = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
+    retryEncounter() { point = { x: 0, z: 3.8 }; velocity = { x: 0, z: 0 }; yaw = 0; pitch = -.035; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
     step(direction: "forward" | "back" | "left" | "right") {
       if (!settings.playing) return;
       if (direction === "left" || direction === "right") { yaw += direction === "left" ? Math.PI / 8 : -Math.PI / 8; return; }
@@ -487,23 +393,23 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     },
     async lockPointer() { await canvas.requestPointerLock(); },
     dispose() {
-      destroyed = true; creature.dispose(); cancelAnimationFrame(animation); observer.disconnect(); clock.dispose(); unlock();
+      destroyed = true; cancelAnimationFrame(animation); observer.disconnect(); timer.dispose(); unlock();
       window.removeEventListener("keydown", keydown); window.removeEventListener("keyup", keyup); window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", visibility); document.removeEventListener("pointerlockchange", lockchange);
       canvas.removeEventListener("pointerdown", pointerdown); window.removeEventListener("pointermove", pointermove);
       canvas.removeEventListener("pointerup", pointerup); canvas.removeEventListener("pointercancel", cancelPointer); canvas.removeEventListener("webglcontextlost", contextlost);
-      const geometries = new Set<THREE.BufferGeometry>();
-      const usedMaterials = new Set<THREE.Material>(materials);
+      villagers.forEach(v => v.character.dispose()); omenFigure?.dispose();
+      creature.dispose(); nature.dispose(); dressing.dispose(); atmosphere.dispose(); post.dispose(); cast.dispose();
+      const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       scene.traverse(object => {
-        if (object instanceof THREE.Sprite) usedMaterials.add(object.material);
-        if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
+        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
           geometries.add(object.geometry);
-          (Array.isArray(object.material) ? object.material : [object.material]).forEach(m => usedMaterials.add(m));
+          (Array.isArray(object.material) ? object.material : [object.material]).forEach(m => materials.add(m));
           if (object instanceof THREE.InstancedMesh) object.dispose();
         }
       });
-      geometries.forEach(g => g.dispose()); usedMaterials.forEach(m => m.dispose()); scene.traverse(object=>{ if(object instanceof THREE.Mesh) for(const material of Array.isArray(object.material)?object.material:[object.material]) for(const value of Object.values(material)) if(value instanceof THREE.Texture && !textures.includes(value)) textures.push(value); });
-      textures.forEach(t => t.dispose()); renderer.dispose();
+      geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose());
+      assets.dispose(); renderer.dispose();
     },
   };
 }

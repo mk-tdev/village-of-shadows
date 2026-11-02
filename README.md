@@ -99,8 +99,10 @@ Two representative learning paths:
 ### Walk the village: The Last Light
 
 The homepage's **Walk into the shadows** action opens `/explore`, a playable
-first-person horror prologue. Walk through a foggy village, recover three seals
-at the abandoned lantern, old well, and chapel, then reach the council fire.
+first-person horror prologue. Walk a rain-soaked, walled village (market,
+tavern, graveyard, farm and mill pond) with rigged, animated villagers and
+positional CC0 sound. Recover three seals at the abandoned lantern, old well and
+chapel, then reach the council fire.
 The ending leads into the existing AI game setup. **Go straight to the AI
 council** remains available for returning players.
 

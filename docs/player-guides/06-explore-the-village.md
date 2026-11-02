@@ -19,6 +19,28 @@ objective points to your next missing discovery, and the journal preserves
 every recovered note. A werewolf encounter interrupts the lane after your first
 seal. Outside that encounter, explore at your pace.
 
+## Beyond the lane
+
+The lane is the quickest route, but the village is walled by a palisade and
+open to explore. Side streets lead to:
+
+- **The market square** (east of the well): the tavern, the smithy's forge,
+  stalls, a pillory, and a lamplighter making his rounds.
+- **The old graveyard** (west, behind the chapel): rows of headstones, a
+  mausoleum, an open grave and someone kneeling beside it.
+- **The Hollow farm** (south-west): a barn, haystacks, a paddock and a scarecrow.
+- **The mill pond** (north-east of the council): a turning waterwheel and a jetty.
+- **The hunter's hut** (north-west, at the forest edge).
+
+Villagers still awake turn to watch you. When **Speak with …** appears, press
+**E** to hear what they saw. They add atmosphere only; nothing they say is
+required, and none of them are council roles.
+
+Sound is positional; headphones help. The fire, forge, mill and creature come
+from where they stand, and footsteps change on cobbles, mud, grass and wood.
+Distant lightning is followed by thunder. Reduced motion turns lightning, rain,
+grain and camera sway off.
+
 ## The watchman’s hunger
 
 Approach the two figures near the old well with at least one seal, facing the

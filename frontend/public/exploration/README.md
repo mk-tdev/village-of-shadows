@@ -1,18 +1,47 @@
-# Prologue environment materials
+# Explore village assets
 
-`weathered-timber.png` and `wet-cobblestone.png` were generated for this feature
-with the built-in OpenAI image generator on 2026-09-05. They are used as repeated
-color and bump maps in the local Three.js scene. No reference app assets were
-copied.
+Every runtime asset here is CC0 except the werewolf, which was authored for
+this project. Nothing is loaded from a third-party CDN at runtime.
 
-- Timber prompt: seamless flat albedo photograph of weathered medieval
-  horizontal timber boards; dark gray wood grain, subtle moss and moisture;
-  neutral diffuse lighting, no perspective, text, objects, or strong shadows.
-- Cobblestone prompt: seamless flat top-down albedo photograph of closely set,
-  irregular wet gray cobblestones in dark soil, dirt and moss in cracks;
-  neutral overcast lighting, no perspective, text, or objects.
+## Environment (`env/`): Poly Haven, CC0
 
-The scene also reuses the existing `public/characters/full/` cast images.
+Downloaded 2026-11-03 from the Poly Haven API (https://polyhaven.com,
+https://api.polyhaven.com) at 1k resolution, then converted.
+
+- **Textures** (`env/textures/*_{diff,nor,arm}.webp`, 1024 px WebP, ARM =
+  AO/roughness/metalness): cobblestone_floor_08, cobblestone_square,
+  muddy_tracks, forest_ground_04, plastered_wall_04, worn_mossy_plasterwall,
+  weathered_planks, dark_wooden_planks, weathered_plank_siding,
+  thatch_roof_angled, roof_slates_02, castle_brick_07, rustic_stone_wall,
+  wood_shutter.
+- **HDRI**: narrow_moonlit_road (1k, used only as image-based lighting).
+- **Models** (`env/models/*.glb`): Barrel_01, wooden_barrels_01,
+  wooden_crate_01/02, wooden_bucket_01, wooden_lantern_01, Lantern_01,
+  wooden_axe, tree_stump_01/02, dead_tree_trunk, dead_tree_trunk_02, shrub_02,
+  fern_02, nettle_plant, boulder_01, rock_moss_set_01, gothic_statue,
+  large_iron_gate, stone_fire_pit, wicker_basket_01, wooden_picnic_table,
+  painted_wooden_bench, spinning_wheel_01, wooden_ladder, wine_barrel_01,
+  wooden_stool_01, WoodenChair_01, wooden_broom.
+  They are optimized with `gltf-transform optimize --compress meshopt
+  --texture-compress webp --texture-size 512`. Dense scanned meshes are
+  simplified: nettle 8%, shrub 10%, boulder 4%, fern 35%, others 15–50%.
+  Poly Haven's fir and pine trees (4M+ triangles each) are not used.
+  Conifers, bare trees and grass are generated in `lib/exploration/nature.ts`.
+
+Houses, the chapel, walls, the palisade and fences are procedural geometry
+(`lib/exploration/architecture.ts`). They use the textures above with
+box-projected, metre-scaled UVs and are merged into one mesh per material.
+
+## Characters (`characters/`): Quaternius, CC0
+
+Eight rigged villagers share one 65-bone skeleton and 27 clips (sitting,
+walking, lantern, death, look-around and others). See
+`characters/PROVENANCE.md` for sources, hashes and edits.
+
+## Audio (`audio/`): Kenney and Freesound, CC0
+
+Surface footsteps, ambience beds, one-shots, music beds and stingers.
+See `audio/PROVENANCE.md` for per-file authors, URLs and edits.
 
 ## Werewolf mesh
 
@@ -39,32 +68,14 @@ Edits: use the first 1.25 seconds of the attack and 3.2 seconds of the growl;
 layers two pitches with a short offset, applies distance attenuation and
 stereo direction, and routes through a compressor. Files are served locally.
 
-The council fire uses procedural shader flames, coals/logs, ember particles,
-and a synthesized crackle loop. No external flame media is used.
+The council fire uses procedural shader flames, coals/logs and ember
+particles. Its crackle is the CC0 campfire loop, positioned in 3D.
 
-## Walk into Shadows update — 2026-09-15
+## Keepsakes
 
-The three optional keepsakes are supported physical objects: a wax-sealed letter
-on a crate, a rusted key on the well rim, and a stamped brass medallion hanging
-against wood. `props.ts` authors their geometry and patina locally. There are no
-spinning, emissive pickup rings. The main objective is the empty council chair.
-
-The pre-transformation watchman and witness use **INFINITE, 3D Head Scan** by
-**Lee Perry-Smith**, based on Triplegangers work, under **CC BY 3.0**. The source
-is pinned to the Three.js r185 example archive:
-https://github.com/mrdoob/three.js/tree/r185/examples/models/gltf/LeePerrySmith
-
-`watchman/LICENSE.txt` preserves the original attribution/license. The runtime
-trims the scanned shoulders, scales/tints the head, and fits it into locally
-authored clothing. The approximately 0.7 MB asset set includes the original
-head GLB, color texture and normal map. The finished wolf asset is unchanged.
-
-`audio.ts` adds an original synthesized horror score: detuned bowed drones,
-sub-bass, slow pitch drift and a low heartbeat pulse. It swells during the
-encounter and recedes near the council fire, alongside spatial creature
-recordings, wind and fire. It begins only on a gesture; sound-off and pause
-suspend it. This is a procedural score, not a licensed music recording.
-
+The three optional keepsakes are physical objects authored in `props.ts`: a
+wax-sealed letter on a crate, a rusted key on the well rim, and a brass
+medallion against wood. The main objective is the empty council chair.
 
 ## Blender refinement (feature branch)
 

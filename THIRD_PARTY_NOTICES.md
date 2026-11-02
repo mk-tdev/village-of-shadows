@@ -59,10 +59,27 @@ References to LangGraph, LangChain, MCP, OpenAI, Anthropic, Google, Ollama,
 Next.js, React, Three.js, FastAPI, Vercel, Render, or their marks indicate
 technical interoperability only. No endorsement or sponsorship is implied.
 
-## Watchman human head scan
+## Explore village: characters (CC0)
 
-“INFINITE, 3D Head Scan” by Lee Perry-Smith, based on work at Triplegangers.
-License: Creative Commons Attribution 3.0 Unported.
-Source: https://github.com/mrdoob/three.js/tree/r185/examples/models/gltf/LeePerrySmith
-Files: `frontend/public/exploration/watchman/head.glb`, `skin.jpg`, `normal.jpg`.
-The runtime trims the scanned shoulders, scales the face, adjusts material tint, and fits it into the game's authored coat. Original license is included beside the assets.
+The eight rigged villagers in `frontend/public/exploration/characters/` were
+assembled for this project from Quaternius packs released under CC0 1.0
+(https://creativecommons.org/publicdomain/zero/1.0/): Universal Base
+Characters, Modular Character Outfits – Fantasy, and Universal Animation
+Library 1 and 2 (https://quaternius.itch.io). Assembly, animation transfer,
+tints and compression are recorded in `characters/PROVENANCE.md`.
+
+## Explore village: environment (CC0)
+
+PBR textures, props, plants and the night HDRI in
+`frontend/public/exploration/env/` are from Poly Haven (https://polyhaven.com),
+released under CC0. They were downsized, simplified and recompressed
+(meshopt geometry, WebP textures). The list is in
+`frontend/public/exploration/README.md`.
+
+## Explore village: audio (CC0)
+
+Footsteps, ambience, one-shots and music in `frontend/public/exploration/audio/`
+come from Kenney (https://kenney.nl, CC0) and CC0-licensed Freesound
+recordings (https://freesound.org). Per-file authors, source URLs and edits are
+in `audio/PROVENANCE.md`. The creature snarls (`attack.mp3`, `growl.mp3`) are
+CC0 recordings by Darsycho on OpenGameArt.

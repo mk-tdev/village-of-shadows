@@ -52,12 +52,12 @@ export default function ExplorationExperience() {
   const [storageBlocked, setStorageBlocked] = useState(false);
   const [encounter, setEncounter] = useState<EncounterPhase>("waiting");
   const [witnessed, setWitnessed] = useState(false);
-  const [snapshot, setSnapshot] = useState<SceneSnapshot>({ point: SPAWN, bearing: 0, nearby: null, council: false, moving: false, encounter: "waiting", ward: 0 });
+  const [snapshot, setSnapshot] = useState<SceneSnapshot>({ point: SPAWN, bearing: 0, nearby: null, council: false, moving: false, encounter: "waiting", ward: 0, district: "The village threshold", villager: null, loading: 0 });
   const playing = mode === "playing";
   const target = LANDMARKS.find(l => l.id === snapshot.nearby);
   const objectiveHint = snapshot.point.z > -22 ? t("Follow the lamps north, past the well and chapel. The council fire is your destination.") : t("Find the empty wooden chair on this side of the fire. Press E to finish the intro, then choose your players and models.");
   const bearing = DIRECTIONS[Math.round(snapshot.bearing / 45) % 8];
-  const location = snapshot.point.z > 7 ? "The village threshold" : snapshot.point.z > -12 ? "The old well" : snapshot.point.z > -28 ? "The silent chapel" : "The council clearing";
+  const location = snapshot.district;
 
   const takeSeat = useCallback(async () => {
     if (launchLock.current) return;
@@ -76,6 +76,7 @@ export default function ExplorationExperience() {
   const interact = useCallback(() => {
     if (mode !== "playing") return;
     if (snapshot.council) { void takeSeat(); return; }
+    if (snapshot.villager && !snapshot.nearby) { audioRef.current?.speak(); setNotice(`${snapshot.villager.name[0].toUpperCase()}${snapshot.villager.name.slice(1)}: ${snapshot.villager.line}`); return; }
     const landmark = LANDMARKS.find(l => l.id === snapshot.nearby);
     if (!landmark || found.includes(landmark.id)) return;
     const updated = [...found, landmark.id];
@@ -83,7 +84,7 @@ export default function ExplorationExperience() {
     audioRef.current?.discovery();
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); }
     catch { setStorageBlocked(true); setNotice("Your journal will be kept for this visit."); }
-  }, [found, mode, snapshot.council, snapshot.nearby, takeSeat]);
+  }, [found, mode, snapshot.council, snapshot.nearby, snapshot.villager, takeSeat]);
 
   const actions = useRef({ interact, playing });
   useEffect(() => { actions.current = { interact, playing }; }, [interact, playing]);
@@ -99,11 +100,12 @@ export default function ExplorationExperience() {
         action: action => {
           if (!actions.current.playing) return;
           if (action === "interact") actions.current.interact();
-          if (action === "journal") setMode("journal");
+          if (action === "journal") { audioRef.current?.journal(); setMode("journal"); }
           if (action === "pause") setMode("paused");
           if (action === "lantern") setLantern(value => !value);
         },
-        step: running => audioRef.current?.step(running),
+        step: (running, surface) => audioRef.current?.step(running, surface),
+        thunder: (delay, strength) => audioRef.current?.thunder(delay, strength),
         spatial: (player, yaw, wolf) => audioRef.current?.spatial(player, yaw, wolf),
         omen: () => { audioRef.current?.whisper(); audioRef.current?.bell(); setNotice("You are certain someone was standing there."); },
         encounter: phase => {
@@ -127,9 +129,15 @@ export default function ExplorationExperience() {
     audioRef.current?.setActive(playing && sound && !failed);
   }, [playing, lantern, reducedMotion, brightness, found, sound, failed]);
 
+  const lanternWas = useRef(lantern);
+  useEffect(() => {
+    if (lanternWas.current !== lantern && playing) audioRef.current?.lantern(lantern);
+    lanternWas.current = lantern;
+  }, [lantern, playing]);
+
   useEffect(() => {
     if (!notice) return;
-    const timeout = window.setTimeout(() => setNotice(""), 6000);
+    const timeout = window.setTimeout(() => setNotice(""), 9000);
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
@@ -177,7 +185,7 @@ export default function ExplorationExperience() {
         <h1>Someone here<br />isn’t <em>human.</em></h1>
         <p>The lamps are still burning. The doors are all locked.<br className={styles.desktopBreak} /> And somewhere in the village, a bell is ringing.</p>
         <p className={styles.premise}>{t("Find the council. Take your seat.")}<br />{t("Keep your lantern close. Something hunts here.")}</p>
-        <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? "Lighting the lanterns…" : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
+        <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? `Lighting the lanterns… ${Math.round(snapshot.loading * 100)}%` : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
         <Link href="/setup" className={styles.textLink}>{t("Go straight to player setup")} <span>↗</span></Link>
       </section>
       <footer className={styles.introFooter}><span><LanternIcon /> A playable horror prologue</span><span>Headphones recommended <i /> Take your time. Listen carefully.</span></footer>
@@ -195,7 +203,7 @@ export default function ExplorationExperience() {
         <button className={styles.journalButton} onClick={() => setMode("journal")}>{t("Open journal")} <kbd>J</kbd></button>
       </aside>
       <div className={styles.interaction}>
-        {playing && (target || snapshot.council) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : `Examine ${target?.id === "lantern" ? "the lantern" : target?.id === "well" ? "the old well" : "the chapel door"}`}</button> : <span className={styles.walkHint}>W A S D to walk <i /> Drag to look <i /> Click ground to walk</span>}
+        {playing && (target || snapshot.council || snapshot.villager) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : target ? `Examine ${target.id === "lantern" ? "the lantern" : target.id === "well" ? "the old well" : "the chapel door"}` : `Speak with ${snapshot.villager?.name}`}</button> : <span className={styles.walkHint}>W A S D to walk <i /> Drag to look <i /> Click ground to walk</span>}
       </div>
       <div className={styles.lanternControl}><button onClick={() => setLantern(value => !value)} aria-pressed={lantern}><LanternIcon /><span>Lantern {lantern ? "lit" : "unlit"}</span><kbd>F</kbd></button></div>
       <div className={styles.movePad} aria-label="Movement controls"><button aria-label="Walk forward" onClick={() => sceneRef.current?.step("forward")}>↑</button><button aria-label="Turn left" onClick={() => sceneRef.current?.step("left")}>↶</button><button aria-label="Walk backward" onClick={() => sceneRef.current?.step("back")}>↓</button><button aria-label="Turn right" onClick={() => sceneRef.current?.step("right")}>↷</button></div>

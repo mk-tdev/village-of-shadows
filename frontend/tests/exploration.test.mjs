@@ -67,8 +67,6 @@ test("large movement cannot tunnel through cottages, the well, or world bounds",
     assert.ok(Math.abs(destination.x) < Math.abs(h.x) - h.w / 2);
   }
   assert.equal(canWalk({ x: 2.5, z: -3 }), false);
-  assert.ok(movePlayer(SPAWN, 0, 100).z <= 23);
-  assert.ok(movePlayer({ x: 0, z: -30 }, 0, -100).z >= -38);
 });
 
 test("diagonal movement slides along walls instead of sticking", () => {
@@ -122,4 +120,33 @@ test('Blender clips follow phase timing, pause deterministically, and freeze red
   for (const phase of ['transforming', 'pouncing', 'feeding', 'hunting', 'fleeing']) {
     assert.equal(wolfClipTime(wolfAnimation({ phase, time: .1 }, true), 2), wolfClipTime(wolfAnimation({ phase, time: .8 }, true), 2));
   }
+});
+
+const { BOUNDS, DISTRICTS, LAMPS, PROPS, BUILDINGS, surfaceAt, districtAt } = await import('../lib/exploration/world.ts');
+function reachable() {
+  const seen = new Set(), key = (x, z) => `${x},${z}`, queue = [[Math.round(SPAWN.x * 2), Math.round(SPAWN.z * 2)]];
+  seen.add(key(...queue[0]));
+  while (queue.length) {
+    const [x, z] = queue.pop();
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, nz = z + dz, k = key(nx, nz);
+      if (!seen.has(k) && canWalk({ x: nx / 2, z: nz / 2 })) { seen.add(k); queue.push([nx, nz]); }
+    }
+  }
+  return (p) => { for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (seen.has(key(Math.round(p.x * 2) + dx, Math.round(p.z * 2) + dz))) return true; return false; };
+}
+test('every district, landmark and lamp-lit street is reachable on foot from the gate', () => {
+  const ok = reachable();
+  for (const d of DISTRICTS) assert.ok(ok(d), `${d.name} unreachable`);
+  for (const l of LANDMARKS) assert.ok(ok(l), `${l.id} unreachable`);
+  assert.ok(ok(COUNCIL_SEAT));
+  for (const lamp of LAMPS.filter(l => l.kind === 'post')) assert.ok(ok(lamp), `lamp ${lamp.x},${lamp.z} unreachable`);
+});
+test('the palisade bounds the village and props never sit inside buildings', () => {
+  assert.ok(movePlayer(SPAWN, 0, 100).z <= BOUNDS.maxZ);
+  assert.ok(movePlayer({ x: 0, z: -30 }, 0, -100).z >= BOUNDS.minZ);
+  for (const p of PROPS) assert.ok(!BUILDINGS.some(h => Math.abs(p.x - h.x) < h.w / 2 && Math.abs(p.z - h.z) < h.d / 2), `${p.kind} inside a building`);
+  assert.equal(surfaceAt(SPAWN), 'stone');
+  assert.equal(surfaceAt({ x: -16.5, z: -10 }), 'dirt');
+  assert.equal(districtAt({ x: 22, z: 0 }), 'The market square');
 });
