@@ -4219,8 +4219,10 @@ input:focus {
 }
 .landing-hero-actions {
   display: flex;
-  align-items: center;
-  gap: 24px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 18px;
+  width: min(500px, 100%);
   margin-top: 28px;
   animation: landing-rise 800ms 340ms both;
 }
@@ -4265,6 +4267,40 @@ input:focus {
 }
 .landing-text-action:hover,
 .landing-text-action:focus-visible { color: white !important; border-color: var(--landing-blue); outline: none; }
+.landing-explore-action {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-height: 154px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid #8bc4d46b;
+  border-radius: 4px;
+  background: #0d202b;
+  box-shadow: 0 12px 32px #0005;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.landing-explore-preview { z-index: -2; object-fit: cover; object-position: 70% 48%; transition: transform 600ms ease; }
+.landing-explore-action::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, #06121bf5 5%, #06121be8 39%, #06121b55 78%, #06121b77); }
+.landing-explore-copy { display: grid; gap: 8px; }
+.landing-explore-copy strong { font: 500 27px/1.15 "Spectral", Georgia, serif; color: #f4eddf; }
+.landing-explore-copy > span { color: #d0dce0; font: 14px/1.55 "Spectral", Georgia, serif; }
+.landing-explore-copy small { color: #edc68e; font-size: 10px; margin-top: 3px; }
+.landing-explore-arrow { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border: 1px solid #ecc78e99; border-radius: 50%; background: #08131bbb; color: #f6d59e; font: 24px Georgia, serif; transition: transform 200ms ease, background 200ms ease; }
+.landing-explore-action:hover { border-color: #d7bd8c; box-shadow: 0 12px 38px #0007, 0 0 24px #8bc4d41a; }
+.landing-explore-action:focus-visible { outline: 2px solid #f6d59e; outline-offset: 5px; }
+.landing-explore-action:hover .landing-explore-preview,
+.landing-explore-action:focus-visible .landing-explore-preview { transform: scale(1.045); }
+.landing-explore-action:hover .landing-explore-arrow,
+.landing-explore-action:focus-visible .landing-explore-arrow { transform: translate(2px, -2px); background: #4e3a20; }
 .landing-hero-stats {
   display: flex;
   gap: 0;
@@ -4590,7 +4626,10 @@ input:focus {
   .landing-hero h1 { font-size: clamp(58px, 19vw, 86px); }
   .landing-hero-copy { max-width: 92%; font-size: 16px; }
   .landing-hero-actions { align-items: flex-start; flex-direction: column; gap: 14px; }
-  .landing-hero-stats { margin-top: 45px; }
+  .landing-hero-stats { margin-top: 28px; }
+  .landing-explore-action { padding: 19px 17px; }
+  .landing-explore-copy strong { font-size: 25px; }
+  .landing-explore-copy > span { font-size: 13px; }
   .landing-hero-stats > div { min-width: 0; padding: 0 13px; }
   .landing-cast { inset: auto -22% 0 -12%; height: 48%; opacity: 0.72; }
   .landing-character { width: 28vw; }
@@ -4648,7 +4687,14 @@ input:focus {
   .landing-mind,
   .visual-01 i:nth-child(4) { animation: none !important; }
   .landing-primary-action,
+  .landing-explore-action,
+  .landing-explore-preview,
+  .landing-explore-arrow,
   .landing-experience-grid > article { transition: none; }
+  .landing-explore-action:hover .landing-explore-preview,
+  .landing-explore-action:focus-visible .landing-explore-preview,
+  .landing-explore-action:hover .landing-explore-arrow,
+  .landing-explore-action:focus-visible .landing-explore-arrow { transform: none; }
 }
 
 /* The case takes the stage until the investigator returns to council. */

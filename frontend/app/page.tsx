@@ -108,8 +108,14 @@ export default function LandingPage() {
               <span><LandingText text="Start Game Setup" /></span>
               <b aria-hidden="true">→</b>
             </Link>
-            <Link className="landing-text-action" href="/explore">
-              <LandingText text="Explore the village first" />
+            <Link className="landing-explore-action" href="/explore" aria-labelledby="explore-invitation-title" aria-describedby="explore-invitation-description">
+              <Image className="landing-explore-preview" src="/scenes/moonlit-village.png" alt="" fill sizes="(max-width: 560px) 100vw, 500px" />
+              <span className="landing-explore-copy">
+                <strong id="explore-invitation-title">Explore the village</strong>
+                <span id="explore-invitation-description">Take a lantern into the forest.<br />Find the ruins. Reach the council fire.</span>
+                <small>Free to explore · No API key</small>
+              </span>
+              <span className="landing-explore-arrow" aria-hidden="true">↗</span>
             </Link>
           </div>
           <dl className="landing-hero-stats">
