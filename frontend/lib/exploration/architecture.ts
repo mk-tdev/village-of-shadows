@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { Assets } from "./assets";
-import { BUILDINGS, CHAPEL, FENCES, GRAVES, GRAVEYARD, STALLS, WALLS, BOUNDS, PADDOCK, type Building } from "./world";
+import { BUILDINGS, CHAPEL, FENCES, GRAVES, GRAVEYARD, STALLS, WALLS, VILLAGE_BOUNDS as BOUNDS, PADDOCK, type Building } from "./world";
 
 const seeded = (i: number, salt = 1) => ((Math.sin(i * 127.1 + salt * 311.7) * 43758.5453) % 1 + 1) % 1;
 const FACING = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 } as const;
@@ -332,7 +332,7 @@ export function buildArchitecture(scene: THREE.Scene, assets: Assets) {
   // Palisade of sharpened stakes around the bounds, with the closed south gate.
   const stakes: [number, number][] = [];
   const edge = 1.2;
-  for (let x = BOUNDS.minX - edge; x <= BOUNDS.maxX + edge; x += .42) { stakes.push([x, BOUNDS.minZ - edge]); if (Math.abs(x) > 2.4) stakes.push([x, BOUNDS.maxZ + edge]); }
+  for (let x = BOUNDS.minX - edge; x <= BOUNDS.maxX + edge; x += .42) { if (Math.abs(x) > 3) stakes.push([x, BOUNDS.minZ - edge]); if (Math.abs(x) > 2.4) stakes.push([x, BOUNDS.maxZ + edge]); }
   for (let z = BOUNDS.minZ - edge; z <= BOUNDS.maxZ + edge; z += .42) { stakes.push([BOUNDS.minX - edge, z]); stakes.push([BOUNDS.maxX + edge, z]); }
   const stakeGeo = mergeGeometries([new THREE.CylinderGeometry(.19, .21, 3.2, 7).translate(0, 1.6, 0).toNonIndexed(), new THREE.ConeGeometry(.19, .5, 7).translate(0, 3.45, 0).toNonIndexed()])!;
   const palisade = new THREE.InstancedMesh(stakeGeo, mat.timber, stakes.length);

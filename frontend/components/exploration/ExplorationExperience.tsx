@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createVillage, type SceneSnapshot, type VillageScene } from "@/lib/exploration/scene";
 import { VillageAudio } from "@/lib/exploration/audio";
-import { LANDMARKS, SPAWN, restoreSeals, type Landmark } from "@/lib/exploration/world";
+import { LANDMARKS, SPAWN, STREETS, COUNCIL, BOUNDS, forestHint, restoreSeals, type Landmark } from "@/lib/exploration/world";
 import { ENCOUNTER_COPY, encounterActive, type EncounterPhase } from "@/lib/exploration/encounter";
 import styles from "./exploration.module.css";
 
@@ -18,14 +18,15 @@ function LanternIcon() {
   return <svg width="26" height="38" viewBox="0 0 26 38" fill="none" aria-hidden="true"><path d="M9 8V5a4 4 0 0 1 8 0v3M6 11h14M7 11l-3 19h18l-3-19M7 34h12M9 14l-2 13h12l-2-13M10 8h6" stroke="currentColor" strokeWidth="1.1"/><path d="M13 18c-5 6-1 8 0 8s5-2 0-8Z" fill="currentColor"/></svg>;
 }
 
-function Modal({ children, onClose, title }: { children: ReactNode; onClose: () => void; title: string }) {
+function Modal({ children, onClose, title, focusTop = false }: { children: ReactNode; onClose: () => void; title: string; focusTop?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
+    if (dialog && focusTop) { dialog.focus(); dialog.scrollTop = 0; }
     return () => dialog?.close();
-  }, []);
-  return <dialog ref={ref} className={styles.modal} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>{children}</dialog>;
+  }, [focusTop]);
+  return <dialog ref={ref} tabIndex={-1} className={styles.modal} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>{children}</dialog>;
 }
 
 function readSavedSeals() {
@@ -55,7 +56,7 @@ export default function ExplorationExperience() {
   const [snapshot, setSnapshot] = useState<SceneSnapshot>({ point: SPAWN, bearing: 0, nearby: null, council: false, moving: false, encounter: "waiting", ward: 0, district: "The village threshold", villager: null, loading: 0 });
   const playing = mode === "playing";
   const target = LANDMARKS.find(l => l.id === snapshot.nearby);
-  const objectiveHint = snapshot.point.z > -22 ? t("Follow the lamps north, past the well and chapel. The council fire is your destination.") : t("Find the empty wooden chair on this side of the fire. Press E to finish the intro, then choose your players and models.");
+  const objectiveHint = snapshot.point.z < -43 ? forestHint(snapshot.point) : snapshot.point.z > -22 ? "Follow the lamps north, past the well and chapel. The forest beyond the council is yours to explore." : "Take the empty chair by the fire to choose your players, or continue north through the broken gate into the forest.";
   const bearing = DIRECTIONS[Math.round(snapshot.bearing / 45) % 8];
   const location = snapshot.district;
 
@@ -183,7 +184,7 @@ export default function ExplorationExperience() {
     </section> : mode === "intro" ? <>
       <section className={styles.intro}>
         <h1>Someone here<br />isn’t <em>human.</em></h1>
-        <p>The lamps are still burning. The doors are all locked.<br className={styles.desktopBreak} /> And somewhere in the village, a bell is ringing.</p>
+        <p>Beyond the last lantern: a temple without worshippers,<br className={styles.desktopBreak} /> houses without voices, and water that whispers your name.</p>
         <p className={styles.premise}>{t("Find the council. Take your seat.")}<br />{t("Keep your lantern close. Something hunts here.")}</p>
         <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? `Lighting the lanterns… ${Math.round(snapshot.loading * 100)}%` : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
         <Link href="/setup" className={styles.textLink}>{t("Go straight to player setup")} <span>↗</span></Link>
@@ -197,13 +198,13 @@ export default function ExplorationExperience() {
       </aside>}
       <aside className={styles.objective} aria-label="Current objective">
         <span className={styles.location}>{t(location)}</span>
-        <h1>{snapshot.council ? t("Take the empty chair") : t("Find the council fire")}</h1>
-        <div className={styles.sealProgress}><span>{found.length} / 3 optional discoveries</span><span aria-hidden="true">{LANDMARKS.map(l => <i key={l.id} className={found.includes(l.id) ? styles.collected : ""}>•</i>)}</span></div>
+        <h1>{snapshot.council ? t("Take the empty chair") : snapshot.point.z < -43 ? "Beyond the last lantern" : t("Find the council fire")}</h1>
+        <div className={styles.sealProgress}><span>{found.length} / {LANDMARKS.length} discoveries</span><span aria-hidden="true">{LANDMARKS.map(l => <i key={l.id} className={found.includes(l.id) ? styles.collected : ""}>•</i>)}</span></div>
         <p>{t(objectiveHint)}</p>
-        <button className={styles.journalButton} onClick={() => setMode("journal")}>{t("Open journal")} <kbd>J</kbd></button>
+        <button className={styles.journalButton} onClick={() => setMode("journal")}>Map & journal <kbd>J</kbd></button>
       </aside>
       <div className={styles.interaction}>
-        {playing && (target || snapshot.council || snapshot.villager) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : target ? `Examine ${target.id === "lantern" ? "the lantern" : target.id === "well" ? "the old well" : "the chapel door"}` : `Speak with ${snapshot.villager?.name}`}</button> : <span className={styles.walkHint}>W A S D to walk <i /> Drag to look <i /> Click ground to walk</span>}
+        {playing && (target || snapshot.council || snapshot.villager) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : target ? `Examine ${target.name.toLowerCase()}` : `Speak with ${snapshot.villager?.name}`}</button> : <span className={styles.walkHint}>W A S D to walk <i /> Drag to look <i /> Click ground to walk</span>}
       </div>
       <div className={styles.lanternControl}><button onClick={() => setLantern(value => !value)} aria-pressed={lantern}><LanternIcon /><span>Lantern {lantern ? "lit" : "unlit"}</span><kbd>F</kbd></button></div>
       <div className={styles.movePad} aria-label="Movement controls"><button aria-label="Walk forward" onClick={() => sceneRef.current?.step("forward")}>↑</button><button aria-label="Turn left" onClick={() => sceneRef.current?.step("left")}>↶</button><button aria-label="Walk backward" onClick={() => sceneRef.current?.step("back")}>↓</button><button aria-label="Turn right" onClick={() => sceneRef.current?.step("right")}>↷</button></div>
@@ -223,15 +224,25 @@ export default function ExplorationExperience() {
       <div className={styles.modalLinks}><button onClick={async () => { resume(); try { await sceneRef.current?.lockPointer(); } catch { setNotice("Mouse capture is unavailable. Drag to look instead."); } }}>Use captured mouse</button><button onClick={() => setMode("restart")}>Start again</button><Link href="/">Leave village</Link></div>
     </Modal>}
 
-    {!failed && mode === "journal" && <Modal title="Your journal" onClose={resume}>
-      <span className={styles.chapter}>Things worth remembering</span><h2>A record of the night.</h2><p>{found.length} of 3 optional keepsakes discovered. {storageBlocked ? "Your discoveries are kept for this visit; device storage is unavailable." : "Your discoveries are saved on this device."}</p>
-      <ol className={styles.journalList}>{LANDMARKS.map((l, i) => <li key={l.id} data-found={found.includes(l.id)}><span>0{i + 1}</span><div><h3>{found.includes(l.id) ? l.seal : "An unwritten page"}</h3><p>{found.includes(l.id) ? l.text : i === 0 ? "A light left burning at the village entrance." : i === 1 ? "Something waits beside the old well." : "The chapel keeps the final secret."}</p></div></li>)}</ol>
+    {!failed && mode === "journal" && <Modal title="Your journal" onClose={resume} focusTop>
+      <span className={styles.chapter}>Things worth remembering</span><h2>A record of the night.</h2><p>{found.length} of {LANDMARKS.length} optional keepsakes discovered. {storageBlocked ? "Your discoveries are kept for this visit; device storage is unavailable." : "Your discoveries are saved on this device."}</p>
+      <figure className={styles.trailMap}>
+        <svg viewBox={`${BOUNDS.minX - 5} ${BOUNDS.minZ - 8} ${BOUNDS.maxX - BOUNDS.minX + 10} ${BOUNDS.maxZ - BOUNDS.minZ + 16}`} role="img" aria-label="Trail map: temple northwest, abandoned houses northeast, waterfall east. Your position is the white arrow. The council is south of the forest gate.">
+          <text x="-62" y="-106" className={styles.mapNorth}>N ↑</text>
+          {STREETS.map((s, i) => <polyline key={i} points={s.points.map(p => `${p.x},${p.z}`).join(" ")} fill="none" stroke="#857356" strokeWidth={s.width * .45} strokeLinecap="round" />)}
+          {LANDMARKS.map(l => <g key={l.id}><circle cx={l.x} cy={l.z} r="1.8" fill={found.includes(l.id) ? "#e6b974" : "#788f85"} /><text x={l.x + 3} y={l.z - 3}>{({ lantern: "Gate", well: "Well", chapel: "Chapel", temple: "Temple", ruins: "Ruins", falls: "Falls" })[l.id]}</text></g>)}
+          <circle cx={COUNCIL.x} cy={COUNCIL.z} r="2" fill="#eea052" /><text x={COUNCIL.x + 4} y={COUNCIL.z + 1}>Council</text>
+          <path d="M0,-3 L2,2 L0,1 L-2,2 Z" transform={`translate(${snapshot.point.x} ${snapshot.point.z}) rotate(${snapshot.bearing})`} fill="#fff5df" stroke="#fff5df" strokeWidth=".5" />
+        </svg>
+        <figcaption>Your lantern marks your position. All discoveries are optional; the council is always your way into the game.</figcaption>
+      </figure>
+      <ol className={styles.journalList}>{LANDMARKS.map((l, i) => <li key={l.id} data-found={found.includes(l.id)}><span>0{i + 1}</span><div><h3>{found.includes(l.id) ? l.seal : l.name}</h3><p>{found.includes(l.id) ? l.text : l.hint}</p></div></li>)}</ol>
       {witnessed && <section className={styles.witness}><span className={styles.chapter}>Witness account · this visit</span><h3>{ENCOUNTER_COPY.aftermath.title}</h3><p>{ENCOUNTER_COPY.aftermath.text}</p></section>}
       <button className={styles.primary} autoFocus onClick={resume}>Close journal <span>→</span></button>
     </Modal>}
 
     {!failed && mode === "clue" && clue && <Modal title={clue.name} onClose={resume}>
-      <span className={styles.chapter}>A keepsake discovered · {found.length} of 3</span><h2>{clue.name}.</h2><p className={styles.story}>{clue.text}</p><p className={styles.clueHint}>{t(objectiveHint)}</p><button className={styles.primary} autoFocus onClick={resume}>Keep moving <span>→</span></button>
+      <span className={styles.chapter}>A keepsake discovered · {found.length} of {LANDMARKS.length}</span><h2>{clue.name}.</h2><p className={styles.story}>{clue.text}</p><p className={styles.clueHint}>{t(objectiveHint)}</p><button className={styles.primary} autoFocus onClick={resume}>Keep moving <span>→</span></button>
     </Modal>}
 
     {!failed && mode === "complete" && <Modal title="Intro complete" onClose={() => {}}>

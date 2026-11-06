@@ -7,6 +7,7 @@ import { createCouncilFire } from "./fire";
 import { createAssets } from "./assets";
 import { buildArchitecture } from "./architecture";
 import { buildNature } from "./nature";
+import { buildWilderness } from "./wilderness";
 import { buildDressing, COUNCIL_CHAIRS, COUNCIL_SEAT_HEIGHT } from "./dressing";
 import { createAtmosphere, FOG_COLOR, MOON_DIRECTION } from "./atmosphere";
 import { createPost } from "./post";
@@ -89,6 +90,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   const wind = { value: 0 };
   const nature = buildNature(scene, assets, wind, quality);
   const dressing = buildDressing(scene, assets, architecture.materials);
+  const wilderness = buildWilderness(scene, assets, quality);
+  dressing.lampPoints.push(...wilderness.lampPoints);
   const atmosphere = createAtmosphere(scene, [...architecture.glows, ...dressing.lampPoints.map(position => ({ position, color: new THREE.Color("#ffae5a"), size: 2.2 }))], architecture.chimneys);
   const keepsakes = createKeepsakes(scene, architecture.materials.door);
   const fire = createCouncilFire(scene, COUNCIL.z);
@@ -271,7 +274,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       events.encounter(encounter.phase);
     }
     if (encounter.phase === "hunting" && settings.playing && wolfDistance > .001) {
-      const speed = warding ? (wolfDistance < 3 ? -1 : 0) : 2.3;
+      const speed = encounter.time < 2.8 ? 0 : warding ? (wolfDistance < 3 ? -1 : 0) : 2.3;
       wolfPosition = movePlayer(wolfPosition, -wolfDx / wolfDistance * dt * speed, -wolfDz / wolfDistance * dt * speed);
     }
     creature.pose(encounter.phase === "waiting" ? { ...encounter, time: elapsed } : encounter, wolfPosition, point, settings.reducedMotion);
@@ -328,6 +331,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     keepsakes.forEach((item, i) => { item.visible = !settings.found.includes(LANDMARKS[i].id); });
     fire.update(world, camera, settings.reducedMotion);
     dressing.update(world, settings.reducedMotion);
+    wilderness.update(elapsed, settings.reducedMotion);
     const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); });
     moonLight.intensity = 1.9 + flash * 9;
     const danger = ["hunting", "pouncing"].includes(encounter.phase) ? 1 : ["feeding", "transforming"].includes(encounter.phase) ? .45 : 0;
@@ -399,7 +403,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       canvas.removeEventListener("pointerdown", pointerdown); window.removeEventListener("pointermove", pointermove);
       canvas.removeEventListener("pointerup", pointerup); canvas.removeEventListener("pointercancel", cancelPointer); canvas.removeEventListener("webglcontextlost", contextlost);
       villagers.forEach(v => v.character.dispose()); omenFigure?.dispose();
-      creature.dispose(); nature.dispose(); dressing.dispose(); atmosphere.dispose(); post.dispose(); cast.dispose();
+      creature.dispose(); nature.dispose(); dressing.dispose(); wilderness.dispose(); atmosphere.dispose(); post.dispose(); cast.dispose();
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       scene.traverse(object => {
         if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {

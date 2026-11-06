@@ -81,6 +81,12 @@
 .modalLinks { display: flex; flex-wrap: wrap; gap: 17px; margin-top: 22px; }
 .modalLinks a, .modalLinks button { color: #a1aaa2; font: 10px "Inter", sans-serif; border: 0; background: none; padding: 0; text-decoration: none; }
 .journalList { list-style: none; padding: 0; margin: 25px 0; }
+.trailMap { margin: 24px 0; padding: 14px; background: #131e1d; border: 1px solid #52605766; border-radius: 3px; }
+.trailMap svg { display: block; width: 100%; max-height: 290px; }
+.trailMap text { fill: #c9c4ab; font: 4px "Inter", sans-serif; }
+.trailMap .mapNorth { fill: #e2bd7e; font-size: 5px; }
+.trailMap figcaption { color: #a4afa5; font: 11px/1.6 "Inter", sans-serif; margin-top: 10px; }
+.modal:focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; }
 .journalList li { display: flex; gap: 20px; border-top: 1px solid var(--line); padding: 17px 0 5px; }
 .journalList li > span { font-size: 12px; color: #9e8c65; padding-top: 3px; }
 .journalList h3 { font-size: 17px; font-weight: 400; margin: 0; }
@@ -119,7 +125,7 @@
   .location { font-size: 8px; } .sealProgress { gap: 15px; font-size: 12px; } .sealProgress i { font-size: 14px; padding: 0 3px; }
   .lanternControl { right: 24px; bottom: 27px; } .lanternControl button { font-size: 11px; } .lanternControl kbd { display: none; }
   .movePad { right: 20px; bottom: 126px; grid-template-columns: repeat(3, 39px); opacity: .9; gap: 5px; } .movePad button { min-height: 40px; }
-  .interaction { bottom: 240px; width: calc(100% - 35px); } .interactButton { font-size: 14px !important; padding: 12px 15px; }
+  .interaction { bottom: 240px; width: calc(100% - 35px); } .interactButton { font-size: 14px !important; padding: 12px 15px; white-space: normal; max-width: 100%; }
   .notice { bottom: 43%; font-size: 13px; } .modal { padding: 30px 25px; } .modal h2 { font-size: 31px; } .modal .story { font-size: 16px; }
 }
 @media (max-height: 600px) and (min-width: 601px) {

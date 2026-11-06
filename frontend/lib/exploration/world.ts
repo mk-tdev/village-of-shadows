@@ -12,13 +12,32 @@ export type District = Rect & { name: string };
 export const SPAWN: Point = { x: 0, z: 19 };
 export const COUNCIL: Point = { x: 0, z: -32 };
 export const COUNCIL_SEAT: Point = { x: 0, z: -28.2 };
-/** The palisade encloses the playable village; the forest beyond is scenery. */
-export const BOUNDS = { minX: -36, maxX: 38, minZ: -56, maxZ: 26 };
+/** Keep the original council route; the broken north gate opens into the forest. */
+export const VILLAGE_BOUNDS = { minX: -36, maxX: 38, minZ: -56, maxZ: 26 };
+export const BOUNDS = { minX: -70, maxX: 76, minZ: -114, maxZ: 26 };
+export const FALLS = { x: 43, z: -91, radius: 7 };
+export const TEMPLE = { x: -29, z: -87 };
+export const RUINS = { x: 15, z: -73 };
 export const LANDMARKS: Landmark[] = [
   { id: "lantern", x: -2.6, z: 13, name: "The abandoned lantern", seal: "The watchman’s letter", text: "Mara's lantern is still warm. Beneath it, a note: ‘There were seven of us at sunset. I counted eight shadows. Follow the lamps north. Your chair is waiting beyond the chapel.’", hint: "Follow the lane to the old well." },
   { id: "well", x: 2.5, z: -3, name: "The old well", seal: "The well keeper’s key", text: "A rope disappears into the black water. Something below knocks three times. Carved into the stone: ‘The bell has no tongue. If you hear it, do not answer.’ A rusted iron key rests on the wet stone rim.", hint: "The council fire burns beyond the chapel. Keep heading north." },
   { id: "chapel", x: -1.8, z: -24, name: "The silent chapel", seal: "The bell-ringer’s medallion", text: "Seven names are scratched into the door. Yours is the last. A tarnished brass medallion hangs from a nail, beside a message: ‘The council is waiting. One of them already knows what you found.’", hint: "Find the empty wooden chair beside the council fire and take your seat." },
+  { id: "temple", x: TEMPLE.x, z: TEMPLE.z + 3, name: "The moon temple", seal: "The broken moon seal", text: "Roots have split the sanctuary, but someone has replaced the candles. The stone reads: ‘We did not build this place to worship the moon. We built it to keep something beneath it.’ Between the broken pillars, your lantern casts one shadow too many.", hint: "Beyond the north gate, take the western trail to the ruined temple." },
+  { id: "ruins", x: RUINS.x, z: RUINS.z + 2, name: "The abandoned settlement", seal: "The last household’s diary", text: "An unfinished meal. A child's empty chair. Every door was barred from the inside, yet no one remains. The diary ends with a single line: ‘Tonight the knocking came from underneath the floor.’", hint: "Follow the trail northeast of the council to the roofless houses." },
+  { id: "falls", x: FALLS.x - 5, z: FALLS.z + 9, name: "The whispering falls", seal: "The river watcher’s charm", text: "The falling water almost sounds like voices. A silver charm hangs above the bank: ‘The water remembers every name. Never tell it yours.’ For a moment the mist takes the shape of someone you recognise.", hint: "Beyond the abandoned houses, follow the sound of water east." },
 ];
+
+/** Walkable ruin interiors: only individual walls, columns and the altar collide. */
+export const RUIN_WALLS: (Rect & { h: number })[] = [
+  { x: -35, z: -87, w: .9, d: 14, h: 2.8 }, { x: -23, z: -87, w: .9, d: 14, h: 1.7 },
+  { x: -29, z: -94, w: 12, d: .9, h: 3.4 }, { x: -29, z: -90, w: 2.7, d: 1.4, h: 1.2 },
+  { x: -33, z: -84, w: 1.2, d: 4.5, h: .8 },
+  ...[9, 21].flatMap(x => [
+    { x: x - 3, z: -74, w: .5, d: 8, h: 2.8 }, { x: x + 3, z: -74, w: .5, d: 8, h: 1.8 },
+    { x, z: -78, w: 6, d: .5, h: 3.2 }, { x: x - 2, z: -70, w: 2, d: .5, h: 1.2 },
+  ]),
+];
+export const TEMPLE_COLUMNS = [-33, -25].flatMap(x => [-91, -86, -81].map((z, i) => ({ x, z, radius: .65, h: i === 1 ? 2.6 : 5.5 })));
 
 /** The original six lane cottages; their footprints are part of the tested route. */
 export const COTTAGES = [
@@ -55,6 +74,10 @@ export const GRAVEYARD = { minX: -32, maxX: -14, minZ: -45, maxZ: -16, gate: { f
 export const PADDOCK = { minX: -22, maxX: -16, minZ: 18, maxZ: 25 };
 
 export const DISTRICTS: District[] = [
+  { name: "The whispering falls", x: 43, z: -88, w: 26, d: 28 },
+  { name: "The moon temple", x: -29, z: -87, w: 25, d: 28 },
+  { name: "The abandoned settlement", x: 15, z: -73, w: 26, d: 20 },
+  { name: "The blackwood trails", x: 0, z: -86, w: 146, d: 56 },
   { name: "The village gate", x: 0, z: 22, w: 30, d: 8 },
   { name: "The market square", x: 22, z: 0, w: 32, d: 34 },
   { name: "The old graveyard", x: -23, z: -30, w: 20, d: 32 },
@@ -68,6 +91,10 @@ export const DISTRICTS: District[] = [
 
 /** Walk surfaces drive footstep audio. Ribbons are [x1,z1,x2,z2,width]. */
 export const STREETS: { surface: Surface; points: Point[]; width: number }[] = [
+  { surface: "dirt", width: 3.8, points: [{ x: 0, z: -39 }, { x: 0, z: -60 }, { x: -15, z: -68 }, { x: -29, z: -78 }, { x: -29, z: -91 }] },
+  { surface: "dirt", width: 3.5, points: [{ x: 0, z: -60 }, { x: 15, z: -65 }, { x: 30, z: -72 }, { x: 38, z: -82 }] },
+  { surface: "dirt", width: 3, points: [{ x: -29, z: -78 }, { x: -43, z: -70 }, { x: -40, z: -60 }, { x: 0, z: -60 }] },
+  { surface: "dirt", width: 3, points: [{ x: 15, z: -65 }, { x: 15, z: -74 }] },
   { surface: "stone", width: 8, points: [{ x: 0, z: 26 }, { x: 0, z: -27 }] },
   { surface: "stone", width: 8, points: [{ x: 3, z: 0 }, { x: 14, z: 0 }] },
   { surface: "dirt", width: 3.2, points: [{ x: -3, z: -7.5 }, { x: -16.5, z: -7.5 }, { x: -16.8, z: -17 }] },
@@ -137,6 +164,9 @@ export const PROPS: Prop[] = [
 
 /** Where lanterns and lamp posts stand. Only the nearest few get real lights at runtime. */
 export const LAMPS: (Point & { kind: "post" | "wall" | "hanging"; yaw?: number })[] = [
+  { kind: "post", x: 2.8, z: -51 }, { kind: "post", x: -2.8, z: -60 },
+  { kind: "post", x: -17, z: -66 }, { kind: "post", x: -31, z: -77 },
+  { kind: "post", x: 17, z: -63 }, { kind: "post", x: 32, z: -71 }, { kind: "post", x: 35, z: -81 },
   { kind: "post", x: -2.6, z: 13 }, { kind: "post", x: 3.6, z: 1 }, { kind: "post", x: -3.4, z: -12 }, { kind: "post", x: -1.8, z: -24 },
   { kind: "post", x: 3.6, z: 23 }, { kind: "post", x: 14, z: -8 }, { kind: "post", x: 29, z: 8 }, { kind: "wall", x: 21.5, z: -9.85 },
   { kind: "wall", x: 30.4, z: -1, yaw: -Math.PI / 2 }, { kind: "post", x: -16, z: -15.6 }, { kind: "post", x: -16, z: 6.8 }, { kind: "wall", x: 24.4, z: -40, yaw: -Math.PI / 2 },
@@ -151,7 +181,27 @@ const distanceToSegment = (p: Point, a: Point, c: Point) => {
   return Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t));
 };
 
+/** Shared deterministic trees keep visible trunks and navigation in agreement. */
+export const FOREST_TREES: (Obstacle & { height: number; dead: boolean })[] = [];
+for (let i = 0; i < 1300; i++) {
+  const x = BOUNDS.minX + 3 + seeded(i, 81) * (BOUNDS.maxX - BOUNDS.minX - 6);
+  const z = BOUNDS.minZ + 3 + seeded(i, 82) * (BOUNDS.maxZ - BOUNDS.minZ - 6);
+  const p = { x, z };
+  if (x > VILLAGE_BOUNDS.minX - 4 && x < VILLAGE_BOUNDS.maxX + 4 && z > VILLAGE_BOUNDS.minZ - 3) continue;
+  if (STREETS.some(s => s.points.some((b, j) => j > 0 && distanceToSegment(p, s.points[j - 1], b) < s.width / 2 + 3))) continue;
+  if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < 12 || Math.hypot(x - FALLS.x, z - FALLS.z) < 16 || Math.hypot(x - RUINS.x, z - RUINS.z) < 14) continue;
+  if (FOREST_TREES.some(t => Math.hypot(t.x - x, t.z - z) < 3.2)) continue;
+  FOREST_TREES.push({ x, z, radius: .5, height: 10 + seeded(i, 83) * 9, dead: seeded(i, 84) < .24 });
+}
+
+export function forestHint(p: Point): string {
+  if (p.z > -43) return "Follow the lamps north to the council. The forest trails beyond are optional.";
+  if (p.z > -63) return "Beyond the broken gate: temple to the west, abandoned houses and waterfall to the east. Council fire is south.";
+  return "Explore the temple, roofless houses and whispering falls. Follow the lamps south to return to the council.";
+}
+
 export function surfaceAt(p: Point): Surface {
+  if (insideRect(p, { ...TEMPLE, w: 12, d: 14 }, 0)) return "stone";
   if (JETTY && insideRect(p, JETTY, 0)) return "wood";
   if (insideRect(p, MARKET, 0)) return "stone";
   for (const street of STREETS) {
@@ -169,6 +219,16 @@ export function districtAt(p: Point): string {
 export function canWalk(p: Point, obstacles: readonly Obstacle[] = []): boolean {
   if (obstacles.some(o => Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .3)) return false;
   if (p.x < BOUNDS.minX || p.x > BOUNDS.maxX || p.z > BOUNDS.maxZ || p.z < BOUNDS.minZ) return false;
+  if (RUIN_WALLS.some(w => insideRect(p, w, .3))) return false;
+  if (TEMPLE_COLUMNS.some(t => Math.hypot(p.x - t.x, p.z - t.z) < t.radius + .3)) return false;
+  if ((p.z < -57 || p.x < -36 || p.x > 38) && FOREST_TREES.some(t => Math.hypot(p.x - t.x, p.z - t.z) < t.radius + .3)) return false;
+  if (Math.hypot(p.x - FALLS.x, p.z - FALLS.z) < FALLS.radius + .3) return false;
+  // Cliff face behind the waterfall; the banks and temple remain approachable.
+  if (insideRect(p, { x: FALLS.x, z: FALLS.z - 8, w: 26, d: 6 }, .3)) return false;
+  // Original palisade, with a five-metre opening at the north trail.
+  const v = VILLAGE_BOUNDS;
+  if ((Math.abs(p.x - (v.minX - 1.2)) < .5 || Math.abs(p.x - (v.maxX + 1.2)) < .5) && p.z > v.minZ - 1.2) return false;
+  if (Math.abs(p.z - (v.minZ - 1.2)) < .5 && Math.abs(p.x) > 2.5 && p.x > v.minX - 1.2 && p.x < v.maxX + 1.2) return false;
   if (BUILDINGS.some(h => insideRect(p, h, .35))) return false;
   // Chapel sits west of the path; its porch remains accessible.
   if (p.x > -10.4 && p.x < -3.6 && p.z > -29.4 && p.z < -20.6) return false;

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { Assets, ModelName } from "./assets";
 import { modelParts } from "./assets";
-import { BOUNDS, BUILDINGS, CHAPEL, COUNCIL, MARKET, POND, STREETS, canWalk, surfaceAt, type Point } from "./world";
+import { BOUNDS, BUILDINGS, CHAPEL, COUNCIL, MARKET, POND, FALLS, RUINS, FOREST_TREES, STREETS, canWalk, surfaceAt, type Point } from "./world";
 
 const seeded = (i: number, salt = 1) => ((Math.sin(i * 127.1 + salt * 311.7) * 43758.5453) % 1 + 1) % 1;
 const hash = (x: number, z: number) => seeded(Math.floor(x) * 57 + Math.floor(z) * 131, 9);
@@ -181,6 +181,7 @@ function grassClump() {
 }
 
 function onRoad(x: number, z: number) {
+  if (Math.hypot(x - FALLS.x, z - FALLS.z) < 16 || Math.hypot(x - RUINS.x, z - RUINS.z) < 12) return true;
   if (Math.hypot(x - POND.x, z - POND.z) < POND.radius + .6) return true;
   const s = surfaceAt({ x, z });
   return s === "stone" || s === "dirt" || s === "wood";
@@ -237,7 +238,7 @@ export function buildNature(scene: THREE.Scene, assets: Assets, wind: Wind, qual
   const pineVariants = [conifer(1), conifer(2), conifer(3)], deadVariants = [deadTree(4), deadTree(5)];
   geometries.push(...pineVariants, ...deadVariants);
   const count = quality === "high" ? 900 : 420;
-  const placements: { x: number; z: number; s: number; dead: boolean }[] = [];
+  const placements: { x: number; z: number; s: number; dead: boolean }[] = FOREST_TREES.map(t => ({ ...t, s: t.height }));
   for (let i = 0; placements.length < count && i < count * 6; i++) {
     const x = (seeded(i, 21) - .5) * 250, z = -15 + (seeded(i, 22) - .5) * 250;
     const outside = Math.max(BOUNDS.minX - x, x - BOUNDS.maxX, BOUNDS.minZ - z, z - BOUNDS.maxZ);

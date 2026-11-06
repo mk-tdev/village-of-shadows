@@ -73,9 +73,23 @@ particles. Its crackle is the CC0 campfire loop, positioned in 3D.
 
 ## Keepsakes
 
-The three optional keepsakes are physical objects authored in `props.ts`: a
-wax-sealed letter on a crate, a rusted key on the well rim, and a brass
-medallion against wood. The main objective is the empty council chair.
+The six optional keepsakes are physical objects authored in `props.ts`: a
+wax-sealed letter, rusted key, brass medallion, broken moon seal, household
+diary and river charm. The main objective remains the empty council chair.
+
+## Blackwood expansion
+
+`wilderness.ts` generates the temple, abandoned houses, waterfall, pool and
+spray. It reuses the CC0 surfaces and moss-rock scan already listed above; no
+additional third-party assets or remotely hosted resources are introduced.
+The waterfall sound is locally synthesized noise in `audio.ts`. Temple bells
+and empty-house sounds reuse the existing CC0 sound library. `world.ts` holds
+the trails, tree placements and collision footprints used by the renderers.
+
+`wolf-appearance.ts` refines the existing GLB at load time: a longer canine
+muzzle, leaner waist, salt-and-pepper coat and short skinned facial guard hairs.
+The original Blender and GLB files are unchanged. Runtime animation blends
+clips, freezes gait when blocked, and keeps the roar stationary before pursuit.
 
 ## Blender refinement (feature branch)
 

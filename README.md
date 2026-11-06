@@ -99,12 +99,16 @@ Two representative learning paths:
 ### Walk the village: The Last Light
 
 The homepage's **Walk into the shadows** action opens `/explore`, a playable
-first-person horror prologue. Walk a rain-soaked, walled village (market,
-tavern, graveyard, farm and mill pond) with rigged, animated villagers and
-positional CC0 sound. Recover three seals at the abandoned lantern, old well and
-chapel, then reach the council fire.
+first-person horror prologue. Walk a rain-soaked village (market, tavern,
+graveyard, farm and mill pond), then cross the broken north gate into the
+Blackwood forest. Lantern trails lead to a ruined moon temple, abandoned
+houses and a waterfall with moving water, spray and positional sound. Six
+optional keepsakes tell the village's story; a map and journal help you find
+your way back. The watchman transforms into a rigged werewolf with a refined
+canine muzzle, layered fur and movement-driven animation.
 The ending leads into the existing AI game setup. **Go straight to the AI
-council** remains available for returning players.
+council** remains available for returning players. Exploring the forest and
+collecting keepsakes are optional: take the empty chair whenever you are ready.
 
 Use **WASD** to walk, **Shift** to hurry, drag to look, or click nearby ground
 to walk. **E** examines, **F** toggles the lantern, **J** opens the journal,

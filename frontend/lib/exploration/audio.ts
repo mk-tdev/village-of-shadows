@@ -1,5 +1,5 @@
 import type { Surface } from "./world";
-import { BOUNDS, CHAPEL, COUNCIL } from "./world";
+import { VILLAGE_BOUNDS, CHAPEL, COUNCIL, FALLS, TEMPLE, RUINS } from "./world";
 
 /**
  * CC0 sound library (public/exploration/audio/PROVENANCE.md) mixed with Web
@@ -106,11 +106,32 @@ export class VillageAudio {
     this.loop("music/explore_dark_ambience_loop", music, .8);
     this.loop("music/tension_suspense_loop", music, 0);
     this.loop("music/chase_drums_loop", music, 0);
+    // A soft, filtered noise bed gives the falls a continuous, spatial roar.
+    // Synthesized locally: no third-party sound request or new licensing dependency.
+    const c = this.context!, water = c.createBuffer(1, c.sampleRate * 5, c.sampleRate);
+    const data = water.getChannelData(0); let low = 0;
+    for (let i = 0; i < data.length; i++) {
+      low = low * .94 + (Math.random() * 2 - 1) * .06;
+      data[i] = low * 2.5 + (Math.random() * 2 - 1) * .055;
+    }
+    this.samples.set("waterfall", water);
+    this.loop("waterfall", amb, 0, { x: FALLS.x, y: 3, z: FALLS.z - 4 }, 8);
+    this.loop("amb/wood_creak_trees", amb, .45, { ...RUINS, y: 2 }, 3, .65);
     // Ambient events, each at a fresh random interval.
     const now = this.context!.currentTime;
     const rnd = (a: number, b: number) => a + Math.random() * (b - a);
     const edge = () => { const a = Math.random() * Math.PI * 2; return { x: this.listener.x + Math.cos(a) * 35, y: 6, z: this.listener.z + Math.sin(a) * 35 }; };
     this.schedule = [
+      { at: now + rnd(16, 28), every: [28, 48], play: () => {
+        if (Math.hypot(this.listener.x - TEMPLE.x, this.listener.z - TEMPLE.z) < 23)
+          this.oneShot("sfx/church_bell_toll", .28, { ...TEMPLE, y: 5 }, 4, .58, undefined, .7);
+      } },
+      { at: now + rnd(12, 22), every: [20, 40], play: () => {
+        if (Math.hypot(this.listener.x - RUINS.x, this.listener.z - RUINS.z) < 18) {
+          this.oneShot("sfx/door_creak", .45, { x: RUINS.x + 6, y: 1.8, z: RUINS.z - 3 }, 3, .7);
+          this.oneShot("sfx/breath_heavy", .12, { x: RUINS.x - 5, y: 1, z: RUINS.z }, 2, .65, undefined, .6, 2);
+        }
+      } },
       { at: now + rnd(8, 16), every: [22, 45], play: () => this.oneShot("sfx/owl_hoot", .5, edge(), 6) },
       { at: now + rnd(20, 40), every: [30, 60], play: () => this.oneShot("sfx/crow_caw", .45, { x: -24 + rnd(-6, 6), y: 6, z: -32 + rnd(-8, 8) }, 6) },
       { at: now + rnd(40, 70), every: [70, 130], play: () => this.oneShot("sfx/wolf_howl_distant_echo", .45, edge(), 20, rnd(.85, 1)) },
@@ -154,8 +175,10 @@ export class VillageAudio {
     L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
     if (this.wolf) this.place(this.wolf, { x: wolf.x, y: 1.1, z: wolf.z });
     // Forest night swells near the palisade; the music bed recedes near the fire.
-    const edge = Math.min(player.x - BOUNDS.minX, BOUNDS.maxX - player.x, player.z - BOUNDS.minZ, BOUNDS.maxZ - player.z);
-    this.loops.get("amb/forest_night_crickets_owl@")?.gain.gain.setTargetAtTime(Math.max(.08, .6 - edge * .04), t, 1);
+    const edge = Math.min(player.x - VILLAGE_BOUNDS.minX, VILLAGE_BOUNDS.maxX - player.x, player.z - VILLAGE_BOUNDS.minZ, VILLAGE_BOUNDS.maxZ - player.z);
+    this.loops.get("amb/forest_night_crickets_owl@")?.gain.gain.setTargetAtTime(Math.min(.65, Math.max(.08, .6 - edge * .04)), t, 1);
+    const fallsDistance = Math.hypot(player.x - FALLS.x, player.z - FALLS.z);
+    this.loops.get(`waterfall@${FALLS.x}`)?.gain.gain.setTargetAtTime(Math.max(0, 1 - fallsDistance / 38) * .95, t, .8);
     const atFire = Math.hypot(player.x - COUNCIL.x, player.z - COUNCIL.z) < 9;
     this.loops.get("music/explore_dark_ambience_loop@")?.gain.gain.setTargetAtTime(this.tension > 0 ? .15 : atFire ? .35 : .8, t, 1.5);
     this.loops.get("music/tension_suspense_loop@")?.gain.gain.setTargetAtTime(this.tension > 0 && !this.hunting ? .9 : this.hunting ? .45 : 0, t, 1.2);

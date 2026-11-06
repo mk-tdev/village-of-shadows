@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import * as THREE from 'three';
+import { refineWolf } from '../lib/exploration/wolf-appearance.ts';
 
 const file = await readFile(new URL('../public/exploration/werewolf-blender.glb', import.meta.url));
 const jsonLength = file.readUInt32LE(12);
@@ -63,4 +65,34 @@ test('all encounter clips contain finite, ordered animation data for valid nodes
   }
   const triangles = model.meshes.flatMap(m => m.primitives).reduce((n, p) => n + model.accessors[p.indices].count / 3, 0);
   assert.ok(triangles < 140000);
+});
+
+test('canine refinement preserves skin weights and adds finite, rigged facial fur', () => {
+  const root = new THREE.Group(), bone = new THREE.Bone(); root.add(bone);
+  const geometry = new THREE.SphereGeometry(.23, 16, 12).translate(0, 2.4, .4);
+  const count = geometry.attributes.position.count;
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(count * 4), 4));
+  const weights = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) weights[i * 4] = 1;
+  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
+  const body = new THREE.SkinnedMesh(geometry, new THREE.MeshStandardMaterial());
+  body.name = 'ContinuousAnatomy'; root.add(body); body.bind(new THREE.Skeleton([bone]));
+  const before = geometry.attributes.position.array.slice();
+  refineWolf(root);
+  assert.notEqual(body.geometry, geometry);
+  assert.deepEqual(geometry.attributes.position.array, before);
+  assert.deepEqual(body.geometry.attributes.skinWeight.array, weights);
+  assert.ok(body.geometry.attributes.position.array.every(Number.isFinite));
+  assert.ok(body.geometry.attributes.normal.array.every(Number.isFinite));
+  assert.ok(body.geometry.attributes.color.array.every(v => Number.isFinite(v) && v >= 0 && v <= 1));
+  body.geometry.computeBoundingBox(); geometry.computeBoundingBox();
+  assert.ok(body.geometry.boundingBox.max.z > geometry.boundingBox.max.z);
+  const fur = root.getObjectByName('CanineFaceCoat');
+  assert.ok(fur instanceof THREE.SkinnedMesh);
+  assert.equal(fur.skeleton, body.skeleton);
+  assert.ok(fur.geometry.attributes.position.count > 0);
+  assert.ok(fur.geometry.attributes.position.array.every(Number.isFinite));
+  assert.ok(fur.geometry.attributes.normal.array.every(Number.isFinite));
+  assert.equal(fur.geometry.attributes.skinWeight.count, fur.geometry.attributes.position.count);
+  body.geometry.dispose(); fur.geometry.dispose(); body.material.dispose(); fur.material.dispose(); body.skeleton.dispose();
 });

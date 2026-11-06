@@ -2,22 +2,24 @@
 
 Open `/explore` or choose **Walk into the shadows** on the homepage. This is
 a short atmospheric prologue to the AI council. You explore on foot with a
-lantern, collect three seals, and reach the fire at the north end of the lane.
+lantern, find up to six optional keepsakes, and reach the council fire. You can
+continue beyond the fire into the forest before taking your seat.
 
 ## Find your way
 
 1. Choose **Enter the village**. Sound starts only after you interact.
-2. Walk toward the lantern on your left. When **Examine the lantern** appears,
+2. Walk toward the lantern on your left. When its **Examine** prompt appears,
    press **E** or select the prompt to recover its seal and read the note.
 3. Follow the lane north to the old well. Examine it for the second seal.
-4. Continue toward the chapel and recover the last seal near its door.
-5. Approach the fire beyond the chapel. **Enter the council clearing** finishes
-   the prologue, and **Take your seat** opens the live AI game setup.
+4. Continue toward the chapel and recover the third keepsake near its door.
+5. Approach the empty chair south of the fire beyond the chapel. **Sit down &
+   choose players** opens the AI game setup. Or continue north to explore.
 
 Seals can be collected in any order. The compass shows your heading, the
-objective points to your next missing discovery, and the journal preserves
-every recovered note. A werewolf encounter interrupts the lane after your first
-seal. Outside that encounter, explore at your pace.
+objective explains nearby routes, and **Map & journal** shows your position,
+trails and every recovered note. A werewolf encounter interrupts the lane when
+you approach while facing the watchman; no keepsake is required. Outside that
+encounter, explore at your pace.
 
 ## Beyond the lane
 
@@ -32,6 +34,25 @@ open to explore. Side streets lead to:
 - **The mill pond** (north-east of the council): a turning waterwheel and a jetty.
 - **The hunter's hut** (north-west, at the forest edge).
 
+## The Blackwood forest
+
+Continue north past the council, through the gap in the palisade. The playable
+area is more than three times its previous size. Open **Map & journal** with
+**J** to see the trails and your current position (the pale arrow).
+
+- **Moon temple:** take the western fork. Enter between the columns to find a
+  broken moon seal. Candlelight, tangled roots and distant tolling surround
+  the ruined sanctuary. Its central aisle is walkable.
+- **Abandoned settlement:** take the northeastern fork. Two roofless houses
+  contain broken rafters and boarded windows. Read the diary in the lane
+  between them; wood creaks and a faint breath come from the empty rooms.
+- **Whispering falls:** follow the trail east past the houses. Animated water
+  falls from a rocky cliff into a misty pool. The water gets louder as you
+  approach. Examine the charm on the bank; the pool and cliff are impassable.
+
+All three discoveries are optional. Follow the lantern trail south to the
+council; you do not need to restart or finish the journal to begin the AI game.
+
 Villagers still awake turn to watch you. When **Speak with …** appears, press
 **E** to hear what they saw. They add atmosphere only; nothing they say is
 required, and none of them are council roles.
@@ -43,7 +64,7 @@ grain and camera sway off.
 
 ## The watchman’s hunger
 
-Approach the two figures near the old well with at least one seal, facing the
+Approach the two figures near the old well, facing the
 watchman. He doubles over, transforms, and attacks the other villager. The
 creature feeds beside the fallen lantern before turning toward you. This is
 an animated, stylized horror scene with a fallen body and a dark blood pool.
@@ -71,7 +92,7 @@ prologue characters, not assigned roles or deaths in the live AI council.
 | Hurry | Hold Shift while walking | — |
 | Examine | E | Select the contextual prompt |
 | Lantern | F | Select the lantern control |
-| Journal | J | Select Open journal |
+| Map & journal | J | Select Map & journal |
 | Pause | Escape | Select Pause |
 
 Click-to-walk follows a straight line and stops at obstacles. Walk around a
@@ -81,8 +102,9 @@ capture and pauses. Drag-to-look is always available.
 
 ## Comfort and saving
 
-Pause stops movement and the atmosphere's animation and mutes the soundscape.
-Opening the journal or a clue also stops the world while you read. Switching
+Pause stops movement, the encounter and waterfall animation, and mutes the
+soundscape. Ambient fire and sky effects can continue. Opening the journal
+or a clue also freezes gameplay while you read. Switching
 away from the page pauses automatically, so a held key cannot leave you moving.
 
 The pause menu has brightness, sound, and reduced-motion controls. Reduced
@@ -91,8 +113,9 @@ rain, moving fog, light variation, and the brief visual apparition. Its story
 cue remains readable. Reduced motion also removes transformation tremor, jump
 height, feeding bob, and running gait, while preserving readable character
 poses and the encounter's rules. Pause and journal freeze the encounter clock,
-including the protection meter and capture checks. The soundscape combines locally served CC0 creature recordings with synthesized
-wind, footsteps, and fire crackle. No microphone is used. Roars change direction
+including the protection meter and capture checks. The soundscape combines
+locally served CC0 recordings with a synthesized waterfall. No microphone is
+used. Roars change direction
 and loudness with the creature’s location. Pausing freezes audio playback as
 well as the encounter; Sound off silences it.
 

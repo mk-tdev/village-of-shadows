@@ -44,5 +44,18 @@ export function createKeepsakes(scene: THREE.Scene, timber: THREE.Material) {
   mesh(groups[2],new THREE.BoxGeometry(.022,.074,.005),rust,0,0,.011);
   mesh(groups[2],new THREE.BoxGeometry(.065,.018,.005),rust,0,.015,.012);
   mesh(groups[2],new THREE.CylinderGeometry(.004,.004,.18,8),leather,0,.15,0);
+  LANDMARKS.slice(3).forEach((landmark, index) => {
+    const group = groups[index + 3];
+    group.position.set(landmark.x, .78, landmark.z);
+    mesh(scene, new THREE.BoxGeometry(.6, .72, .45), timber, landmark.x, .36, landmark.z);
+    if (landmark.id === "ruins") {
+      mesh(group, new THREE.BoxGeometry(.34, .05, .26), leather);
+      mesh(group, new THREE.BoxGeometry(.30, .035, .24), paper, .01, .025, 0);
+    } else {
+      const token = mesh(group, new THREE.TorusGeometry(.11, .025, 8, 24), brass);
+      token.rotation.x = Math.PI / 2;
+      mesh(group, new THREE.BoxGeometry(.04, .02, .2), rust, .08, 0, .06);
+    }
+  });
   return groups;
 }

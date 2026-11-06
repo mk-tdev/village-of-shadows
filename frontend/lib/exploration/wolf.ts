@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { EncounterState } from "./encounter";
 import { wolfAnimation, wolfClipTime } from "./wolf-animation";
+import { refineWolf } from "./wolf-appearance";
 
 function disposeAsset(object: THREE.Object3D) {
   const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
@@ -22,8 +23,11 @@ export function createWolf(scene: THREE.Object3D, loading: THREE.LoadingManager,
   const actions = new Map<string, THREE.AnimationAction>();
   let disposed = false;
   let mixer: THREE.AnimationMixer | undefined, active: THREE.AnimationAction | undefined;
+  let previous: THREE.AnimationAction | undefined, blend = 1, lastTime = 0, lastPhase = "waiting";
+  let lastPosition: THREE.Vector3 | null = null, strideTime = 0;
   new GLTFLoader(loading).load("/exploration/werewolf-blender.glb", gltf => {
     if (disposed) { disposeAsset(gltf.scene); return; }
+    refineWolf(gltf.scene);
     gltf.scene.traverse(child => {
       if (child instanceof THREE.Mesh) { child.castShadow = child.receiveShadow = true; child.frustumCulled = false; }
     });
@@ -49,13 +53,23 @@ export function createWolf(scene: THREE.Object3D, loading: THREE.LoadingManager,
       root.visible = progress > .42 && !["aftermath", "caught"].includes(state.phase);
       root.position.copy(position); root.rotation.y = yaw;
       root.scale.setScalar(THREE.MathUtils.lerp(.67, 1, THREE.MathUtils.smoothstep(progress, .42, 1)));
-      const sample = wolfAnimation(state, reduced), action = actions.get(sample.name);
+      const delta = state.phase === lastPhase ? Math.max(0, Math.min(.1, state.time - lastTime)) : 0;
+      const distance = lastPosition && state.phase === lastPhase ? Math.min(.8, position.distanceTo(lastPosition)) : 0;
+      strideTime += distance / 2.3;
+      lastPosition = position.clone(); lastTime = state.time; lastPhase = state.phase;
+      const sample = wolfAnimation(state, reduced);
+      if (sample.name === "Hunt_Stride" && !reduced) sample.seconds = strideTime;
+      const action = actions.get(sample.name);
       if (action && mixer) {
         if (action !== active) {
-          active?.stop(); active = action;
+          previous?.stop(); previous = active; active = action; blend = 0;
           action.reset().setLoop(THREE.LoopOnce, 1).play();
           action.clampWhenFinished = true;
         }
+        blend = reduced ? 1 : Math.min(1, blend + delta / .22);
+        action.setEffectiveWeight(previous ? blend : 1);
+        previous?.setEffectiveWeight(1 - blend);
+        if (blend === 1) { previous?.stop(); previous = undefined; }
         action.time = wolfClipTime(sample, action.getClip().duration);
         mixer.update(0);
       }

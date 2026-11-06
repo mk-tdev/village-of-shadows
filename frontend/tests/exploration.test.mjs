@@ -44,7 +44,7 @@ test("holding the light drives it away; losing focus drains protection; darkness
   assert.deepEqual(tick({ phase: "caught", time: 0, lightTime: 0 }, 20), { phase: "caught", time: 0, lightTime: 0 });
 });
 
-test("the entire main lane connects spawn, every seal, and the council", () => {
+test("the original main lane still connects spawn, its three keepsakes, and the council", () => {
   let point = { ...SPAWN };
   const found = [];
   for (let i = 0; i < 580; i++) {
@@ -54,7 +54,7 @@ test("the entire main lane connects spawn, every seal, and the council", () => {
     point = movePlayer(point, 0, -.1);
     if (atCouncil(point)) break;
   }
-  assert.deepEqual(found, LANDMARKS.map(l => l.id));
+  assert.deepEqual(found, ["lantern", "well", "chapel"]);
   assert.ok(atCouncil(point));
 });
 
@@ -137,7 +137,11 @@ function reachable() {
 }
 test('every district, landmark and lamp-lit street is reachable on foot from the gate', () => {
   const ok = reachable();
-  for (const d of DISTRICTS) assert.ok(ok(d), `${d.name} unreachable`);
+  for (const d of DISTRICTS) {
+    // District centres can be water or a solid altar; verify an actual point inside.
+    const approach = d.name === 'The whispering falls' ? { x: 38, z: -82 } : d;
+    assert.ok(ok(approach), `${d.name} unreachable`);
+  }
   for (const l of LANDMARKS) assert.ok(ok(l), `${l.id} unreachable`);
   assert.ok(ok(COUNCIL_SEAT));
   for (const lamp of LAMPS.filter(l => l.kind === 'post')) assert.ok(ok(lamp), `lamp ${lamp.x},${lamp.z} unreachable`);
@@ -149,4 +153,40 @@ test('the palisade bounds the village and props never sit inside buildings', () 
   assert.equal(surfaceAt(SPAWN), 'stone');
   assert.equal(surfaceAt({ x: -16.5, z: -10 }), 'dirt');
   assert.equal(districtAt({ x: 22, z: 0 }), 'The market square');
+});
+
+const { FALLS, TEMPLE, RUIN_WALLS, TEMPLE_COLUMNS, FOREST_TREES, forestHint, VILLAGE_BOUNDS } = await import('../lib/exploration/world.ts');
+test('the forest is substantially larger, with a clear north gate and a return path', () => {
+  const area = (b) => (b.maxX - b.minX) * (b.maxZ - b.minZ);
+  assert.ok(area(BOUNDS) > area(VILLAGE_BOUNDS) * 3);
+  let p = { x: 0, z: -40 };
+  p = movePlayer(p, 0, -20);
+  assert.ok(p.z < -59.9);
+  p = movePlayer(p, 0, 31.8);
+  assert.ok(atCouncil(p));
+  assert.equal(districtAt(COUNCIL), 'The council clearing');
+  assert.match(forestHint({x: 0, z: -60}), /west.*east/);
+  assert.match(forestHint({x: -29, z: -85}), /south/);
+});
+
+test('water, cliffs, ruin walls, columns and visible forest trunks block walking', () => {
+  assert.equal(canWalk(FALLS), false);
+  assert.equal(canWalk({x: FALLS.x, z: FALLS.z - 8}), false);
+  for (const w of RUIN_WALLS) assert.equal(canWalk(w), false);
+  for (const c of TEMPLE_COLUMNS) assert.equal(canWalk(c), false);
+  for (const tree of FOREST_TREES) assert.equal(canWalk(tree), false);
+  assert.ok(FOREST_TREES.length > 100);
+  assert.ok(canWalk({x: TEMPLE.x, z: TEMPLE.z + 3}));
+  assert.equal(surfaceAt({x: TEMPLE.x, z: TEMPLE.z + 3}), 'stone');
+});
+
+test('new optional discoveries restore alongside old saves and can each be collected once', () => {
+  const ids = LANDMARKS.map(l => l.id);
+  assert.equal(ids.length, 6);
+  assert.deepEqual(restoreSeals(JSON.stringify([...ids, ...ids, 'unknown'])), ids);
+  for (const l of LANDMARKS.slice(3)) {
+    assert.ok(canWalk(l));
+    assert.equal(nearbyLandmark(l, [])?.id, l.id);
+    assert.equal(nearbyLandmark(l, [l.id]), undefined);
+  }
 });
