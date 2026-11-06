@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createVillage, type SceneSnapshot, type VillageScene } from "@/lib/exploration/scene";
 import { VillageAudio } from "@/lib/exploration/audio";
+import { TRAVELLERS, type CameraView, type TravellerName } from "@/lib/exploration/traveller";
 import { LANDMARKS, SPAWN, STREETS, COUNCIL, BOUNDS, forestHint, restoreSeals, type Landmark } from "@/lib/exploration/world";
 import { ENCOUNTER_COPY, encounterActive, type EncounterPhase } from "@/lib/exploration/encounter";
 import styles from "./exploration.module.css";
 
-type Mode = "intro" | "playing" | "paused" | "journal" | "clue" | "complete" | "restart" | "caught";
+type Mode = "intro" | "playing" | "paused" | "journal" | "clue" | "complete" | "restart" | "caught" | "traveller";
 const STORAGE_KEY = "village:prologue:seals:v1";
 const DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
@@ -47,6 +48,10 @@ export default function ExplorationExperience() {
   const [lantern, setLantern] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [brightness, setBrightness] = useState(1);
+  const [view, setView] = useState<CameraView>("first");
+  const [traveller, setTraveller] = useState<TravellerName>("woodsman_man");
+  const [running, setRunning] = useState(false);
+  const travellerReturn = useRef<"intro" | "paused">("intro");
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState("");
@@ -104,6 +109,7 @@ export default function ExplorationExperience() {
           if (action === "journal") { audioRef.current?.journal(); setMode("journal"); }
           if (action === "pause") setMode("paused");
           if (action === "lantern") setLantern(value => !value);
+          if (action === "view") setView(value => value === "first" ? "third" : "first");
         },
         step: (running, surface) => audioRef.current?.step(running, surface),
         thunder: (delay, strength) => audioRef.current?.thunder(delay, strength),
@@ -116,6 +122,7 @@ export default function ExplorationExperience() {
           if (phase === "caught") setMode("caught");
         },
         error: () => setFailed(true),
+        avatarError: () => { setView("first"); setNotice("Your traveller could not load. First-person exploration is still available; choose a traveller to try again."); },
       });
       sceneRef.current = scene;
       return () => { scene?.dispose(); sceneRef.current = null; audioRef.current?.dispose(); };
@@ -126,9 +133,9 @@ export default function ExplorationExperience() {
   }, []);
 
   useEffect(() => {
-    sceneRef.current?.configure({ playing: playing && !failed, lantern, reducedMotion, brightness, found });
+    sceneRef.current?.configure({ playing: playing && !failed, lantern, reducedMotion, brightness, found, view, traveller, running });
     audioRef.current?.setActive(playing && sound && !failed);
-  }, [playing, lantern, reducedMotion, brightness, found, sound, failed]);
+  }, [playing, lantern, reducedMotion, brightness, found, sound, failed, view, traveller, running]);
 
   const lanternWas = useRef(lantern);
   useEffect(() => {
@@ -151,6 +158,7 @@ export default function ExplorationExperience() {
   }
 
   function resume() { setMode("playing"); canvasRef.current?.focus(); }
+  function chooseTraveller(from: "intro" | "paused") { travellerReturn.current = from; setMode("traveller"); }
 
   async function toggleSound() {
     const next = !sound;
@@ -167,8 +175,10 @@ export default function ExplorationExperience() {
     sceneRef.current?.reset(); resume();
   }
 
-  return <main className={styles.experience} data-mode={mode} data-reduced-motion={reducedMotion} data-encounter={encounter}>
-    <canvas ref={canvasRef} className={styles.canvas} tabIndex={0} aria-label="Explore the village. W A S D to walk, arrow left and right to turn, E to examine, F for lantern, J for journal. Drag to look or click nearby ground to walk." />
+  return <main className={styles.experience} data-mode={mode} data-reduced-motion={reducedMotion} data-encounter={encounter}
+    onContextMenuCapture={event => { if (event.target instanceof Element && event.target.closest("button")) event.preventDefault(); }}
+    onDragStartCapture={event => { if (event.target instanceof Element && event.target.closest("button")) event.preventDefault(); }}>
+    <canvas ref={canvasRef} className={styles.canvas} tabIndex={0} aria-label="Explore the village. W A S D to walk, Shift to run, Space to jump, V to switch camera, arrow left and right to turn, E to examine, F for lantern, J for journal. Drag to look or click nearby ground to walk." />
     <div className={styles.vignette} aria-hidden="true" /><div className={styles.grain} aria-hidden="true" />
     <header className={styles.header}>
       <Link href="/" className={styles.brand}>{t("Village of Shadows")}<span>{t("The last light")}</span></Link>
@@ -187,6 +197,7 @@ export default function ExplorationExperience() {
         <p>Beyond the last lantern: a temple without worshippers,<br className={styles.desktopBreak} /> houses without voices, and water that whispers your name.</p>
         <p className={styles.premise}>{t("Find the council. Take your seat.")}<br />{t("Keep your lantern close. Something hunts here.")}</p>
         <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? `Lighting the lanterns… ${Math.round(snapshot.loading * 100)}%` : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
+        <button className={styles.travellerLink} onClick={() => chooseTraveller("intro")}>Choose your traveller <span>Optional · free presets</span></button>
         <Link href="/setup" className={styles.textLink}>{t("Go straight to player setup")} <span>↗</span></Link>
       </section>
       <footer className={styles.introFooter}><span><LanternIcon /> A playable horror prologue</span><span>Headphones recommended <i /> Take your time. Listen carefully.</span></footer>
@@ -204,12 +215,27 @@ export default function ExplorationExperience() {
         <button className={styles.journalButton} onClick={() => setMode("journal")}>Map & journal <kbd>J</kbd></button>
       </aside>
       <div className={styles.interaction}>
-        {playing && (target || snapshot.council || snapshot.villager) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : target ? `Examine ${target.name.toLowerCase()}` : `Speak with ${snapshot.villager?.name}`}</button> : <span className={styles.walkHint}>W A S D to walk <i /> Drag to look <i /> Click ground to walk</span>}
+        {playing && (target || snapshot.council || snapshot.villager) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : target ? `Examine ${target.name.toLowerCase()}` : `Speak with ${snapshot.villager?.name}`}</button> : <span className={styles.walkHint}>W A S D · walk <i /> Shift · run <i /> Space · jump <i /> Drag · look</span>}
       </div>
       <div className={styles.lanternControl}><button onClick={() => setLantern(value => !value)} aria-pressed={lantern}><LanternIcon /><span>Lantern {lantern ? "lit" : "unlit"}</span><kbd>F</kbd></button></div>
-      <div className={styles.movePad} aria-label="Movement controls"><button aria-label="Walk forward" onClick={() => sceneRef.current?.step("forward")}>↑</button><button aria-label="Turn left" onClick={() => sceneRef.current?.step("left")}>↶</button><button aria-label="Walk backward" onClick={() => sceneRef.current?.step("back")}>↓</button><button aria-label="Turn right" onClick={() => sceneRef.current?.step("right")}>↷</button></div>
+      <div className={styles.travelControls} aria-label="Traveller controls">
+        <button disabled={!playing} onClick={() => setView(v => v === "first" ? "third" : "first")}>{view === "first" ? "Third-person view" : "First-person view"} <kbd>V</kbd></button>
+        <div><button disabled={!playing} aria-pressed={running} onClick={() => setRunning(v => !v)}>{running ? "Running" : "Run"}</button><button disabled={!playing} onClick={() => sceneRef.current?.jump()}>Jump <kbd>Space</kbd></button></div>
+      </div>
+      <div className={styles.movePad} aria-label="Movement controls">{([ ["forward", "Walk forward", "↑"], ["left", "Turn left", "↶"], ["back", "Walk backward", "↓"], ["right", "Turn right", "↷"] ] as const).map(([direction, label, symbol]) => <button key={direction} disabled={!playing} aria-label={label}
+        onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); sceneRef.current?.hold(direction, true); }}
+        onPointerUp={() => sceneRef.current?.hold(direction, false)} onPointerCancel={() => sceneRef.current?.hold(direction, false)} onLostPointerCapture={() => sceneRef.current?.hold(direction, false)}
+        onClick={event => { if (event.detail === 0) sceneRef.current?.step(direction); }}>{symbol}</button>)}</div>
     </>}
     <div className={styles.notice} role="status">{notice}</div>
+
+    {!failed && mode === "traveller" && <Modal title="Choose your traveller" onClose={() => setMode(travellerReturn.current)}>
+      <span className={styles.chapter}>A face in the mist</span><h2>Who walks tonight?</h2>
+      <p>Choose an animated village traveller. No photo, account or generation fee. You can switch back to first-person at any time.</p>
+      <div className={styles.travellerGrid} role="group" aria-label="Free traveller presets">{TRAVELLERS.map((item, index) => <button key={item.id} aria-pressed={traveller === item.id} onClick={() => { setTraveller(item.id); setView("third"); }}><span className={styles.travellerNumber}>0{index + 1} {traveller === item.id ? "· Selected" : ""}</span><strong>{item.name}</strong><small>{item.description}</small></button>)}</div>
+      <button className={styles.primary} onClick={() => { setView("third"); setMode(travellerReturn.current); }}>Use this traveller <span>→</span></button>
+      <div className={styles.modalLinks}><button onClick={() => { setView("first"); setMode(travellerReturn.current); }}>Stay in first-person</button></div>
+    </Modal>}
 
     {!failed && mode === "paused" && <Modal title="Night paused" onClose={resume}>
       <span className={styles.chapter}>Take a breath</span><h2>The night can wait.</h2><p>You are safe here. The village is paused.</p>
@@ -219,7 +245,8 @@ export default function ExplorationExperience() {
         <label>Reduced motion <input type="checkbox" checked={reducedMotion} onChange={e => setReducedMotion(e.target.checked)} /></label>
         <label htmlFor="brightness">Brightness <span>{Math.round(brightness * 100)}%</span></label><input id="brightness" type="range" min="0.7" max="1.8" step="0.1" value={brightness} onChange={e => setBrightness(Number(e.target.value))} />
       </div>
-      <div className={styles.controlGuide}><p><kbd>W A S D</kbd> Walk <kbd>Shift</kbd> Hurry</p><p><kbd>← →</kbd> Turn <kbd>E</kbd> Examine</p><p><kbd>F</kbd> Lantern <kbd>J</kbd> Journal</p><p>Drag to look. Click nearby ground to walk. On touch screens, use the arrows.</p></div>
+      <button className={styles.travellerLink} onClick={() => chooseTraveller("paused")}>Choose your traveller <span>{TRAVELLERS.find(item => item.id === traveller)?.name}</span></button>
+      <div className={styles.controlGuide}><p><kbd>W A S D</kbd> Walk <kbd>Shift</kbd> Run</p><p><kbd>Space</kbd> Jump <kbd>V</kbd> Camera view</p><p><kbd>← →</kbd> Turn <kbd>E</kbd> Examine</p><p><kbd>F</kbd> Lantern <kbd>J</kbd> Journal</p><p>Drag to look. Jump over low fences, crates and street barriers. Buildings and water remain impassable. On touch screens, hold the arrows and use Run / Jump.</p></div>
       <button className={styles.primary} autoFocus onClick={resume}>Return to the village <span>→</span></button>
       <div className={styles.modalLinks}><button onClick={async () => { resume(); try { await sceneRef.current?.lockPointer(); } catch { setNotice("Mouse capture is unavailable. Drag to look instead."); } }}>Use captured mouse</button><button onClick={() => setMode("restart")}>Start again</button><Link href="/">Leave village</Link></div>
     </Modal>}
@@ -253,7 +280,7 @@ export default function ExplorationExperience() {
       <Link className={styles.primary} href="/setup">Choose players &amp; models <span>→</span></Link>
     </Modal>}
 
-    {!failed && mode === "restart" && <Modal title="Restart the prologue" onClose={() => setMode("paused")}><h2>Walk into the night again?</h2><p>This clears the three optional discoveries from your local journal and returns you to the entrance.</p><button className={styles.primary} onClick={restart}>Begin again <span>↻</span></button><button className={styles.textLink} autoFocus onClick={() => setMode("paused")}>Keep my discoveries</button></Modal>}
+    {!failed && mode === "restart" && <Modal title="Restart the prologue" onClose={() => setMode("paused")}><h2>Walk into the night again?</h2><p>This clears the {LANDMARKS.length} optional discoveries from your local journal and returns you to the entrance.</p><button className={styles.primary} onClick={restart}>Begin again <span>↻</span></button><button className={styles.textLink} autoFocus onClick={() => setMode("paused")}>Keep my discoveries</button></Modal>}
     {!failed && mode === "caught" && <Modal title="The creature found you" onClose={() => { sceneRef.current?.retryEncounter(); setLantern(true); resume(); }}>
       <span className={styles.chapter}>The watchman’s hunger</span><h2>{ENCOUNTER_COPY.caught.title}</h2><p>{ENCOUNTER_COPY.caught.text}</p><p>Keep the creature in front of you with your lantern lit until it retreats. You can also run: hold Shift while walking.</p><button className={styles.primary} autoFocus onClick={() => { sceneRef.current?.retryEncounter(); setLantern(true); resume(); }}>Return to the lane <span>↻</span></button><Link className={styles.textLink} href="/setup">Escape to the council →</Link>
     </Modal>}

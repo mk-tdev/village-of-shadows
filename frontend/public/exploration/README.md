@@ -45,6 +45,17 @@ See `audio/PROVENANCE.md` for per-file authors, URLs and edits.
 
 ## Werewolf mesh
 
+The runtime repairs arm skin weights in `wolf-appearance.ts`: low-hanging
+wrists in the original mesh were incorrectly assigned to leg bones. Both body
+and fur now follow the arm/forearm/hand chain, matching the rigid fingers and
+claws. The source generator checks arm regions before legs to avoid repeating
+the issue. Authored Blender clips and the existing GLB remain intact.
+
+The optional player traveller reuses four existing CC0 rigged characters
+(woodsman, huntress, hooded man and hooded woman) with walking, sprinting and
+crouched airborne poses. No new third-party avatar service or photo processing
+is involved; see `characters/PROVENANCE.md` for the asset licenses.
+
 `werewolf.glb` is authored locally by `frontend/scripts/build-werewolf.mjs`
 using Three.js: smooth-union anatomical surfaces, an 18-bone skeleton, skin
 weights, tapered fur ribbons, articulated jaw, eyes, teeth, and claws. Run

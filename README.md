@@ -99,7 +99,7 @@ Two representative learning paths:
 ### Walk the village: The Last Light
 
 The homepage's **Walk into the shadows** action opens `/explore`, a playable
-first-person horror prologue. Walk a rain-soaked village (market, tavern,
+first- or third-person horror prologue. Walk a rain-soaked village (market, tavern,
 graveyard, farm and mill pond), then cross the broken north gate into the
 Blackwood forest. Lantern trails lead to a ruined moon temple, abandoned
 houses and a waterfall with moving water, spray and positional sound. Six
@@ -110,10 +110,14 @@ The ending leads into the existing AI game setup. **Go straight to the AI
 council** remains available for returning players. Exploring the forest and
 collecting keepsakes are optional: take the empty chair whenever you are ready.
 
-Use **WASD** to walk, **Shift** to hurry, drag to look, or click nearby ground
-to walk. **E** examines, **F** toggles the lantern, **J** opens the journal,
+Use **WASD** to walk, **Shift** to run, **Space** to jump over low fences and
+street obstacles, and **V** to switch camera views. Choose one of four free,
+animated traveller presets from the intro or pause menu. No photo upload,
+avatar-generation service or additional API key is needed. Drag to look or
+click nearby ground to walk. **E** examines, **F** toggles the lantern, **J** opens the journal,
 and **Escape** pauses. Arrow keys and on-screen movement buttons provide
-alternatives. The pause menu includes brightness, sound, reduced motion,
+alternatives, including hold-to-move arrows and Run / Jump buttons on touch screens.
+The follow camera pulls in near obstacles. The pause menu includes brightness, sound, reduced motion,
 optional mouse capture, and a restart action.
 
 This prologue runs entirely in the browser: its environmental story is

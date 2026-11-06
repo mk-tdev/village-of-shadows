@@ -85,11 +85,29 @@ prologue characters, not assigned roles or deaths in the live AI council.
 
 ## Controls
 
+### Your traveller and camera
+
+First-person is the default. **Choose your traveller** on the intro or pause
+screen offers four free animated presets: the woodsman, huntress, wanderer and
+wayfarer. Selecting one enables a third-person follow camera. Press **V** or
+use the camera button to switch views at any time while playing. The camera
+pulls closer near solid obstacles and temporarily hides the avatar when there
+is not enough room. Preset choice lasts for this visit; no photo is uploaded
+and no external avatar service is used. Photo-generated likenesses are deferred.
+
+Run and jump to cross low fences, crates, carts and broken walls. You can land
+on a low obstacle and jump again, or step off it. You cannot double-jump, jump
+through buildings or trees, or cross the water and outer palisade. Pause also
+freezes an in-progress jump. The selected traveller is only your exploration
+appearance; it does not select your council seat or secret role.
+
 | Action | Keyboard | Pointer / touch |
 |---|---|---|
-| Walk | W A S D; Up / Down | Click nearby ground; tap movement arrows |
-| Turn | Left / Right | Drag across the scene; tap turning arrows |
-| Hurry | Hold Shift while walking | — |
+| Walk | W A S D; Up / Down | Click nearby ground; hold movement arrows |
+| Turn | Left / Right | Drag across the scene; hold turning arrows |
+| Run | Hold Shift while walking | Toggle Run, then move |
+| Jump | Space | Select Jump |
+| First / third person | V | Select the camera-view button |
 | Examine | E | Select the contextual prompt |
 | Lantern | F | Select the lantern control |
 | Map & journal | J | Select Map & journal |
@@ -110,10 +128,11 @@ away from the page pauses automatically, so a held key cannot leave you moving.
 The pause menu has brightness, sound, and reduced-motion controls. Reduced
 motion starts from your system preference and removes head bob, lantern sway,
 rain, moving fog, light variation, and the brief visual apparition. Its story
-cue remains readable. Reduced motion also removes transformation tremor, jump
-height, feeding bob, and running gait, while preserving readable character
-poses and the encounter's rules. Pause and journal freeze the encounter clock,
-including the protection meter and capture checks. The soundscape combines
+cue remains readable. Reduced motion also removes transformation tremor, the
+creature's pounce height, feeding bob, and running gait, while preserving readable character
+poses and the encounter's rules. Player jumping still changes height so low
+barriers can be crossed; avatar gait is frozen. Pause and journal freeze the
+encounter clock, including the protection meter and capture checks. The soundscape combines
 locally served CC0 recordings with a synthesized waterfall. No microphone is
 used. Roars change direction
 and loudness with the creature’s location. Pausing freezes audio playback as

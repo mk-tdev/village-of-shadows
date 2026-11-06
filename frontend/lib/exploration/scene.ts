@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { COUNCIL, COUNCIL_SEAT, LANDMARKS, SPAWN, atCouncil, districtAt, movePlayer, nearbyLandmark, surfaceAt, type Obstacle, type Point, type Surface } from "./world";
+import { COUNCIL, COUNCIL_SEAT, LANDMARKS, SPAWN, atCouncil, canWalk, districtAt, movePlayer, nearbyLandmark, supportHeightAt, surfaceAt, type Obstacle, type Point, type Surface } from "./world";
+import { advanceJump, cameraDistance, followCameraHeight, groundedJump, RUN_SPEED, WALK_SPEED } from "./locomotion";
+import { createTraveller, type CameraView, type TravellerName } from "./traveller";
 import { advanceEncounter, canStartEncounter, encounterActive, newEncounter, VICTIM, type EncounterPhase } from "./encounter";
 import { createCreatureEncounter } from "./creature";
 import { createKeepsakes } from "./props";
@@ -15,11 +17,12 @@ import { createCast, handLantern, patrol, seated, standing, type CharacterName, 
 
 export type NearbyVillager = { id: string; name: string; line: string };
 export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number; district: string; villager: NearbyVillager | null; loading: number };
-export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[] };
+export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[]; view: CameraView; traveller: TravellerName; running: boolean };
 type SceneEvents = {
   ready: () => void;
   snapshot: (state: SceneSnapshot) => void;
-  action: (key: "interact" | "journal" | "pause" | "lantern") => void;
+  action: (key: "interact" | "journal" | "pause" | "lantern" | "view") => void;
+  avatarError: () => void;
   step: (running: boolean, surface: Surface) => void;
   omen: () => void;
   encounter: (phase: EncounterPhase) => void;
@@ -50,7 +53,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   camera.rotation.order = "YXZ";
   const timer = new THREE.Timer();
   timer.connect(document);
-  let settings: SceneSettings = { playing: false, lantern: true, reducedMotion: false, brightness: 1, found: [] };
+  let settings: SceneSettings = { playing: false, lantern: true, reducedMotion: false, brightness: 1, found: [], view: "first", traveller: "woodsman_man", running: false };
+  let jump = groundedJump(), jumpRequested = false, facing = Math.PI;
   let point = { ...SPAWN };
   let velocity = { x: 0, z: 0 };
   let yaw = 0;
@@ -70,6 +74,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   let wolfPosition: Point = { ...VICTIM };
   let loadProgress = 0;
   const keys = new Set<string>();
+  const touchKeys = new Set<string>();
 
   const loading = new THREE.LoadingManager();
   loading.onProgress = (_url, loaded, total) => { loadProgress = total ? loaded / total : 0; };
@@ -96,6 +101,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   const keepsakes = createKeepsakes(scene, architecture.materials.door);
   const fire = createCouncilFire(scene, COUNCIL.z);
   const cast = createCast(assets);
+  const traveller = createTraveller(scene, cast, events.avatarError);
+  traveller.select(settings.traveller);
   const creature = createCreatureEncounter(scene, loading, cast, events.error);
   const post = createPost(renderer, scene, camera, quality);
 
@@ -171,16 +178,20 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     camera.aspect = width / height; camera.updateProjectionMatrix();
   }
   const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
-  function clearInput() { keys.clear(); walkTarget = null; }
+  function clearInput() { keys.clear(); touchKeys.clear(); jumpRequested = false; walkTarget = null; }
   function unlock() { if (document.pointerLockElement === canvas) document.exitPointerLock(); }
   function keydown(event: KeyboardEvent) {
     if (!settings.playing || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
     const key = event.key.toLowerCase();
-    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift", "e", "f", "j", "escape"].includes(key)) event.preventDefault();
+    // Let focused buttons keep their normal Space/Enter behaviour.
+    if (event.target instanceof HTMLButtonElement && (key === " " || key === "enter")) return;
+    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift", "e", "f", "j", "v", " ", "escape"].includes(key)) event.preventDefault();
     if (!event.repeat) {
       if (key === "e") events.action("interact");
       if (key === "j") events.action("journal");
       if (key === "f") events.action("lantern");
+      if (key === "v") events.action("view");
+      if (key === " ") jumpRequested = true;
       if (key === "escape") events.action("pause");
     }
     keys.add(key); walkTarget = null;
@@ -234,15 +245,16 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     world += dt; // ambient clock: fire, wind and sky keep breathing on the intro screen
     if (settings.playing) elapsed += dt;
     let moving = false;
-    const running = keys.has("shift");
+    const running = keys.has("shift") || settings.running;
+    const held = (key: string) => keys.has(key) || touchKeys.has(key);
     if (settings.playing) {
-      if (keys.has("arrowleft")) yaw += dt * 1.5;
-      if (keys.has("arrowright")) yaw -= dt * 1.5;
-      const forward = Number(keys.has("w") || keys.has("arrowup")) - Number(keys.has("s") || keys.has("arrowdown"));
-      const strafe = Number(keys.has("d")) - Number(keys.has("a"));
+      if (held("arrowleft")) yaw += dt * 1.5;
+      if (held("arrowright")) yaw -= dt * 1.5;
+      const forward = Number(held("w") || held("arrowup")) - Number(held("s") || held("arrowdown"));
+      const strafe = Number(held("d")) - Number(held("a"));
       let dx = -Math.sin(yaw) * forward + Math.cos(yaw) * strafe;
       let dz = -Math.cos(yaw) * forward - Math.sin(yaw) * strafe;
-      let speed = running ? 4.6 : 2.4;
+      let speed = running ? RUN_SPEED : WALK_SPEED;
       if (walkTarget) {
         dx = walkTarget.x - point.x; dz = walkTarget.z - point.z;
         if (Math.hypot(dx, dz) < .15) { walkTarget = null; dx = dz = 0; }
@@ -254,12 +266,17 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       const k = 1 - Math.exp(-dt * (length > 0 ? 10 : 14));
       velocity = { x: velocity.x + (want.x - velocity.x) * k, z: velocity.z + (want.z - velocity.z) * k };
       if (Math.hypot(velocity.x, velocity.z) > .02) {
-        const next = movePlayer(point, velocity.x * dt, velocity.z * dt, [...creature.obstacles(), ...villagerObstacles()]);
+        const next = movePlayer(point, velocity.x * dt, velocity.z * dt, [...creature.obstacles(), ...villagerObstacles()], jump.height);
         const distance = Math.hypot(next.x - point.x, next.z - point.z);
         moving = distance > .001; footDistance += distance; bob += distance; point = next;
+        if (moving) facing = Math.atan2(velocity.x, velocity.z);
         if (!moving) { walkTarget = null; velocity = { x: 0, z: 0 }; }
-        if (footDistance > (running ? 1.45 : .95)) { events.step(running, surfaceAt(point)); footDistance = 0; }
+        if (footDistance > (running ? 1.65 : 1.1) && jump.grounded) { events.step(running, surfaceAt(point)); footDistance = 0; }
       }
+      const wasAirborne = !jump.grounded;
+      jump = advanceJump(jump, dt, supportHeightAt(point), jumpRequested);
+      jumpRequested = false;
+      if (wasAirborne && jump.grounded) { events.step(false, surfaceAt(point)); footDistance = 0; }
       if (point.z < 10 && !omenSeen) { omenSeen = true; omenUntil = elapsed + 2.2; events.omen(); }
     }
     const wolfDx = wolfPosition.x - point.x, wolfDz = wolfPosition.z - point.z;
@@ -290,16 +307,24 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       if (sitting.progress === 1) { seated_ = true; const resolve = sitting.resolve; sitting = null; resolve(); }
     }
     const eyeHeight = seated_ ? 1.05 : sitting ? THREE.MathUtils.lerp(1.68, 1.05, THREE.MathUtils.smoothstep(sitting.progress, 0, 1)) : 1.68;
-    const bobOn = moving && !settings.reducedMotion;
+    const bobOn = moving && jump.grounded && !settings.reducedMotion;
     const stride = bob * (running ? 2.2 : 2.9);
-    camera.position.set(point.x + (bobOn ? Math.cos(stride * .5) * .018 : 0), eyeHeight + (bobOn ? Math.abs(Math.sin(stride * .5)) * (running ? .05 : .03) - .015 : 0), point.z);
+    camera.position.set(point.x + (bobOn ? Math.cos(stride * .5) * .018 : 0), jump.height + eyeHeight + (bobOn ? Math.abs(Math.sin(stride * .5)) * (running ? .05 : .03) - .015 : 0), point.z);
     camera.rotation.set(pitch, yaw, bobOn ? Math.sin(stride * .5) * .006 : 0);
+    const third = settings.view === "third" && !sitting && !seated_;
+    const boom = third ? cameraDistance(d => canWalk({ x: point.x + Math.sin(yaw) * d, z: point.z + Math.cos(yaw) * d }, [], jump.height + followCameraHeight(pitch, d) - .15)) : 0;
+    if (third && boom > .8) {
+      camera.position.set(point.x + Math.sin(yaw) * boom, jump.height + followCameraHeight(pitch, boom), point.z + Math.cos(yaw) * boom);
+      camera.lookAt(point.x - Math.sin(yaw) * .7, jump.height + 1.3, point.z - Math.cos(yaw) * .7);
+    }
+    traveller.update(point, jump.height, facing, moving, running, !jump.grounded, settings.playing ? dt : 0, third && boom > .8, settings.lantern, settings.reducedMotion);
     const targetFov = running && moving && !settings.reducedMotion ? 68 : 62;
     if (Math.abs(camera.fov - targetFov) > .05) { camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
-    hand.visible = settings.lantern;
+    hand.visible = settings.lantern && (!third || boom <= .8);
     hand.rotation.z = bobOn ? Math.sin(stride * .5) * .05 : 0;
     hand.position.y = -.27 + (bobOn ? Math.abs(Math.sin(stride * .5)) * .02 : 0);
-    lamp.position.copy(camera.position); lamp.position.y -= .25; lamp.position.x -= Math.sin(yaw) * .6; lamp.position.z -= Math.cos(yaw) * .6;
+    // Light, interaction and sound stay at the traveller, not the follow camera.
+    lamp.position.set(point.x - Math.sin(yaw) * .6, jump.height + 1.4, point.z - Math.cos(yaw) * .6);
     lamp.intensity = settings.lantern ? 12 + (settings.reducedMotion ? 0 : Math.sin(world * 7) * .5 + Math.sin(world * 13.3) * .3) : 0;
     heldGlow.emissiveIntensity = settings.lantern ? 1 : 0;
 
@@ -318,7 +343,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       slot.light.intensity += (goal - slot.light.intensity) * Math.min(1, dt * 5);
     });
 
-    playerEye.copy(camera.position);
+    playerEye.set(point.x, jump.height + 1.68, point.z);
     nearestVillager = null;
     let nearestD = 2.4;
     for (const v of villagers) {
@@ -344,8 +369,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       const active = encounterActive(encounter.phase);
       events.snapshot({
         point: { ...point }, bearing: ((-yaw * 180 / Math.PI) % 360 + 360) % 360,
-        nearby: active ? null : nearbyLandmark(point, settings.found)?.id ?? null,
-        council: !active && atCouncil(point), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6,
+        nearby: active || !jump.grounded ? null : nearbyLandmark(point, settings.found)?.id ?? null,
+        council: !active && jump.grounded && jump.height < .1 && atCouncil(point), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6,
         district: districtAt(point), villager: active || !nearestVillager ? null : { id: nearestVillager.id, name: nearestVillager.name, line: nearestVillager.line },
         loading: loadProgress,
       });
@@ -357,7 +382,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   // Dev-only camera hook for visual QA scripts; stripped from production builds.
   if (process.env.NODE_ENV !== "production") {
     (window as unknown as { __village?: unknown }).__village = {
-      teleport(x: number, z: number, y = 0, p = -.035) { point = { x, z }; yaw = y; pitch = p; velocity = { x: 0, z: 0 }; },
+      teleport(x: number, z: number, y = 0, p = -.035) { point = { x, z }; yaw = y; facing = y + Math.PI; pitch = p; velocity = { x: 0, z: 0 }; jump = groundedJump(); },
+      state: () => ({ point: { ...point }, jump: { ...jump }, view: settings.view, traveller: settings.traveller, camera: camera.position.toArray(), playing: settings.playing, encounter: { ...encounter } }),
       breakdown() {
         const rows: [string, number, number, boolean][] = [];
         scene.traverse(o => {
@@ -377,17 +403,23 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   return {
     configure(next: SceneSettings) {
       settings = next;
+      traveller.select(next.traveller);
       renderer.toneMappingExposure = 1.2 * next.brightness;
       if (!next.playing) { clearInput(); dragging = null; unlock(); }
     },
     sit() {
       if (seated_) return Promise.resolve();
-      if (sitting || !atCouncil(point) || encounterActive(encounter.phase)) return Promise.reject(new Error("Reach the empty council chair first."));
+      if (sitting || !jump.grounded || jump.height > .1 || !atCouncil(point) || encounterActive(encounter.phase)) return Promise.reject(new Error("Reach the empty council chair first."));
       settings.playing = false; clearInput(); unlock();
       return new Promise<void>(resolve => { sitting = { from: { ...point }, yaw: Math.atan2(Math.sin(yaw), Math.cos(yaw)), pitch, progress: 0, resolve }; });
     },
-    reset() { seated_ = false; sitting = null; point = { ...SPAWN }; velocity = { x: 0, z: 0 }; yaw = 0; pitch = -.035; elapsed = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
-    retryEncounter() { point = { x: 0, z: 3.8 }; velocity = { x: 0, z: 0 }; yaw = 0; pitch = -.035; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
+    reset() { seated_ = false; sitting = null; jump = groundedJump(); point = { ...SPAWN }; velocity = { x: 0, z: 0 }; yaw = 0; facing = Math.PI; pitch = -.035; elapsed = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
+    retryEncounter() { jump = groundedJump(); point = { x: 0, z: 3.8 }; velocity = { x: 0, z: 0 }; yaw = 0; facing = Math.PI; pitch = -.035; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
+    jump() { if (settings.playing) jumpRequested = true; },
+    hold(direction: "forward" | "back" | "left" | "right", active: boolean) {
+      const key = { forward: "w", back: "s", left: "arrowleft", right: "arrowright" }[direction];
+      if (active && settings.playing) { touchKeys.add(key); walkTarget = null; } else touchKeys.delete(key);
+    },
     step(direction: "forward" | "back" | "left" | "right") {
       if (!settings.playing) return;
       if (direction === "left" || direction === "right") { yaw += direction === "left" ? Math.PI / 8 : -Math.PI / 8; return; }
@@ -403,7 +435,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       canvas.removeEventListener("pointerdown", pointerdown); window.removeEventListener("pointermove", pointermove);
       canvas.removeEventListener("pointerup", pointerup); canvas.removeEventListener("pointercancel", cancelPointer); canvas.removeEventListener("webglcontextlost", contextlost);
       villagers.forEach(v => v.character.dispose()); omenFigure?.dispose();
-      creature.dispose(); nature.dispose(); dressing.dispose(); wilderness.dispose(); atmosphere.dispose(); post.dispose(); cast.dispose();
+      traveller.dispose(); creature.dispose(); nature.dispose(); dressing.dispose(); wilderness.dispose(); atmosphere.dispose(); post.dispose(); cast.dispose();
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       scene.traverse(object => {
         if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {

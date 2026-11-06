@@ -216,10 +216,23 @@ export function districtAt(p: Point): string {
   return DISTRICTS.find(d => insideRect(p, d, 0))?.name ?? (p.z > 7 ? "The village threshold" : "The village lanes");
 }
 
-export function canWalk(p: Point, obstacles: readonly Obstacle[] = []): boolean {
+const PROP_TOP: Partial<Record<PropKind, number>> = { bucket: .45, crate: .9, crate2: .85, barrel: 1.15, bench: .9, stool: .65, stump: .8, stump2: .8, rocks: 1.2, cart: 1.5, woodpile: 1.3, table: 1.1, axe: .8, basket: .5 };
+
+/** Tops of low, vaultable objects. Buildings, water and the palisade stay solid. */
+export function supportHeightAt(p: Point): number {
+  let height = 0;
+  if (FENCES.some(f => insideRect(p, f, .3))) height = 1.2;
+  if (WALLS.some(w => insideRect(p, w, .3))) height = Math.max(height, 1.25);
+  for (const w of RUIN_WALLS) if (w.h <= 1.5 && insideRect(p, w, .3)) height = Math.max(height, w.h);
+  for (const o of PROPS) if (o.radius > 0 && PROP_TOP[o.kind] && Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .25) height = Math.max(height, PROP_TOP[o.kind]!);
+  if (GRAVES.some(g => Math.abs(p.x - g.x) < .55 && Math.abs(p.z - g.z) < .35)) height = Math.max(height, 1.35);
+  return height;
+}
+
+export function canWalk(p: Point, obstacles: readonly Obstacle[] = [], footHeight = 0): boolean {
   if (obstacles.some(o => Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .3)) return false;
   if (p.x < BOUNDS.minX || p.x > BOUNDS.maxX || p.z > BOUNDS.maxZ || p.z < BOUNDS.minZ) return false;
-  if (RUIN_WALLS.some(w => insideRect(p, w, .3))) return false;
+  if (RUIN_WALLS.some(w => insideRect(p, w, .3) && (w.h > 1.5 || footHeight < w.h))) return false;
   if (TEMPLE_COLUMNS.some(t => Math.hypot(p.x - t.x, p.z - t.z) < t.radius + .3)) return false;
   if ((p.z < -57 || p.x < -36 || p.x > 38) && FOREST_TREES.some(t => Math.hypot(p.x - t.x, p.z - t.z) < t.radius + .3)) return false;
   if (Math.hypot(p.x - FALLS.x, p.z - FALLS.z) < FALLS.radius + .3) return false;
@@ -234,19 +247,19 @@ export function canWalk(p: Point, obstacles: readonly Obstacle[] = []): boolean 
   if (p.x > -10.4 && p.x < -3.6 && p.z > -29.4 && p.z < -20.6) return false;
   if (Math.hypot(p.x - 2.5, p.z + 3) < 1.05) return false;
   if (Math.hypot(p.x - POND.x, p.z - POND.z) < POND.radius && !insideRect(p, JETTY, 0)) return false;
-  if (FENCES.some(f => insideRect(p, f, .3)) || WALLS.some(w => insideRect(p, w, .3)) || STALLS.some(s => insideRect(p, s, .3))) return false;
-  if (PROPS.some(o => o.radius > 0 && Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .25)) return false;
-  if (GRAVES.some(g => Math.abs(p.x - g.x) < .55 && Math.abs(p.z - g.z) < .35)) return false;
+  if ((footHeight < 1.2 && FENCES.some(f => insideRect(p, f, .3))) || (footHeight < 1.25 && WALLS.some(w => insideRect(p, w, .3))) || STALLS.some(s => insideRect(p, s, .3))) return false;
+  if (PROPS.some(o => o.radius > 0 && footHeight < (PROP_TOP[o.kind] ?? Infinity) && Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .25)) return false;
+  if (footHeight < 1.35 && GRAVES.some(g => Math.abs(p.x - g.x) < .55 && Math.abs(p.z - g.z) < .35)) return false;
   return true;
 }
 
 /** Axis sliding avoids sticking to corners; substeps prevent wall tunnelling. */
-export function movePlayer(from: Point, dx: number, dz: number, obstacles: readonly Obstacle[] = []): Point {
+export function movePlayer(from: Point, dx: number, dz: number, obstacles: readonly Obstacle[] = [], footHeight = 0): Point {
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / .18));
   const p = { ...from };
   for (let i = 0; i < steps; i++) {
-    if (canWalk({ x: p.x + dx / steps, z: p.z }, obstacles)) p.x += dx / steps;
-    if (canWalk({ x: p.x, z: p.z + dz / steps }, obstacles)) p.z += dz / steps;
+    if (canWalk({ x: p.x + dx / steps, z: p.z }, obstacles, footHeight)) p.x += dx / steps;
+    if (canWalk({ x: p.x, z: p.z + dz / steps }, obstacles, footHeight)) p.z += dz / steps;
   }
   return p;
 }

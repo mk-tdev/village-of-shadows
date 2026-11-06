@@ -2,12 +2,51 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SPAWN, COUNCIL, COUNCIL_SEAT, COTTAGES, LANDMARKS, canWalk, movePlayer, nearbyLandmark, atCouncil, restoreSeals } from "../lib/exploration/world.ts";
 import { advanceEncounter, canStartEncounter, newEncounter } from "../lib/exploration/encounter.ts";
+import { advanceJump, groundedJump, cameraDistance, followCameraHeight, RUN_SPEED, WALK_SPEED } from "../lib/exploration/locomotion.ts";
+import { supportHeightAt } from "../lib/exploration/world.ts";
 
 const encounterInput = { playing: true, trigger: false, warding: false, distance: 5, escaped: false };
 const tick = (state, seconds, overrides = {}) => {
   for (let i = 0; i < Math.ceil(seconds / .05); i++) state = advanceEncounter(state, .05, { ...encounterInput, ...overrides });
   return state;
 };
+
+test('jump has a bounded arc, prevents double jumps, freezes on pause and lands', () => {
+  let state = advanceJump(groundedJump(), .02, 0, true);
+  assert.ok(state.height > 0 && !state.grounded);
+  assert.deepEqual(advanceJump(state, .05, 0, true, false), state);
+  assert.deepEqual(advanceJump(state, .02, 0, true), advanceJump(state, .02, 0, false));
+  let peak = 0;
+  for (let i = 0; i < 50; i++) { state = advanceJump(state, .02, 0, false); peak = Math.max(peak, state.height); }
+  assert.ok(peak > 1.8 && peak < 1.9);
+  assert.deepEqual(state, groundedJump());
+  state = { height: 1.2, velocity: -1, grounded: false };
+  assert.deepEqual(advanceJump(state, .02, 1.2, false), {height:1.2,velocity:0,grounded:true});
+  assert.equal(advanceJump({height:1.2,velocity:0,grounded:true}, .02, 0, false).grounded, false);
+  assert.ok(RUN_SPEED > WALK_SPEED * 2);
+});
+
+test('a running jump crosses a low fence but never tunnels through buildings or water', () => {
+  const fence = {x:-4.25,z:17.25};
+  assert.equal(supportHeightAt(fence), 1.2);
+  assert.equal(canWalk(fence), false);
+  assert.equal(canWalk(fence, [], 1.8), true);
+  let point = {x:-2.7,z:17.25}, state = groundedJump();
+  for (let i=0;i<55;i++) {
+    point = movePlayer(point, -RUN_SPEED*.02, 0, [], state.height);
+    state = advanceJump(state, .02, supportHeightAt(point), i===0);
+  }
+  assert.ok(point.x < -6, JSON.stringify(point));
+  for (const house of COTTAGES) assert.equal(canWalk(house, [], 1.85), false);
+  assert.equal(canWalk({x:46,z:-87}, [], 1.85), false);
+});
+
+test('follow camera pulls forward before obstacles and supports a close first-person fallback', () => {
+  assert.equal(cameraDistance(() => true), 4.2);
+  assert.ok(cameraDistance(d => d < 2) < 2);
+  assert.equal(cameraDistance(() => false), .05);
+  for (const pitch of [-.9,0,.85]) assert.ok(followCameraHeight(pitch, 4.2) >= .55);
+});
 
 test("the transformation starts only when a player is near and looking at the watchman", () => {
   assert.equal(canStartEncounter({ x: 0, z: 3 }, 0), true);

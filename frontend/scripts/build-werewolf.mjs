@@ -73,8 +73,8 @@ const rand=(i,s=1)=>{const f=Math.sin(i*127.1+s*311.7)*43758.5453;return f-Math.
 function influences(x,y,z){
  let a=hips,b=spine,t=T.MathUtils.clamp((y-1.15)/.4,0,1);
  const tag=x<0?'L':'R'; const l=limbs[tag];
- if(y<1.06 && Math.abs(x)>.13){a=l.thigh;b=l.shin;t=T.MathUtils.clamp((.9-y)/.35,0,1);if(y<.45){a=l.shin;b=l.foot;t=T.MathUtils.clamp((.45-y)/.2,0,1);}}
- else if(Math.abs(x)>.46 && y<2.12){a=l.arm;b=l.fore;t=T.MathUtils.clamp((1.69-y)/.36,0,1);if(y<1.15){a=l.fore;b=l.hand;t=T.MathUtils.clamp((1.17-y)/.27,0,1);}}
+ if(Math.abs(x)>.46 && y<2.12){a=l.arm;b=l.fore;t=T.MathUtils.clamp((1.69-y)/.36,0,1);if(y<1.15){a=l.fore;b=l.hand;t=T.MathUtils.clamp((1.17-y)/.27,0,1);}}
+ else if(y<1.06 && Math.abs(x)>.13){a=l.thigh;b=l.shin;t=T.MathUtils.clamp((.9-y)/.35,0,1);if(y<.45){a=l.shin;b=l.foot;t=T.MathUtils.clamp((.45-y)/.2,0,1);}}
  else if(y>2.18){a=neck;b=head;t=T.MathUtils.clamp((y-2.18+Math.max(0,z-.2))/.23,0,1);}
  else if(y>1.55){a=spine;b=chest;t=T.MathUtils.clamp((y-1.55)/.38,0,1);}
  return {ids:[bones.indexOf(a),bones.indexOf(b),0,0],weights:[1-t,t,0,0]};

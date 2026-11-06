@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import * as THREE from 'three';
-import { refineWolf } from '../lib/exploration/wolf-appearance.ts';
+import { refineWolf, repairWolfArmWeights } from '../lib/exploration/wolf-appearance.ts';
 
 const file = await readFile(new URL('../public/exploration/werewolf-blender.glb', import.meta.url));
 const jsonLength = file.readUInt32LE(12);
@@ -65,6 +65,33 @@ test('all encounter clips contain finite, ordered animation data for valid nodes
   }
   const triangles = model.meshes.flatMap(m => m.primitives).reduce((n, p) => n + model.accessors[p.indices].count / 3, 0);
   assert.ok(triangles < 140000);
+});
+
+test('actual creature wrists and fur follow arm joints, not legs, without altering inner leg weights', () => {
+  for (const node of model.nodes.filter(n => n.skin !== undefined)) {
+    const bones = model.skins[node.skin].joints.map(id => { const bone = new THREE.Bone(); bone.name = model.nodes[id].name; return bone; });
+    for (const primitive of model.meshes[node.mesh].primitives) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(values(primitive.attributes.POSITION), 3));
+      geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(values(primitive.attributes.JOINTS_0), 4));
+      geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(values(primitive.attributes.WEIGHTS_0), 4));
+      const mesh = new THREE.SkinnedMesh(geometry); mesh.bind(new THREE.Skeleton(bones));
+      const original = geometry.attributes.skinWeight.array.slice();
+      repairWolfArmWeights(mesh);
+      const {position, skinIndex, skinWeight} = geometry.attributes;
+      let wrists = 0;
+      for (let i = 0; i < position.count; i++) {
+        if (Math.abs(position.getX(i)) > .6 && position.getY(i) < 1.05) {
+          wrists++;
+          for (let j = 0; j < 4; j++) if (skinWeight.array[i * 4 + j] > 0) assert.match(bones[skinIndex.array[i * 4 + j]].name, /^(Forearm|Hand)[LR]$/);
+          assert.ok(Math.abs(skinWeight.getX(i) + skinWeight.getY(i) - 1) < .00001);
+        }
+        if (Math.abs(position.getX(i)) <= .46) assert.deepEqual(skinWeight.array.slice(i*4,i*4+4), original.slice(i*4,i*4+4));
+      }
+      assert.ok(wrists > 100);
+      geometry.dispose(); mesh.material.dispose(); mesh.skeleton.dispose();
+    }
+  }
 });
 
 test('canine refinement preserves skin weights and adds finite, rigged facial fur', () => {

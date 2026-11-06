@@ -1,5 +1,24 @@
 import * as THREE from "three";
 
+/** The source generator's leg branch also caught low-hanging wrists. Repair
+ * both skin and fur to the same arm chain as the rigid fingers/claws. */
+export function repairWolfArmWeights(mesh: THREE.SkinnedMesh) {
+  const pos = mesh.geometry.getAttribute("position"), ids = mesh.geometry.getAttribute("skinIndex"), weights = mesh.geometry.getAttribute("skinWeight");
+  if (!pos || !ids || !weights) return;
+  const index = new Map(mesh.skeleton.bones.map((b, i) => [b.name, i]));
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i);
+    if (Math.abs(x) <= .46 || y >= 2.12) continue;
+    const side = x < 0 ? "L" : "R";
+    const lower = y < 1.15;
+    const a = index.get(`${lower ? "Forearm" : "Arm"}${side}`), b = index.get(`${lower ? "Hand" : "Forearm"}${side}`);
+    if (a === undefined || b === undefined) continue;
+    const t = THREE.MathUtils.clamp(lower ? (1.17 - y) / .27 : (1.69 - y) / .36, 0, 1);
+    ids.setXYZW(i, a, b, 0, 0); weights.setXYZW(i, 1 - t, t, 0, 0);
+  }
+  ids.needsUpdate = weights.needsUpdate = true;
+}
+
 /** Refine the existing rig in bind space; retain its skin weights and authored clips. */
 export function refineWolf(model: THREE.Object3D) {
   model.updateMatrixWorld(true);
@@ -10,6 +29,7 @@ export function refineWolf(model: THREE.Object3D) {
     if (!(child instanceof THREE.Mesh)) return;
     // Some rigid details share geometry (eyes and nose). Clone before reshaping.
     originals.add(child.geometry); child.geometry = child.geometry.clone();
+    if (child instanceof THREE.SkinnedMesh && ["ContinuousAnatomy", "GroomedFur"].includes(child.name)) repairWolfArmWeights(child);
     const positions = child.geometry.getAttribute("position");
     inverse.copy(child.matrixWorld).invert();
     const coat = child.name === "ContinuousAnatomy" || child.name === "GroomedFur";

@@ -12,6 +12,14 @@
 .brand span { display: block; font-size: 12px; text-transform: none; letter-spacing: .18em; color: var(--muted); margin-top: 8px; }
 .topControls { display: flex; align-items: center; gap: 20px; }
 .experience button, .modal button { cursor: pointer; font: inherit; color: inherit; }
+/* Treat controls (including nested labels/icons) as game input, not selectable
+   text. WebKit needs its prefixed rules to suppress iOS selection/callouts. */
+.experience button, .experience button *, .modal button, .modal button * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.experience button, .modal button { touch-action: manipulation; }
 .topControls > button { background: none; border: 0; padding: 0; font-size: 14px; color: var(--paper); text-shadow: 0 1px 8px #000; }
 .topControls > button + button { border-left: 1px solid var(--line); padding-left: 20px; }
 .experience kbd, .modal kbd { font: 10px "Inter", sans-serif; color: var(--muted); border: 1px solid var(--line); padding: 3px 5px; border-radius: 2px; margin-left: 7px; }
@@ -135,4 +143,26 @@
 }
 @media (prefers-reduced-motion: reduce) { .primary { transition: none; } }
 .languagePicker { width: 148px; flex-shrink: 0; }
+.travellerLink { display: block; border: 0; background: none; color: #d6c19b; padding: 14px 0; text-align: left; font: 14px "Spectral", Georgia, serif; cursor: pointer; }
+.travellerLink span { display: block; margin-top: 3px; color: #aab3b1; font: 10px "Inter", sans-serif; }
+.travellerGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; }
+.travellerGrid button { text-align: left; padding: 18px 14px; border: 1px solid #59615b; color: #e0dace; background: #202d33; cursor: pointer; }
+.travellerGrid button[aria-pressed="true"] { border-color: #d8bc83; background: #34372e; box-shadow: inset 3px 0 #d8bc83; }
+.travellerGrid strong { display: block; font: 19px "Spectral", Georgia, serif; margin: 12px 0 6px; }
+.travellerGrid small, .travellerNumber { font: 10px/1.5 "Inter", sans-serif; color: #b8b8a9; }
+.travellerNumber { color: #c6ac80; text-transform: uppercase; letter-spacing: .1em; }
+.travelControls { position: absolute; right: 32px; top: 105px; display: grid; gap: 8px; }
+.travelControls button { border: 1px solid #b8a07466; background: #10191cdd; padding: 11px 13px; font: 11px "Inter", sans-serif; min-height: 42px; }
+.travelControls > div { display: flex; gap: 8px; }
+.travelControls > div button { flex: 1; }
+.travelControls button[aria-pressed="true"] { color: #f0d49f; border-color: #d8bc83; background: #34372eee; }
+.movePad button { touch-action: none; }
+@media (max-width: 600px) {
+  .travelControls { top: auto; bottom: 226px; right: 20px; gap: 5px; }
+  .travelControls button { font-size: 10px; padding: 9px; }
+  .travelControls kbd { display: none; }
+  .interaction { bottom: 338px; }
+  .travellerGrid { gap: 8px; } .travellerGrid button { padding: 14px 10px; }
+  .travellerGrid strong { font-size: 17px; }
+}
 @media (max-width: 600px) { .topControls { gap: 8px; } .brand { max-width: 140px; } }
