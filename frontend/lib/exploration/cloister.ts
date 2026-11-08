@@ -2,16 +2,16 @@ import * as T from "three";
 import { StaticBatch } from "./architecture";
 import { TOWER as s, arcadePiers, CLOISTER, type Point } from "./world";
 import type { Assets } from "./assets";
+import { handLantern, type Cast, type Character } from "./characters";
 
 /** An open nave: the north arcade screens the Keeper from the eastbound player. */
-export function buildCloister(root:T.Group, assets:Assets, lamps:T.Vector3[]) {
+export function buildCloister(root:T.Group, assets:Assets, lamps:T.Vector3[], cast:Cast) {
   const b=new StaticBatch();
   const stone=assets.surface("castle_brick_07",{metres:1.7,color:"#909ca3"});
   const moss=assets.surface("worn_mossy_plasterwall",{metres:2.8,color:"#6c786a"});
   const timber=assets.surface("dark_wooden_planks",{metres:1.6,color:"#705a42"});
   const brass=assets.track(new T.MeshStandardMaterial({color:0xb19566,roughness:.46,metalness:.42}));
   const wax=assets.track(new T.MeshBasicMaterial({color:0xffcb80}));
-  const cloth=assets.track(new T.MeshStandardMaterial({color:0x322f30,roughness:1,flatShading:true}));
   function taper(x:number,y:number,z:number) {
     for(let i=0;i<3;i++){
       b.cylinder(brass,.05,.08,.24,[x+i*.12,y+.12,z],8);
@@ -62,26 +62,44 @@ export function buildCloister(root:T.Group, assets:Assets, lamps:T.Vector3[]) {
   b.build(root);
 
   const keeper=new T.Group(); root.add(keeper);
-  const k=new StaticBatch();
-  k.add(cloth,new T.CylinderGeometry(.26,.51,1.63,11).scale(1,1,.68),[0,.84,0]);
-  k.add(cloth,new T.SphereGeometry(.32,11,9).scale(1,1.18,.9),[0,1.86,0]);
-  k.add(brass,new T.SphereGeometry(.23,10,9).scale(.81,1.12,.48),[0,1.88,.23]);
-  for(const side of [-1,1]) k.box(cloth,[.083,.032,.03],[side*.079,1.93,.327],[0,0,side*.13]);
-  k.cylinder(cloth,.12,.09,.65,[.38,1.33,.02],8,[0,0,.55]);
-  k.box(brass,[.27,.08,.24],[.54,1.04,.06]); k.box(brass,[.27,.08,.24],[.54,.7,.06]);
-  k.add(wax,new T.SphereGeometry(.09,8,8).scale(.8,1.38,.8),[.54,.86,.06]); k.build(keeper);
+  let actor:Character|null=null, lamp:T.Group|null=null, disposed=false;
+  const gaze=new T.Vector3();
+  void cast.spawn("hooded_woman",1.77).then(person=>{
+    if(disposed){person.dispose();return;}
+    actor=person; keeper.add(person.root);
+    for(const m of person.materials){
+      if(m.name.includes("Ranger")) m.color.multiply(new T.Color("#555969"));
+    }
+    lamp=handLantern({iron:brass,glow:wax});
+    person.attach("hand_r",lamp,new T.Vector3(0,-.12,0));
+    // A small, local pool of light reveals the cheek and hand, not the whole court.
+    const light=new T.PointLight(0xffb371,1.3,3);lamp.add(light);
+    person.play("Idle_Lantern_Loop",0);
+  }).catch(()=>{/* Missing character assets must never block the walk. */});
   keeper.visible=false;
-  let entered:number|null=null, tolled=false;
+  let entered:number|null=null, tolled=false, previous:number|null=null, patrolTime=0;
   return {
-    reset(){entered=null;tolled=false;keeper.visible=false;},
+    reset(){entered=previous=null;patrolTime=0;tolled=false;keeper.visible=false;keeper.rotation.y=0;},
+    dispose(){disposed=true;lamp?.traverse(o=>{if(o instanceof T.Mesh)o.geometry.dispose();});actor?.dispose();},
     update(t:number,p:Point,height:number,reduced:boolean,toll:()=>void){
       if(entered===null && p.z<-103 && p.x>-57 && p.x<-32) entered=t;
       keeper.visible=entered!==null && p.z<-99 && p.x<-30;
-      if(keeper.visible){
-        const phase=reduced?0:(1-Math.cos((t-entered!)*.19))*.5;
-        keeper.position.set(-49+12*phase,0,-112.2);
-        keeper.rotation.y=Math.atan2(p.x-keeper.position.x,p.z-keeper.position.z);
+      if(keeper.visible && actor){
+        const dt=previous===null?0:Math.min(.05,t-previous);
+        if(!reduced)patrolTime+=dt;
+        // Cross each arcade on foot, rest at either end, then turn back.
+        const cycle=patrolTime%32, reverse=cycle>=16, leg=cycle%16;
+        const walking=!reduced && leg<12;
+        const along=Math.min(12,leg);
+        keeper.position.set(-49+(reverse?12-along:along),0,-112.2);
+        const want=walking?(reverse?-Math.PI/2:Math.PI/2):Math.atan2(p.x-keeper.position.x,p.z-keeper.position.z);
+        keeper.rotation.y+=Math.atan2(Math.sin(want-keeper.rotation.y),Math.cos(want-keeper.rotation.y))*(reduced?1:1-Math.exp(-dt*3));
+        actor.play(walking?"Walk_Formal_Loop":"Idle_Lantern_Loop",.45);
+        actor.mixer.update(reduced?0:dt);
+        keeper.updateWorldMatrix(true,false);
+        if(!reduced)actor.lookAt(gaze.set(p.x,height+1.6,p.z),dt,.7);
       }
+      previous=t;
       if(!tolled && p.x>end && p.x<end+s.landing && Math.abs(p.z-s.z)<s.width/2 && height>=top-.05){tolled=true;toll();}
     }
   };

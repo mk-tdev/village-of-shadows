@@ -99,13 +99,13 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   const nature = buildNature(scene, assets, wind, quality);
   const dressing = buildDressing(scene, assets, architecture.materials);
   const wilderness = buildWilderness(scene, assets, quality);
-  const abbey = buildAbbey(scene, assets);
+  const cast = createCast(assets);
+  const abbey = buildAbbey(scene, assets, cast);
   dressing.lampPoints.push(...abbey.lamps);
   dressing.lampPoints.push(...wilderness.lampPoints);
   const atmosphere = createAtmosphere(scene, [...architecture.glows, ...dressing.lampPoints.map(position => ({ position, color: new THREE.Color("#ffae5a"), size: 2.2 }))], architecture.chimneys);
   const keepsakes = createKeepsakes(scene, architecture.materials.door);
   const fire = createCouncilFire(scene, COUNCIL.z);
-  const cast = createCast(assets);
   const traveller = createTraveller(scene, cast, events.avatarError);
   traveller.select(settings.traveller);
   const creature = createCreatureEncounter(scene, loading, cast, events.error);
@@ -448,7 +448,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       document.removeEventListener("visibilitychange", visibility); document.removeEventListener("pointerlockchange", lockchange);
       canvas.removeEventListener("pointerdown", pointerdown); window.removeEventListener("pointermove", pointermove);
       canvas.removeEventListener("pointerup", pointerup); canvas.removeEventListener("pointercancel", cancelPointer); canvas.removeEventListener("webglcontextlost", contextlost);
-      villagers.forEach(v => v.character.dispose()); omenFigure?.dispose();
+      villagers.forEach(v => v.character.dispose()); omenFigure?.dispose(); abbey.dispose();
       traveller.dispose(); creature.dispose(); nature.dispose(); dressing.dispose(); wilderness.dispose(); atmosphere.dispose(); post.dispose(); cast.dispose();
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       scene.traverse(object => {

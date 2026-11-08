@@ -1,6 +1,7 @@
 import * as T from "three";
 import { StaticBatch } from "./architecture";
 import { buildCloister } from "./cloister";
+import type { Cast } from "./characters";
 import type { Assets } from "./assets";
 import { ABBEY_GATE as gate, ABBEY_GRAVES, type Point } from "./world";
 
@@ -8,7 +9,7 @@ export type AbbeyCue = "crows" | "bell" | "chain" | "toll";
 type Cue = (name: AbbeyCue, source: Point) => void;
 
 /** An optional encounter, entirely local to this walk. No council/session state. */
-export function buildAbbey(scene: T.Scene, assets: Assets) {
+export function buildAbbey(scene: T.Scene, assets: Assets, cast: Cast) {
   const root = new T.Group(); scene.add(root);
   const batch = new StaticBatch();
   const stone = assets.surface("castle_brick_07", { metres: 1.8, color: "#80857c" });
@@ -17,7 +18,7 @@ export function buildAbbey(scene: T.Scene, assets: Assets) {
   const bronze = plain("#826747"), bone = plain("#c3b999"), black = plain("#161820");
   const flame = assets.track(new T.MeshBasicMaterial({color:"#ffd186"}));
   const lamps: T.Vector3[] = [];
-  const cloister=buildCloister(root,assets,lamps);
+  const cloister=buildCloister(root,assets,lamps,cast);
   function candle(x:number,y:number,z:number) {
     batch.cylinder(wood,.07,.1,.38,[x,y+.19,z]);
     batch.add(flame,new T.SphereGeometry(.065,6,5).scale(.8,1.7,.8),[x,y+.43,z]);
@@ -109,5 +110,5 @@ export function buildAbbey(scene: T.Scene, assets: Assets) {
     if(!Number.isFinite(gateTime)&&distance(gate)<7){gateTime=t;cue("chain",gate);}
     body.rotation.z=reduced?0:Math.sin(t*.95)*.075*(Number.isFinite(gateTime)?Math.exp(-(t-gateTime)*4):1);
   }
-  return {lamps,reset,update};
+  return {lamps,reset,update,dispose:cloister.dispose};
 }
