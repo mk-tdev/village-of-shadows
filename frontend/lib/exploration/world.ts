@@ -18,6 +18,9 @@ export const BOUNDS = { minX: -70, maxX: 76, minZ: -114, maxZ: 26 };
 export const FALLS = { x: 43, z: -91, radius: 7 };
 export const TEMPLE = { x: -29, z: -87 };
 export const RUINS = { x: 15, z: -73 };
+export const ABBEY_TRAIL = [{ x: -43, z: -70 }, { x: -51, z: -77 }, { x: -53, z: -86 }, { x: -53, z: -106 }];
+export const ABBEY_GATE = { x: -53, z: -101 };
+export const ABBEY_GRAVES = Array.from({ length: 12 }, (_, i) => ({ x: -53 + (i % 2 ? 2.6 : -2.8), z: -81 - Math.floor(i / 2) * 3 }));
 export const LANDMARKS: Landmark[] = [
   { id: "lantern", x: -2.6, z: 13, name: "The abandoned lantern", seal: "The watchman’s letter", text: "Mara's lantern is still warm. Beneath it, a note: ‘There were seven of us at sunset. I counted eight shadows. Follow the lamps north. Your chair is waiting beyond the chapel.’", hint: "Follow the lane to the old well." },
   { id: "well", x: 2.5, z: -3, name: "The old well", seal: "The well keeper’s key", text: "A rope disappears into the black water. Something below knocks three times. Carved into the stone: ‘The bell has no tongue. If you hear it, do not answer.’ A rusted iron key rests on the wet stone rim.", hint: "The council fire burns beyond the chapel. Keep heading north." },
@@ -29,6 +32,7 @@ export const LANDMARKS: Landmark[] = [
 
 /** Walkable ruin interiors: only individual walls, columns and the altar collide. */
 export const RUIN_WALLS: (Rect & { h: number })[] = [
+  ...[-4, 4].map(dx => ({ x: ABBEY_GATE.x + dx, z: ABBEY_GATE.z, w: 3, d: 3.6, h: 6.8 })),
   { x: -35, z: -87, w: .9, d: 14, h: 2.8 }, { x: -23, z: -87, w: .9, d: 14, h: 1.7 },
   { x: -29, z: -94, w: 12, d: .9, h: 3.4 }, { x: -29, z: -90, w: 2.7, d: 1.4, h: 1.2 },
   { x: -33, z: -84, w: 1.2, d: 4.5, h: .8 },
@@ -74,6 +78,7 @@ export const GRAVEYARD = { minX: -32, maxX: -14, minZ: -45, maxZ: -16, gate: { f
 export const PADDOCK = { minX: -22, maxX: -16, minZ: 18, maxZ: 25 };
 
 export const DISTRICTS: District[] = [
+  { name: "Abbey of the Last Bell", x: -53, z: -92, w: 17, d: 34 },
   { name: "The whispering falls", x: 43, z: -88, w: 26, d: 28 },
   { name: "The moon temple", x: -29, z: -87, w: 25, d: 28 },
   { name: "The abandoned settlement", x: 15, z: -73, w: 26, d: 20 },
@@ -91,6 +96,7 @@ export const DISTRICTS: District[] = [
 
 /** Walk surfaces drive footstep audio. Ribbons are [x1,z1,x2,z2,width]. */
 export const STREETS: { surface: Surface; points: Point[]; width: number }[] = [
+  { surface: "dirt", width: 3.4, points: ABBEY_TRAIL },
   { surface: "dirt", width: 3.8, points: [{ x: 0, z: -39 }, { x: 0, z: -60 }, { x: -15, z: -68 }, { x: -29, z: -78 }, { x: -29, z: -91 }] },
   { surface: "dirt", width: 3.5, points: [{ x: 0, z: -60 }, { x: 15, z: -65 }, { x: 30, z: -72 }, { x: 38, z: -82 }] },
   { surface: "dirt", width: 3, points: [{ x: -29, z: -78 }, { x: -43, z: -70 }, { x: -40, z: -60 }, { x: 0, z: -60 }] },
@@ -197,7 +203,7 @@ for (let i = 0; i < 1300; i++) {
 export function forestHint(p: Point): string {
   if (p.z > -43) return "Follow the lamps north to the council. The forest trails beyond are optional.";
   if (p.z > -63) return "Beyond the broken gate: temple to the west, abandoned houses and waterfall to the east. Council fire is south.";
-  return "Explore the temple, roofless houses and whispering falls. Follow the lamps south to return to the council.";
+  return "The western trail forks toward the Abbey of the Last Bell. Follow the lamps south to return to the council.";
 }
 
 export function surfaceAt(p: Point): Surface {
@@ -230,6 +236,7 @@ export function supportHeightAt(p: Point): number {
 }
 
 export function canWalk(p: Point, obstacles: readonly Obstacle[] = [], footHeight = 0): boolean {
+  if (p.x < -48 && footHeight < 1.15 && ABBEY_GRAVES.some(g => Math.abs(g.x-p.x)<.7 && Math.abs(g.z-p.z)<.55)) return false;
   if (obstacles.some(o => Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .3)) return false;
   if (p.x < BOUNDS.minX || p.x > BOUNDS.maxX || p.z > BOUNDS.maxZ || p.z < BOUNDS.minZ) return false;
   if (RUIN_WALLS.some(w => insideRect(p, w, .3) && (w.h > 1.5 || footHeight < w.h))) return false;

@@ -6,6 +6,17 @@ import { advanceJump, groundedJump, cameraDistance, followCameraHeight, RUN_SPEE
 import { supportHeightAt } from "../lib/exploration/world.ts";
 
 const encounterInput = { playing: true, trigger: false, warding: false, distance: 5, escaped: false };
+test('optional western fork is walkable both ways through the cemetery and gate', async () => {
+  const { ABBEY_TRAIL, ABBEY_GATE, ABBEY_GRAVES } = await import('../lib/exploration/world.ts');
+  const route = [{x:-29,z:-78}, ...ABBEY_TRAIL];
+  for(let j=1;j<route.length;j++) for(let i=0;i<=80;i++) {
+    const a=route[j-1], b=route[j], t=i/80;
+    assert.ok(canWalk({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t}));
+  }
+  for(const grave of ABBEY_GRAVES) assert.equal(canWalk(grave),false);
+  assert.equal(canWalk({x:ABBEY_GATE.x+4,z:ABBEY_GATE.z}),false);
+  assert.ok(atCouncil(COUNCIL_SEAT));
+});
 const tick = (state, seconds, overrides = {}) => {
   for (let i = 0; i < Math.ceil(seconds / .05); i++) state = advanceEncounter(state, .05, { ...encounterInput, ...overrides });
   return state;

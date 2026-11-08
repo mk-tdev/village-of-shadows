@@ -114,6 +114,10 @@ export default function ExplorationExperience() {
         step: (running, surface) => audioRef.current?.step(running, surface),
         thunder: (delay, strength) => audioRef.current?.thunder(delay, strength),
         spatial: (player, yaw, wolf) => audioRef.current?.spatial(player, yaw, wolf),
+        abbey: (cue, source) => {
+          audioRef.current?.abbey(cue, source);
+          setNotice({ crows: "The crows scatter toward the tower.", bell: "A cord pulls tight beneath the soil.", chain: "Overhead, the chain goes quiet." }[cue]);
+        },
         omen: () => { audioRef.current?.whisper(); audioRef.current?.bell(); setNotice("You are certain someone was standing there."); },
         encounter: phase => {
           setEncounter(phase); setNotice("");
@@ -255,7 +259,8 @@ export default function ExplorationExperience() {
       <span className={styles.chapter}>Things worth remembering</span><h2>A record of the night.</h2><p>{found.length} of {LANDMARKS.length} optional keepsakes discovered. {storageBlocked ? "Your discoveries are kept for this visit; device storage is unavailable." : "Your discoveries are saved on this device."}</p>
       <figure className={styles.trailMap}>
         <svg viewBox={`${BOUNDS.minX - 5} ${BOUNDS.minZ - 8} ${BOUNDS.maxX - BOUNDS.minX + 10} ${BOUNDS.maxZ - BOUNDS.minZ + 16}`} role="img" aria-label="Trail map: temple northwest, abandoned houses northeast, waterfall east. Your position is the white arrow. The council is south of the forest gate.">
-          <text x="-62" y="-106" className={styles.mapNorth}>N ↑</text>
+          <text x="-62" y="-111" className={styles.mapNorth}>N ↑</text>
+          <text x="-52" y="-102">Abbey gate</text>
           {STREETS.map((s, i) => <polyline key={i} points={s.points.map(p => `${p.x},${p.z}`).join(" ")} fill="none" stroke="#857356" strokeWidth={s.width * .45} strokeLinecap="round" />)}
           {LANDMARKS.map(l => <g key={l.id}><circle cx={l.x} cy={l.z} r="1.8" fill={found.includes(l.id) ? "#e6b974" : "#788f85"} /><text x={l.x + 3} y={l.z - 3}>{({ lantern: "Gate", well: "Well", chapel: "Chapel", temple: "Temple", ruins: "Ruins", falls: "Falls" })[l.id]}</text></g>)}
           <circle cx={COUNCIL.x} cy={COUNCIL.z} r="2" fill="#eea052" /><text x={COUNCIL.x + 4} y={COUNCIL.z + 1}>Council</text>

@@ -1,4 +1,5 @@
 import type { Surface } from "./world";
+import type { AbbeyCue } from "./abbey";
 import { VILLAGE_BOUNDS, CHAPEL, COUNCIL, FALLS, TEMPLE, RUINS } from "./world";
 
 /**
@@ -211,6 +212,15 @@ export class VillageAudio {
   lantern(lit: boolean) { this.oneShot(lit ? "sfx/match_strike_light" : "sfx/candle_blow_out", lit ? 1.4 : .9, undefined, 1, 1, undefined, .05); }
   speak() { this.oneShot("sfx/cloth_rustle", .7, undefined, 1, 1, undefined, .05); }
   bell() { this.oneShot("sfx/church_bell_toll", .8, { x: CHAPEL.x, y: 12, z: CHAPEL.z - 2.7 }, 12, .92); }
+  abbey(cue: AbbeyCue, source: { x: number; z: number }) {
+    const at = { x: source.x, z: source.z, y: cue === "chain" ? 4 : 1.6 };
+    if (cue === "crows") {
+      this.oneShot("sfx/crow_caw", .54, at, 5);
+      this.oneShot("sfx/cloth_whoosh_1", .35, at, 4, 1.4);
+    } else if (cue === "bell") {
+      this.oneShot("sfx/church_bell_toll", .44, at, 3, 1.24, undefined, .52);
+    } else this.oneShot("sfx/chain_rattle", .45, at, 4, .72);
+  }
   whisper() {
     // A breath right behind the player's shoulder.
     const { x, z, yaw } = this.listener;

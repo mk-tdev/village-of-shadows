@@ -10,6 +10,7 @@ import { createAssets } from "./assets";
 import { buildArchitecture } from "./architecture";
 import { buildNature } from "./nature";
 import { buildWilderness } from "./wilderness";
+import { buildAbbey, type AbbeyCue } from "./abbey";
 import { buildDressing, COUNCIL_CHAIRS, COUNCIL_SEAT_HEIGHT } from "./dressing";
 import { createAtmosphere, FOG_COLOR, MOON_DIRECTION } from "./atmosphere";
 import { createPost } from "./post";
@@ -19,6 +20,7 @@ export type NearbyVillager = { id: string; name: string; line: string };
 export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number; district: string; villager: NearbyVillager | null; loading: number };
 export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[]; view: CameraView; traveller: TravellerName; running: boolean };
 type SceneEvents = {
+  abbey: (cue: AbbeyCue, source: Point) => void;
   ready: () => void;
   snapshot: (state: SceneSnapshot) => void;
   action: (key: "interact" | "journal" | "pause" | "lantern" | "view") => void;
@@ -96,6 +98,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   const nature = buildNature(scene, assets, wind, quality);
   const dressing = buildDressing(scene, assets, architecture.materials);
   const wilderness = buildWilderness(scene, assets, quality);
+  const abbey = buildAbbey(scene, assets);
+  dressing.lampPoints.push(...abbey.lamps);
   dressing.lampPoints.push(...wilderness.lampPoints);
   const atmosphere = createAtmosphere(scene, [...architecture.glows, ...dressing.lampPoints.map(position => ({ position, color: new THREE.Color("#ffae5a"), size: 2.2 }))], architecture.chimneys);
   const keepsakes = createKeepsakes(scene, architecture.materials.door);
@@ -357,6 +361,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     fire.update(world, camera, settings.reducedMotion);
     dressing.update(world, settings.reducedMotion);
     wilderness.update(elapsed, settings.reducedMotion);
+    if (settings.playing) abbey.update(elapsed, point, moving && running, settings.reducedMotion, events.abbey);
     const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); });
     moonLight.intensity = 1.9 + flash * 9;
     const danger = ["hunting", "pouncing"].includes(encounter.phase) ? 1 : ["feeding", "transforming"].includes(encounter.phase) ? .45 : 0;
@@ -413,7 +418,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       settings.playing = false; clearInput(); unlock();
       return new Promise<void>(resolve => { sitting = { from: { ...point }, yaw: Math.atan2(Math.sin(yaw), Math.cos(yaw)), pitch, progress: 0, resolve }; });
     },
-    reset() { seated_ = false; sitting = null; jump = groundedJump(); point = { ...SPAWN }; velocity = { x: 0, z: 0 }; yaw = 0; facing = Math.PI; pitch = -.035; elapsed = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
+    reset() { abbey.reset(); seated_ = false; sitting = null; jump = groundedJump(); point = { ...SPAWN }; velocity = { x: 0, z: 0 }; yaw = 0; facing = Math.PI; pitch = -.035; elapsed = 0; omenSeen = false; omenUntil = 0; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
     retryEncounter() { jump = groundedJump(); point = { x: 0, z: 3.8 }; velocity = { x: 0, z: 0 }; yaw = 0; facing = Math.PI; pitch = -.035; encounter = newEncounter(); wolfPosition = { ...VICTIM }; events.encounter("waiting"); clearInput(); },
     jump() { if (settings.playing) jumpRequested = true; },
     hold(direction: "forward" | "back" | "left" | "right", active: boolean) {
