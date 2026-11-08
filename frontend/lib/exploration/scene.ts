@@ -11,6 +11,7 @@ import { buildArchitecture } from "./architecture";
 import { buildNature } from "./nature";
 import { buildWilderness } from "./wilderness";
 import { buildAbbey, type AbbeyCue } from "./abbey";
+import { ABBEY_TRAIL } from "./world";
 import { buildDressing, COUNCIL_CHAIRS, COUNCIL_SEAT_HEIGHT } from "./dressing";
 import { createAtmosphere, FOG_COLOR, MOON_DIRECTION } from "./atmosphere";
 import { createPost } from "./post";
@@ -361,7 +362,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     fire.update(world, camera, settings.reducedMotion);
     dressing.update(world, settings.reducedMotion);
     wilderness.update(elapsed, settings.reducedMotion);
-    if (settings.playing) abbey.update(elapsed, point, moving && running, settings.reducedMotion, events.abbey);
+    if (settings.playing) abbey.update(elapsed, point, jump.height, moving && running, settings.reducedMotion, events.abbey);
     const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); });
     moonLight.intensity = 1.9 + flash * 9;
     const danger = ["hunting", "pouncing"].includes(encounter.phase) ? 1 : ["feeding", "transforming"].includes(encounter.phase) ? .45 : 0;
@@ -406,6 +407,14 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   }
 
   return {
+    startAtAbbey() {
+      const [fork, trail] = ABBEY_TRAIL;
+      point = { ...fork };
+      yaw = Math.atan2(fork.x - trail.x, fork.z - trail.z);
+      facing = yaw + Math.PI;
+      // Skip the village entrance omen; the abbey encounters are still ahead.
+      omenSeen = true;
+    },
     configure(next: SceneSettings) {
       settings = next;
       traveller.select(next.traveller);

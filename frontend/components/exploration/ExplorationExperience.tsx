@@ -116,7 +116,7 @@ export default function ExplorationExperience() {
         spatial: (player, yaw, wolf) => audioRef.current?.spatial(player, yaw, wolf),
         abbey: (cue, source) => {
           audioRef.current?.abbey(cue, source);
-          setNotice({ crows: "The crows scatter toward the tower.", bell: "A cord pulls tight beneath the soil.", chain: "Overhead, the chain goes quiet." }[cue]);
+          setNotice({ crows: "The crows scatter toward the tower.", bell: "A cord pulls tight beneath the soil.", chain: "Overhead, the chain goes quiet.", toll: "The bell has no tongue. The toll comes from beneath your feet." }[cue]);
         },
         omen: () => { audioRef.current?.whisper(); audioRef.current?.bell(); setNotice("You are certain someone was standing there."); },
         encounter: phase => {
@@ -153,7 +153,8 @@ export default function ExplorationExperience() {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-  async function enter() {
+  async function enter(atAbbey = false) {
+    if (atAbbey) sceneRef.current?.startAtAbbey();
     if (sound) {
       try { await audioRef.current?.start(); }
       catch { setSound(false); setNotice("Audio is unavailable. You can still explore in silence."); }
@@ -200,7 +201,10 @@ export default function ExplorationExperience() {
         <h1>Someone here<br />isn’t <em>human.</em></h1>
         <p>Beyond the last lantern: a temple without worshippers,<br className={styles.desktopBreak} /> houses without voices, and water that whispers your name.</p>
         <p className={styles.premise}>{t("Find the council. Take your seat.")}<br />{t("Keep your lantern close. Something hunts here.")}</p>
-        <button className={styles.primary} onClick={enter} disabled={!ready}>{!ready ? `Lighting the lanterns… ${Math.round(snapshot.loading * 100)}%` : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
+        <div className={styles.entryRoutes}>
+          <button className={styles.primary} onClick={() => enter()} disabled={!ready}>{!ready ? `Lighting the lanterns… ${Math.round(snapshot.loading * 100)}%` : found.length ? t("Continue the night") : t("Enter the village")}<span>→</span></button>
+          <button className={styles.abbeyLink} onClick={() => enter(true)} disabled={!ready}>Take me to the abbey <span aria-hidden="true">↗</span></button>
+        </div>
         <button className={styles.travellerLink} onClick={() => chooseTraveller("intro")}>Choose your traveller <span>Optional · free presets</span></button>
         <Link href="/setup" className={styles.textLink}>{t("Go straight to player setup")} <span>↗</span></Link>
       </section>

@@ -6,6 +6,17 @@ import { advanceJump, groundedJump, cameraDistance, followCameraHeight, RUN_SPEE
 import { supportHeightAt } from "../lib/exploration/world.ts";
 
 const encounterInput = { playing: true, trigger: false, warding: false, distance: 5, escaped: false };
+test('gatehouse opens onto a clear cloister aisle and a continuous two-way belfry stair', async () => {
+  const { TOWER:s }=await import('../lib/exploration/world.ts');
+  for(let z=-101;z>=s.z;z-=.1) assert.ok(canWalk({x:-53,z}));
+  let h=0;
+  for(let x=-53;x<s.start+s.count*s.run+s.landing-.3;x+=.08){
+    const p={x,z:s.z}; assert.ok(canWalk(p,[],h));
+    const next=supportHeightAt(p); assert.ok(next>=h && next-h<=s.rise+.001); h=next;
+  }
+  assert.equal(h,s.count*s.rise);
+  assert.equal(canWalk({x:s.start+5,z:s.z+s.width/2+.18},[],h),false);
+});
 test('optional western fork is walkable both ways through the cemetery and gate', async () => {
   const { ABBEY_TRAIL, ABBEY_GATE, ABBEY_GRAVES } = await import('../lib/exploration/world.ts');
   const route = [{x:-29,z:-78}, ...ABBEY_TRAIL];

@@ -1,9 +1,10 @@
 import * as T from "three";
 import { StaticBatch } from "./architecture";
+import { buildCloister } from "./cloister";
 import type { Assets } from "./assets";
 import { ABBEY_GATE as gate, ABBEY_GRAVES, type Point } from "./world";
 
-export type AbbeyCue = "crows" | "bell" | "chain";
+export type AbbeyCue = "crows" | "bell" | "chain" | "toll";
 type Cue = (name: AbbeyCue, source: Point) => void;
 
 /** An optional encounter, entirely local to this walk. No council/session state. */
@@ -16,6 +17,7 @@ export function buildAbbey(scene: T.Scene, assets: Assets) {
   const bronze = plain("#826747"), bone = plain("#c3b999"), black = plain("#161820");
   const flame = assets.track(new T.MeshBasicMaterial({color:"#ffd186"}));
   const lamps: T.Vector3[] = [];
+  const cloister=buildCloister(root,assets,lamps);
   function candle(x:number,y:number,z:number) {
     batch.cylinder(wood,.07,.1,.38,[x,y+.19,z]);
     batch.add(flame,new T.SphereGeometry(.065,6,5).scale(.8,1.7,.8),[x,y+.43,z]);
@@ -85,10 +87,11 @@ export function buildAbbey(scene: T.Scene, assets: Assets) {
     return {bird,home,wings};
   });
   let flight=-Infinity, gateTime=-Infinity;
-  function reset(){ flight=gateTime=-Infinity; bells.forEach(b=>b.start=-Infinity); }
-  function update(t:number,p:Point,running:boolean,reduced:boolean,cue:Cue){
+  function reset(){ cloister.reset(); flight=gateTime=-Infinity; bells.forEach(b=>b.start=-Infinity); }
+  function update(t:number,p:Point,height:number,running:boolean,reduced:boolean,cue:Cue){
     root.visible=p.x<-15 && p.z<-50;
     if(!root.visible) return;
+    cloister.update(t,p,height,reduced,()=>cue("toll",p));
     const distance=(q:Point)=>Math.hypot(q.x-p.x,q.z-p.z);
     if(!Number.isFinite(flight) && distance(birds[2].home)<(running?8:4.5)){flight=t;cue("crows",birds[2].home);}
     birds.forEach(({bird,home,wings},i)=>{

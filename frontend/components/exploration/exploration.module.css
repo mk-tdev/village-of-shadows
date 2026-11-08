@@ -166,3 +166,7 @@
   .travellerGrid strong { font-size: 17px; }
 }
 @media (max-width: 600px) { .topControls { gap: 8px; } .brand { max-width: 140px; } }
+.entryRoutes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.abbeyLink { min-height: 44px; padding: 8px 14px; border: 1px solid #857356; border-radius: 3px; background: #101718; color: #e4cfaa; font: inherit; cursor: pointer; }
+.abbeyLink:hover:not(:disabled), .abbeyLink:focus-visible { border-color: #e4cfaa; }
+.abbeyLink:disabled { opacity: .55; cursor: wait; }

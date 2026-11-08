@@ -219,7 +219,8 @@ export class VillageAudio {
       this.oneShot("sfx/cloth_whoosh_1", .35, at, 4, 1.4);
     } else if (cue === "bell") {
       this.oneShot("sfx/church_bell_toll", .44, at, 3, 1.24, undefined, .52);
-    } else this.oneShot("sfx/chain_rattle", .45, at, 4, .72);
+    } else if(cue === "toll") this.oneShot("sfx/church_bell_toll", .65, {...at,y:.2}, 6, .58, undefined, .8);
+    else this.oneShot("sfx/chain_rattle", .45, at, 4, .72);
   }
   whisper() {
     // A breath right behind the player's shoulder.

@@ -20,6 +20,18 @@ export const TEMPLE = { x: -29, z: -87 };
 export const RUINS = { x: 15, z: -73 };
 export const ABBEY_TRAIL = [{ x: -43, z: -70 }, { x: -51, z: -77 }, { x: -53, z: -86 }, { x: -53, z: -106 }];
 export const ABBEY_GATE = { x: -53, z: -101 };
+export const CLOISTER = { x:-44, z:-108, w:24, d:9 };
+export const TOWER = { start:-32, count:24, run:.43, rise:.24, landing:3, z:-108, width:3.6 };
+const stairEnd = TOWER.start + TOWER.count*TOWER.run;
+export const arcadePiers = [-53,-48,-43,-38,-33].flatMap(x=>[-111,-105].map(z=>({x,z})));
+export const abbeySolids = [
+  ...arcadePiers.filter(p=>!(p.x===-53 && p.z===-105)).map(p=>({...p,w:.72,d:.72})),
+  ...[-1,1].map(side=>({x:(TOWER.start+stairEnd+TOWER.landing)/2,z:TOWER.z+side*(TOWER.width/2+.18),w:stairEnd+TOWER.landing-TOWER.start,d:.36})),
+  {x:stairEnd+TOWER.landing+.18,z:TOWER.z,w:.36,d:TOWER.width+.72}
+];
+export function stairHeight(x:number) {
+  return Math.min(TOWER.count,Math.max(0,1+Math.floor((x-TOWER.start)/TOWER.run)))*TOWER.rise;
+}
 export const ABBEY_GRAVES = Array.from({ length: 12 }, (_, i) => ({ x: -53 + (i % 2 ? 2.6 : -2.8), z: -81 - Math.floor(i / 2) * 3 }));
 export const LANDMARKS: Landmark[] = [
   { id: "lantern", x: -2.6, z: 13, name: "The abandoned lantern", seal: "The watchman’s letter", text: "Mara's lantern is still warm. Beneath it, a note: ‘There were seven of us at sunset. I counted eight shadows. Follow the lamps north. Your chair is waiting beyond the chapel.’", hint: "Follow the lane to the old well." },
@@ -78,6 +90,8 @@ export const GRAVEYARD = { minX: -32, maxX: -14, minZ: -45, maxZ: -16, gate: { f
 export const PADDOCK = { minX: -22, maxX: -16, minZ: 18, maxZ: 25 };
 
 export const DISTRICTS: District[] = [
+  {name:"The hollow belfry",x:-25,z:TOWER.z,w:14,d:4},
+  {name:"The ruined cloister",...CLOISTER},
   { name: "Abbey of the Last Bell", x: -53, z: -92, w: 17, d: 34 },
   { name: "The whispering falls", x: 43, z: -88, w: 26, d: 28 },
   { name: "The moon temple", x: -29, z: -87, w: 25, d: 28 },
@@ -193,6 +207,7 @@ for (let i = 0; i < 1300; i++) {
   const x = BOUNDS.minX + 3 + seeded(i, 81) * (BOUNDS.maxX - BOUNDS.minX - 6);
   const z = BOUNDS.minZ + 3 + seeded(i, 82) * (BOUNDS.maxZ - BOUNDS.minZ - 6);
   const p = { x, z };
+  if(x>-59 && x<-15 && z<-102) continue;
   if (x > VILLAGE_BOUNDS.minX - 4 && x < VILLAGE_BOUNDS.maxX + 4 && z > VILLAGE_BOUNDS.minZ - 3) continue;
   if (STREETS.some(s => s.points.some((b, j) => j > 0 && distanceToSegment(p, s.points[j - 1], b) < s.width / 2 + 3))) continue;
   if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < 12 || Math.hypot(x - FALLS.x, z - FALLS.z) < 16 || Math.hypot(x - RUINS.x, z - RUINS.z) < 14) continue;
@@ -201,6 +216,7 @@ for (let i = 0; i < 1300; i++) {
 }
 
 export function forestHint(p: Point): string {
+  if(p.z < -103 && p.x > -57 && p.x < -18) return p.x < -32 ? "Turn east through the cloister. Follow the arches to the belfry stairs." : "Climb to the cut rope. Return west to the cloister and south through the gate.";
   if (p.z > -43) return "Follow the lamps north to the council. The forest trails beyond are optional.";
   if (p.z > -63) return "Beyond the broken gate: temple to the west, abandoned houses and waterfall to the east. Council fire is south.";
   return "The western trail forks toward the Abbey of the Last Bell. Follow the lamps south to return to the council.";
@@ -226,6 +242,7 @@ const PROP_TOP: Partial<Record<PropKind, number>> = { bucket: .45, crate: .9, cr
 
 /** Tops of low, vaultable objects. Buildings, water and the palisade stay solid. */
 export function supportHeightAt(p: Point): number {
+  if(p.x>=TOWER.start && p.x<=stairEnd+TOWER.landing && Math.abs(p.z-TOWER.z)<=TOWER.width/2) return stairHeight(p.x);
   let height = 0;
   if (FENCES.some(f => insideRect(p, f, .3))) height = 1.2;
   if (WALLS.some(w => insideRect(p, w, .3))) height = Math.max(height, 1.25);
@@ -236,6 +253,7 @@ export function supportHeightAt(p: Point): number {
 }
 
 export function canWalk(p: Point, obstacles: readonly Obstacle[] = [], footHeight = 0): boolean {
+  if(p.z < -102 && abbeySolids.some(r=>insideRect(p,r,.3))) return false;
   if (p.x < -48 && footHeight < 1.15 && ABBEY_GRAVES.some(g => Math.abs(g.x-p.x)<.7 && Math.abs(g.z-p.z)<.55)) return false;
   if (obstacles.some(o => Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .3)) return false;
   if (p.x < BOUNDS.minX || p.x > BOUNDS.maxX || p.z > BOUNDS.maxZ || p.z < BOUNDS.minZ) return false;
