@@ -119,11 +119,11 @@ export function createAtmosphere(scene: THREE.Scene, glows: Glow[], chimneys: TH
   return {
     uniforms,
     /** Returns lightning brightness (0..1) so the caller can lift scene lights in sync. */
-    update(time: number, camera: THREE.Camera, reduced: boolean, onThunder: (delay: number, strength: number) => void) {
+    update(time: number, camera: THREE.Camera, reduced: boolean, onThunder: (delay: number, strength: number) => void, shelter = 0) {
       uniforms.time.value = time;
       sky.position.copy(camera.position);
       rainUniforms.center.value.copy(camera.position);
-      rain.visible = !reduced;
+      rain.visible = !reduced && shelter < .35;
       mist.forEach((s, i) => { if (!reduced) s.position.x += Math.sin(time * .05 + i) * .004; });
       let flash = 0;
       if (!reduced) {

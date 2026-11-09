@@ -14,25 +14,117 @@ export const COUNCIL: Point = { x: 0, z: -32 };
 export const COUNCIL_SEAT: Point = { x: 0, z: -28.2 };
 /** Keep the original council route; the broken north gate opens into the forest. */
 export const VILLAGE_BOUNDS = { minX: -36, maxX: 38, minZ: -56, maxZ: 26 };
-export const BOUNDS = { minX: -70, maxX: 76, minZ: -114, maxZ: 26 };
+export const BOUNDS = { minX: -70, maxX: 76, minZ: -136, maxZ: 26 };
 export const FALLS = { x: 43, z: -91, radius: 7 };
 export const TEMPLE = { x: -29, z: -87 };
 export const RUINS = { x: 15, z: -73 };
-export const ABBEY_TRAIL = [{ x: -43, z: -70 }, { x: -51, z: -77 }, { x: -53, z: -86 }, { x: -53, z: -106 }];
+/**
+ * Abbey of the Last Bell: a walled compound north-west of the forest trail.
+ * Every wall, pew and altar below is both drawn (abbey.ts) and collided
+ * (canWalk), so what the player sees is exactly what blocks them.
+ */
+export const ABBEY = { minX: -68, maxX: -16, minZ: -134, maxZ: -100.5 };
 export const ABBEY_GATE = { x: -53, z: -101 };
-export const CLOISTER = { x:-44, z:-108, w:24, d:9 };
-export const TOWER = { start:-32, count:24, run:.43, rise:.24, landing:3, z:-108, width:3.6 };
-const stairEnd = TOWER.start + TOWER.count*TOWER.run;
-export const arcadePiers = [-53,-48,-43,-38,-33].flatMap(x=>[-111,-105].map(z=>({x,z})));
-export const abbeySolids = [
-  ...arcadePiers.filter(p=>!(p.x===-53 && p.z===-105)).map(p=>({...p,w:.72,d:.72})),
-  ...[-1,1].map(side=>({x:(TOWER.start+stairEnd+TOWER.landing)/2,z:TOWER.z+side*(TOWER.width/2+.18),w:stairEnd+TOWER.landing-TOWER.start,d:.36})),
-  {x:stairEnd+TOWER.landing+.18,z:TOWER.z,w:.36,d:TOWER.width+.72}
-];
-export function stairHeight(x:number) {
-  return Math.min(TOWER.count,Math.max(0,1+Math.floor((x-TOWER.start)/TOWER.run)))*TOWER.rise;
+export const ABBEY_TRAIL = [{ x: -43, z: -70 }, { x: -51, z: -77 }, { x: -53, z: -86 }, { x: -53, z: -104 }];
+export const NAVE = { x: -53, z: -122, w: 14, d: 18, h: 8.5 };
+export const OSSUARY = { x: -63.8, z: -123, w: 7.6, d: 8, h: 3.6 };
+export const HALL = { x: -33.4, z: -122.5, w: 25.2, d: 4, h: 4.2 };
+export const TOWER = { start: -35, count: 24, run: .43, rise: .24, landing: 3.6, z: -122.5, width: 3.6 };
+const stairEnd = TOWER.start + TOWER.count * TOWER.run;
+export const BELFRY_TOP = TOWER.count * TOWER.rise;
+export const BELL = { x: stairEnd + TOWER.landing / 2, z: TOWER.z, y: BELFRY_TOP + 4.15 };
+export function stairHeight(x: number) {
+  return Math.min(TOWER.count, Math.max(0, 1 + Math.floor((x - TOWER.start) / TOWER.run))) * TOWER.rise;
 }
-export const ABBEY_GRAVES = Array.from({ length: 12 }, (_, i) => ({ x: -53 + (i % 2 ? 2.6 : -2.8), z: -81 - Math.floor(i / 2) * 3 }));
+export function onBelfry(p: Point, height: number) {
+  return p.x > stairEnd && p.x < stairEnd + TOWER.landing && Math.abs(p.z - TOWER.z) < TOWER.width / 2 && height >= BELFRY_TOP - .05;
+}
+type Wall = Rect & { h: number; kind: "outer" | "nave" | "ossuary" | "hall" | "stair" | "pier" | "parapet" | "pew" | "altar" };
+const wallX = (z: number, x1: number, x2: number, h: number, kind: Wall["kind"], t = .8): Wall => ({ x: (x1 + x2) / 2, z, w: Math.abs(x2 - x1), d: t, h, kind });
+const wallZ = (x: number, z1: number, z2: number, h: number, kind: Wall["kind"], t = .8): Wall => ({ x, z: (z1 + z2) / 2, w: t, d: Math.abs(z2 - z1), h, kind });
+const naveMin = { x: NAVE.x - NAVE.w / 2, z: NAVE.z - NAVE.d / 2 }, naveMax = { x: NAVE.x + NAVE.w / 2, z: NAVE.z + NAVE.d / 2 };
+export const ABBEY_WALLS: Wall[] = [
+  // Compound wall; the gatehouse towers (RUIN_WALLS) close the gap either side of the gate.
+  wallX(ABBEY.maxZ, ABBEY.minX, -58.5, 4.4, "outer"), wallX(ABBEY.maxZ, -47.5, ABBEY.maxX, 4.4, "outer"),
+  wallX(ABBEY.minZ, ABBEY.minX, ABBEY.maxX, 4.4, "outer"),
+  wallZ(ABBEY.minX, ABBEY.minZ, ABBEY.maxZ, 4.4, "outer"), wallZ(ABBEY.maxX, ABBEY.minZ, ABBEY.maxZ, 4.4, "outer"),
+  // Chapel nave: south door to the courtyard, west door to the ossuary, east opening to the sisters' walk.
+  wallX(naveMax.z, naveMin.x - .4, NAVE.x - 1.6, NAVE.h, "nave"), wallX(naveMax.z, NAVE.x + 1.6, naveMax.x + .4, NAVE.h, "nave"),
+  wallX(naveMin.z, naveMin.x - .4, naveMax.x + .4, NAVE.h, "nave"),
+  wallZ(naveMin.x, naveMin.z, -124.6, NAVE.h, "nave"), wallZ(naveMin.x, -121.4, naveMax.z, NAVE.h, "nave"),
+  wallZ(naveMax.x, naveMin.z, TOWER.z - TOWER.width / 2 - .2, NAVE.h, "nave"), wallZ(naveMax.x, TOWER.z + TOWER.width / 2 + .2, naveMax.z, NAVE.h, "nave"),
+  // Ossuary: a low bone chapel off the nave.
+  wallX(OSSUARY.z - OSSUARY.d / 2, OSSUARY.x - OSSUARY.w / 2, naveMin.x, OSSUARY.h, "ossuary", .6),
+  wallX(OSSUARY.z + OSSUARY.d / 2, OSSUARY.x - OSSUARY.w / 2, naveMin.x, OSSUARY.h, "ossuary", .6),
+  wallZ(OSSUARY.x - OSSUARY.w / 2, OSSUARY.z - OSSUARY.d / 2, OSSUARY.z + OSSUARY.d / 2, OSSUARY.h, "ossuary", .6),
+  // Sisters' walk: blind north wall, arcaded south side, then the enclosed belfry stair.
+  wallX(TOWER.z - TOWER.width / 2 - .2, naveMax.x, TOWER.start, HALL.h, "hall", .4),
+  wallX(TOWER.z - TOWER.width / 2 - .2, TOWER.start, stairEnd + TOWER.landing + .2, BELFRY_TOP + 5, "stair", .4),
+  wallX(TOWER.z + TOWER.width / 2 + .2, TOWER.start, stairEnd + TOWER.landing + .2, BELFRY_TOP + 5, "stair", .4),
+  wallZ(stairEnd + TOWER.landing + .2, TOWER.z - TOWER.width / 2 - .4, TOWER.z + TOWER.width / 2 + .4, BELFRY_TOP + 5, "stair", .4),
+  ...[naveMax.x + 2.75, naveMax.x + 5.5, naveMax.x + 8.25, TOWER.start].map(x => ({ x, z: TOWER.z + TOWER.width / 2 + .2, w: .7, d: .7, h: HALL.h, kind: "pier" as const })),
+  ...[0, 1, 2, 3].map(i => wallX(TOWER.z + TOWER.width / 2 + .2, naveMax.x + i * 2.75 + .35, naveMax.x + (i + 1) * 2.75 - .35, 1, "parapet", .4)),
+  // Pews either side of the nave aisle, and the altar.
+  ...[0, 1, 2, 3, 4, 5].flatMap(row => [-1, 1].map(side => ({ x: NAVE.x + side * 3.1, z: naveMax.z - 3.5 - row * 2, w: 3.2, d: .7, h: .95, kind: "pew" as const }))),
+  { x: NAVE.x, z: naveMin.z + 1.6, w: 3, d: 1.2, h: 1.1, kind: "altar" },
+  { x: OSSUARY.x - 2.4, z: OSSUARY.z, w: 1.1, d: 2.4, h: 1.05, kind: "altar" },
+];
+export const ABBEY_INTERIORS: Rect[] = [
+  { ...NAVE, w: NAVE.w - .8, d: NAVE.d - .8 }, { ...OSSUARY, w: OSSUARY.w - .6, d: OSSUARY.d - .6 },
+  { x: (naveMax.x + stairEnd + TOWER.landing) / 2, z: TOWER.z, w: stairEnd + TOWER.landing - naveMax.x, d: TOWER.width },
+];
+/** Where the Keeper may be standing while she stalks; yaw is the way she faces. */
+export const ABBEY_ANCHORS: (Point & { yaw: number })[] = [
+  { x: NAVE.x, z: naveMin.z + 2.9, yaw: 0 }, { x: naveMin.x + 1.2, z: naveMax.z - 1.2, yaw: 2.36 },
+  { x: naveMax.x + 1.4, z: TOWER.z, yaw: -Math.PI / 2 }, { x: OSSUARY.x - 2.5, z: OSSUARY.z + 2.8, yaw: Math.PI / 2 },
+  { x: -36.5, z: -105.5, yaw: -1.39 }, { x: -46.5, z: -103.2, yaw: -1.7 },
+  { x: TOWER.start + .4, z: TOWER.z, yaw: -Math.PI / 2 }, { x: -63.5, z: -106.5, yaw: 1.6 },
+];
+/** Whether the player is looking at a point (yaw 0 faces -z), within range and unobstructed. */
+export function facingPoint(player: Point, yaw: number, target: Point, range: number, cone = .8) {
+  const dx = target.x - player.x, dz = target.z - player.z, d = Math.hypot(dx, dz);
+  if (d < .01 || d > range) return false;
+  return (-Math.sin(yaw) * dx - Math.cos(yaw) * dz) / d > cone && lineOfSight(player, target);
+}
+
+/**
+ * Choose where the Keeper reappears: inside the compound, 6–16 m away, and
+ * preferably somewhere the player is not looking, so she is found by turning.
+ */
+export function pickAnchor(player: Point, yaw: number, current: number) {
+  const scored = ABBEY_ANCHORS.map((a, i) => {
+    const d = Math.hypot(a.x - player.x, a.z - player.z);
+    const seen = facingPoint(player, yaw, a, 40, .35);
+    const score = (i === current ? 100 : 0) + (d < 6 ? 50 : 0) + (d > 16 ? (d - 16) * 2 : 0) + (seen ? 20 : 0) + Math.abs(d - 9) * .3;
+    return { i, score };
+  }).sort((a, b) => a.score - b.score);
+  return scored[0].i;
+}
+
+/** Sisters' cemetery before the gate: four ranks either side of the trail. */
+export const ABBEY_GRAVES = [-5.4, -2.8, 2.8, 5.4].flatMap((dx, c) => [0, 1, 2, 3, 4, 5].map(r => ({ x: -53 + dx, z: -82 - r * 3 - (c % 2) * .6 })));
+export const RINGING_GRAVE = ABBEY_GRAVES.find(g => g.x === -50.2 && g.z === -91)!;
+export function insideAbbey(p: Point) {
+  return p.x > ABBEY.minX && p.x < ABBEY.maxX && p.z < ABBEY.maxZ - 1.5 && p.z > ABBEY.minZ;
+}
+/** 0 outdoors, 1 under the abbey roofs. Drives interior darkness, reverb and choir. */
+export function interiorAt(p: Point) {
+  let best = 0;
+  for (const r of ABBEY_INTERIORS) {
+    const edge = Math.min(r.w / 2 - Math.abs(p.x - r.x), r.d / 2 - Math.abs(p.z - r.z));
+    if (edge > -1.5) best = Math.max(best, Math.min(1, (edge + 1.5) / 2.5));
+  }
+  return best;
+}
+/** True when no tall abbey wall lies between two points. */
+export function lineOfSight(a: Point, b: Point) {
+  const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / .35);
+  for (let i = 1; i < steps; i++) {
+    const p = { x: a.x + (b.x - a.x) * i / steps, z: a.z + (b.z - a.z) * i / steps };
+    if (ABBEY_WALLS.some(w => w.h > 2 && insideRect(p, w, 0))) return false;
+  }
+  return true;
+}
 export const LANDMARKS: Landmark[] = [
   { id: "lantern", x: -2.6, z: 13, name: "The abandoned lantern", seal: "The watchman’s letter", text: "Mara's lantern is still warm. Beneath it, a note: ‘There were seven of us at sunset. I counted eight shadows. Follow the lamps north. Your chair is waiting beyond the chapel.’", hint: "Follow the lane to the old well." },
   { id: "well", x: 2.5, z: -3, name: "The old well", seal: "The well keeper’s key", text: "A rope disappears into the black water. Something below knocks three times. Carved into the stone: ‘The bell has no tongue. If you hear it, do not answer.’ A rusted iron key rests on the wet stone rim.", hint: "The council fire burns beyond the chapel. Keep heading north." },
@@ -40,6 +132,9 @@ export const LANDMARKS: Landmark[] = [
   { id: "temple", x: TEMPLE.x, z: TEMPLE.z + 3, name: "The moon temple", seal: "The broken moon seal", text: "Roots have split the sanctuary, but someone has replaced the candles. The stone reads: ‘We did not build this place to worship the moon. We built it to keep something beneath it.’ Between the broken pillars, your lantern casts one shadow too many.", hint: "Beyond the north gate, take the western trail to the ruined temple." },
   { id: "ruins", x: RUINS.x, z: RUINS.z + 2, name: "The abandoned settlement", seal: "The last household’s diary", text: "An unfinished meal. A child's empty chair. Every door was barred from the inside, yet no one remains. The diary ends with a single line: ‘Tonight the knocking came from underneath the floor.’", hint: "Follow the trail northeast of the council to the roofless houses." },
   { id: "falls", x: FALLS.x - 5, z: FALLS.z + 9, name: "The whispering falls", seal: "The river watcher’s charm", text: "The falling water almost sounds like voices. A silver charm hangs above the bank: ‘The water remembers every name. Never tell it yours.’ For a moment the mist takes the shape of someone you recognise.", hint: "Beyond the abandoned houses, follow the sound of water east." },
+  { id: "grave", x: RINGING_GRAVE.x - 1.4, z: RINGING_GRAVE.z, name: "The ringing grave", seal: "The cut bell-cord", text: "The soil is fresh, and the little bell above it will not stop trembling. The sisters here were buried with a cord in hand, so that anyone who woke beneath the earth could ring for help. The cross reads SISTER ODILE, KEEPER OF THE BELL. The cord has been cut clean. Someone heard her once, and made sure no one would hear her again.", hint: "Take the western fork past the temple. The sisters’ graves line the way to the abbey gate." },
+  { id: "register", x: NAVE.x, z: NAVE.z - 4.4, name: "The burial register", seal: "The abbey’s burial register", text: "Twelve sisters, each entered in the same careful hand: name, date, and the words ‘bell given’. The thirteenth line is Odile’s, written twice. Once in ink: ‘Buried at dusk.’ Once in candle soot, pressed hard enough to tear the page: ‘Still ringing.’ The tower bell has had no tongue since that night.", hint: "Inside the abbey chapel, a book lies open before the altar." },
+  { id: "clapper", x: OSSUARY.x - .8, z: OSSUARY.z, name: "The bell’s iron tongue", seal: "The iron clapper", text: "On an altar of stacked bones, wrapped in a novice’s veil, lies the clapper torn from the abbey bell. A note is pinned through the cloth: ‘She rings so she can come home. Do not give back her voice.’ It is heavier than it looks, and cold. You take it anyway. The stair to the belfry is east, along the sisters’ walk.", hint: "Through the chapel’s west door, the bone chapel keeps what the sisters hid." },
 ];
 
 /** Walkable ruin interiors: only individual walls, columns and the altar collide. */
@@ -90,9 +185,13 @@ export const GRAVEYARD = { minX: -32, maxX: -14, minZ: -45, maxZ: -16, gate: { f
 export const PADDOCK = { minX: -22, maxX: -16, minZ: 18, maxZ: 25 };
 
 export const DISTRICTS: District[] = [
-  {name:"The hollow belfry",x:-25,z:TOWER.z,w:14,d:4},
-  {name:"The ruined cloister",...CLOISTER},
-  { name: "Abbey of the Last Bell", x: -53, z: -92, w: 17, d: 34 },
+  { name: "The belfry stair", x: (TOWER.start + stairEnd + TOWER.landing) / 2, z: TOWER.z, w: stairEnd + TOWER.landing - TOWER.start, d: TOWER.width },
+  { name: "The sisters’ walk", x: (NAVE.x + NAVE.w / 2 + TOWER.start) / 2, z: TOWER.z, w: TOWER.start - NAVE.x - NAVE.w / 2, d: TOWER.width + 1 },
+  { name: "The bone chapel", ...OSSUARY },
+  { name: "The abbey chapel", ...NAVE },
+  { name: "The abbey courtyard", x: (ABBEY.minX + ABBEY.maxX) / 2, z: -107, w: ABBEY.maxX - ABBEY.minX, d: 13 },
+  { name: "Abbey of the Last Bell", x: (ABBEY.minX + ABBEY.maxX) / 2, z: (ABBEY.minZ + ABBEY.maxZ) / 2, w: ABBEY.maxX - ABBEY.minX, d: ABBEY.maxZ - ABBEY.minZ },
+  { name: "The sisters’ graves", x: -53, z: -89.5, w: 16, d: 20 },
   { name: "The whispering falls", x: 43, z: -88, w: 26, d: 28 },
   { name: "The moon temple", x: -29, z: -87, w: 25, d: 28 },
   { name: "The abandoned settlement", x: 15, z: -73, w: 26, d: 20 },
@@ -207,7 +306,8 @@ for (let i = 0; i < 1300; i++) {
   const x = BOUNDS.minX + 3 + seeded(i, 81) * (BOUNDS.maxX - BOUNDS.minX - 6);
   const z = BOUNDS.minZ + 3 + seeded(i, 82) * (BOUNDS.maxZ - BOUNDS.minZ - 6);
   const p = { x, z };
-  if(x>-59 && x<-15 && z<-102) continue;
+  if (x > ABBEY.minX - 4 && x < ABBEY.maxX + 4 && z < ABBEY.maxZ + 3) continue;
+  if (x > -62 && x < -44 && z < -78 && z > -100) continue; // the sisters' cemetery
   if (x > VILLAGE_BOUNDS.minX - 4 && x < VILLAGE_BOUNDS.maxX + 4 && z > VILLAGE_BOUNDS.minZ - 3) continue;
   if (STREETS.some(s => s.points.some((b, j) => j > 0 && distanceToSegment(p, s.points[j - 1], b) < s.width / 2 + 3))) continue;
   if (Math.hypot(x - TEMPLE.x, z - TEMPLE.z) < 12 || Math.hypot(x - FALLS.x, z - FALLS.z) < 16 || Math.hypot(x - RUINS.x, z - RUINS.z) < 14) continue;
@@ -215,8 +315,12 @@ for (let i = 0; i < 1300; i++) {
   FOREST_TREES.push({ x, z, radius: .5, height: 10 + seeded(i, 83) * 9, dead: seeded(i, 84) < .24 });
 }
 
-export function forestHint(p: Point): string {
-  if(p.z < -103 && p.x > -57 && p.x < -18) return p.x < -32 ? "Turn east through the cloister. Follow the arches to the belfry stairs." : "Climb to the cut rope. Return west to the cloister and south through the gate.";
+export function forestHint(p: Point, found: readonly string[] = []): string {
+  if (insideAbbey(p) || (p.x < -44 && p.z < -78)) {
+    if (!found.includes("register")) return "Go through the gate and into the chapel. Something is written in the book before the altar.";
+    if (!found.includes("clapper")) return "The bell has no tongue. Search the bone chapel through the west door of the nave.";
+    return "Carry the clapper east along the sisters’ walk and climb to the belfry. Ring the bell, and keep your lantern on whatever answers.";
+  }
   if (p.z > -43) return "Follow the lamps north to the council. The forest trails beyond are optional.";
   if (p.z > -63) return "Beyond the broken gate: temple to the west, abandoned houses and waterfall to the east. Council fire is south.";
   return "The western trail forks toward the Abbey of the Last Bell. Follow the lamps south to return to the council.";
@@ -242,8 +346,9 @@ const PROP_TOP: Partial<Record<PropKind, number>> = { bucket: .45, crate: .9, cr
 
 /** Tops of low, vaultable objects. Buildings, water and the palisade stay solid. */
 export function supportHeightAt(p: Point): number {
-  if(p.x>=TOWER.start && p.x<=stairEnd+TOWER.landing && Math.abs(p.z-TOWER.z)<=TOWER.width/2) return stairHeight(p.x);
+  if (p.x >= TOWER.start && p.x <= stairEnd + TOWER.landing && Math.abs(p.z - TOWER.z) <= TOWER.width / 2) return stairHeight(p.x);
   let height = 0;
+  for (const w of ABBEY_WALLS) if (w.h <= 1.5 && insideRect(p, w, .3)) height = Math.max(height, w.h);
   if (FENCES.some(f => insideRect(p, f, .3))) height = 1.2;
   if (WALLS.some(w => insideRect(p, w, .3))) height = Math.max(height, 1.25);
   for (const w of RUIN_WALLS) if (w.h <= 1.5 && insideRect(p, w, .3)) height = Math.max(height, w.h);
@@ -253,8 +358,10 @@ export function supportHeightAt(p: Point): number {
 }
 
 export function canWalk(p: Point, obstacles: readonly Obstacle[] = [], footHeight = 0): boolean {
-  if(p.z < -102 && abbeySolids.some(r=>insideRect(p,r,.3))) return false;
-  if (p.x < -48 && footHeight < 1.15 && ABBEY_GRAVES.some(g => Math.abs(g.x-p.x)<.7 && Math.abs(g.z-p.z)<.55)) return false;
+  if (p.z < -78 && p.x < -14) {
+    if (ABBEY_WALLS.some(w => insideRect(p, w, .3) && (w.h > 1.5 || footHeight < w.h))) return false;
+    if (footHeight < 1.15 && ABBEY_GRAVES.some(g => Math.abs(g.x - p.x) < .7 && Math.abs(g.z - p.z) < .55)) return false;
+  }
   if (obstacles.some(o => Math.hypot(p.x - o.x, p.z - o.z) < o.radius + .3)) return false;
   if (p.x < BOUNDS.minX || p.x > BOUNDS.maxX || p.z > BOUNDS.maxZ || p.z < BOUNDS.minZ) return false;
   if (RUIN_WALLS.some(w => insideRect(p, w, .3) && (w.h > 1.5 || footHeight < w.h))) return false;

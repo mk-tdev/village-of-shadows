@@ -6,27 +6,80 @@ import { advanceJump, groundedJump, cameraDistance, followCameraHeight, RUN_SPEE
 import { supportHeightAt } from "../lib/exploration/world.ts";
 
 const encounterInput = { playing: true, trigger: false, warding: false, distance: 5, escaped: false };
-test('gatehouse opens onto a clear cloister aisle and a continuous two-way belfry stair', async () => {
-  const { TOWER:s }=await import('../lib/exploration/world.ts');
-  for(let z=-101;z>=s.z;z-=.1) assert.ok(canWalk({x:-53,z}));
-  let h=0;
-  for(let x=-53;x<s.start+s.count*s.run+s.landing-.3;x+=.08){
-    const p={x,z:s.z}; assert.ok(canWalk(p,[],h));
-    const next=supportHeightAt(p); assert.ok(next>=h && next-h<=s.rise+.001); h=next;
+test('abbey: gate, courtyard, nave, bone chapel and the walk to the belfry stair are connected', async () => {
+  const { ABBEY_GATE, NAVE, OSSUARY, TOWER: s, BELFRY_TOP, onBelfry } = await import('../lib/exploration/world.ts');
+  const walk = (from, to) => { let p = from; for (let i = 0; i < 400; i++) { const dx = to.x - p.x, dz = to.z - p.z, d = Math.hypot(dx, dz); if (d < .2) break; p = movePlayer(p, dx / d * .1, dz / d * .1); } return p; };
+  const near = (p, q) => Math.hypot(p.x - q.x, p.z - q.z) < .3;
+  // Through the gate, across the courtyard, in at the south door and up the aisle.
+  const door = { x: NAVE.x, z: NAVE.z + NAVE.d / 2 - 1 };
+  for (const path of [
+    [{ x: ABBEY_GATE.x, z: -98 }, { x: ABBEY_GATE.x, z: -110 }, door, { x: NAVE.x, z: NAVE.z - 4.4 }],
+    [door, { x: NAVE.x - 5.8, z: door.z }, { x: NAVE.x - 5.8, z: OSSUARY.z }, { x: OSSUARY.x - .8, z: OSSUARY.z }],
+    [door, { x: NAVE.x + 5.8, z: door.z }, { x: NAVE.x + 5.8, z: s.z }, { x: s.start - .3, z: s.z }],
+  ]) {
+    let p = path[0];
+    for (const b of path.slice(1)) { p = walk(p, b); assert.ok(near(p, b), `blocked on the way to ${JSON.stringify(b)} at ${JSON.stringify(p)}`); }
   }
-  assert.equal(h,s.count*s.rise);
-  assert.equal(canWalk({x:s.start+5,z:s.z+s.width/2+.18},[],h),false);
+  // The stair climbs in steps no taller than a riser, to a landing where the bell can be rung.
+  let h = 0;
+  for (let x = s.start - .3; x < s.start + s.count * s.run + s.landing - .4; x += .08) {
+    const p = { x, z: s.z }; assert.ok(canWalk(p, [], h));
+    const next = supportHeightAt(p); assert.ok(next >= h && next - h <= s.rise + .001); h = next;
+  }
+  assert.equal(h, BELFRY_TOP);
+  assert.ok(onBelfry({ x: s.start + s.count * s.run + 1, z: s.z }, h));
+  assert.ok(!onBelfry({ x: s.start + s.count * s.run + 1, z: s.z }, 0));
+  // Walls are solid: no walking through the nave wall or out of the stair.
+  assert.equal(canWalk({ x: NAVE.x + NAVE.w / 2, z: NAVE.z + 6 }), false);
+  assert.equal(canWalk({ x: s.start + 5, z: s.z + s.width / 2 + .2 }, [], 3), false);
 });
-test('optional western fork is walkable both ways through the cemetery and gate', async () => {
-  const { ABBEY_TRAIL, ABBEY_GATE, ABBEY_GRAVES } = await import('../lib/exploration/world.ts');
-  const route = [{x:-29,z:-78}, ...ABBEY_TRAIL];
-  for(let j=1;j<route.length;j++) for(let i=0;i<=80;i++) {
-    const a=route[j-1], b=route[j], t=i/80;
-    assert.ok(canWalk({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t}));
+test('abbey: the cemetery trail is walkable both ways and graves block', async () => {
+  const { ABBEY_TRAIL, ABBEY_GATE, ABBEY_GRAVES, RINGING_GRAVE } = await import('../lib/exploration/world.ts');
+  const route = [{ x: -29, z: -78 }, ...ABBEY_TRAIL];
+  for (let j = 1; j < route.length; j++) for (let i = 0; i <= 80; i++) {
+    const a = route[j - 1], b = route[j], t = i / 80;
+    assert.ok(canWalk({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }));
   }
-  for(const grave of ABBEY_GRAVES) assert.equal(canWalk(grave),false);
-  assert.equal(canWalk({x:ABBEY_GATE.x+4,z:ABBEY_GATE.z}),false);
-  assert.ok(atCouncil(COUNCIL_SEAT));
+  for (const grave of ABBEY_GRAVES) assert.equal(canWalk(grave), false);
+  assert.ok(ABBEY_GRAVES.includes(RINGING_GRAVE));
+  assert.equal(canWalk({ x: ABBEY_GATE.x + 4, z: ABBEY_GATE.z }), false);
+});
+test('abbey: walls block sight, interiors are dark, and hints follow the story', async () => {
+  const { NAVE, lineOfSight, interiorAt, forestHint } = await import('../lib/exploration/world.ts');
+  assert.equal(lineOfSight({ x: NAVE.x, z: NAVE.z }, { x: NAVE.x + 12, z: NAVE.z + 4 }), false);
+  assert.ok(lineOfSight({ x: NAVE.x, z: NAVE.z + 6 }, { x: NAVE.x, z: NAVE.z - 6 }));
+  assert.equal(interiorAt({ x: NAVE.x, z: NAVE.z }), 1);
+  assert.equal(interiorAt({ x: -40, z: -106 }), 0);
+  const p = { x: NAVE.x, z: NAVE.z };
+  assert.match(forestHint(p, []), /chapel/);
+  assert.match(forestHint(p, ['register']), /bone chapel/);
+  assert.match(forestHint(p, ['register', 'clapper']), /belfry/);
+});
+test('abbey story: stalk, vanish when lit, ring, hunt, banish or be caught; pause freezes', async () => {
+  const { newAbbey, advanceAbbey, ABBEY_TIMING } = await import('../lib/exploration/abbey-story.ts');
+  const { pickAnchor } = await import('../lib/exploration/world.ts');
+  const base = { playing: true, inside: false, lit: false, distance: 9, ring: false, escaped: false, nextAnchor: () => 2 };
+  const run = (s, seconds, o = {}) => { for (let i = 0; i < Math.ceil(seconds / .05); i++) s = advanceAbbey(s, .05, { ...base, ...o }); return s; };
+  let s = run(newAbbey(), 1);
+  assert.equal(s.phase, 'dormant');
+  s = run(s, .05, { inside: true });
+  assert.equal(s.phase, 'stalking'); assert.equal(s.anchor, 2);
+  const lit = run(s, ABBEY_TIMING.reveal + .1, { inside: true, lit: true });
+  assert.equal(lit.sightings, 1); assert.ok(lit.hidden > 0);
+  const back = run(lit, ABBEY_TIMING.hide + .1, { inside: true, nextAnchor: () => 5 });
+  assert.equal(back.hidden, 0); assert.equal(back.anchor, 5);
+  assert.deepEqual(run(lit, 30, { playing: false }), lit);
+  let hunt = run(run(s, .05, { ring: true }), ABBEY_TIMING.tolling + .1);
+  assert.equal(hunt.phase, 'hunting');
+  assert.equal(run(hunt, ABBEY_TIMING.ward + .1, { lit: true }).phase, 'banished');
+  assert.equal(run(hunt, .05, { distance: .5 }).phase, 'caught');
+  assert.equal(run(hunt, .05, { distance: .5, lit: true }).phase, 'hunting');
+  assert.equal(run(hunt, .05, { escaped: true }).phase, 'stalking');
+  const caught = run(hunt, .05, { distance: .5 });
+  assert.deepEqual(run(caught, 10, { lit: true }), caught);
+  // She never reappears right beside you or at the anchor you just saw.
+  const a = pickAnchor({ x: -53, z: -128 }, 0, 0);
+  assert.notEqual(a, 0);
 });
 const tick = (state, seconds, overrides = {}) => {
   for (let i = 0; i < Math.ceil(seconds / .05); i++) state = advanceEncounter(state, .05, { ...encounterInput, ...overrides });
@@ -243,7 +296,7 @@ test('water, cliffs, ruin walls, columns and visible forest trunks block walking
 
 test('new optional discoveries restore alongside old saves and can each be collected once', () => {
   const ids = LANDMARKS.map(l => l.id);
-  assert.equal(ids.length, 6);
+  assert.equal(ids.length, 9);
   assert.deepEqual(restoreSeals(JSON.stringify([...ids, ...ids, 'unknown'])), ids);
   for (const l of LANDMARKS.slice(3)) {
     assert.ok(canWalk(l));

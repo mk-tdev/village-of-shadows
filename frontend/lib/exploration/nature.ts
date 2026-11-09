@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { Assets, ModelName } from "./assets";
 import { modelParts } from "./assets";
-import { BOUNDS, BUILDINGS, CHAPEL, COUNCIL, MARKET, POND, FALLS, RUINS, FOREST_TREES, STREETS, canWalk, surfaceAt, type Point } from "./world";
+import { ABBEY_WALLS, interiorAt, BOUNDS, BUILDINGS, CHAPEL, COUNCIL, MARKET, POND, FALLS, RUINS, FOREST_TREES, STREETS, canWalk, surfaceAt, type Point } from "./world";
 
 const seeded = (i: number, salt = 1) => ((Math.sin(i * 127.1 + salt * 311.7) * 43758.5453) % 1 + 1) % 1;
 const hash = (x: number, z: number) => seeded(Math.floor(x) * 57 + Math.floor(z) * 131, 9);
@@ -181,6 +181,7 @@ function grassClump() {
 }
 
 function onRoad(x: number, z: number) {
+  if (interiorAt({ x, z }) > 0 || ABBEY_WALLS.some(w => Math.abs(x - w.x) < w.w / 2 + .3 && Math.abs(z - w.z) < w.d / 2 + .3)) return true;
   if (Math.hypot(x - FALLS.x, z - FALLS.z) < 16 || Math.hypot(x - RUINS.x, z - RUINS.z) < 12) return true;
   if (Math.hypot(x - POND.x, z - POND.z) < POND.radius + .6) return true;
   const s = surfaceAt({ x, z });

@@ -50,7 +50,7 @@ area is more than three times its previous size. Open **Map & journal** with
   falls from a rocky cliff into a misty pool. The water gets louder as you
   approach. Examine the charm on the bank; the pool and cliff are impassable.
 
-All three discoveries are optional. Follow the lantern trail south to the
+All discoveries are optional, including the three at the abbey. Follow the lantern trail south to the
 council; you do not need to restart or finish the journal to begin the AI game.
 
 Villagers still awake turn to watch you. When **Speak with …** appears, press
@@ -61,6 +61,42 @@ Sound is positional; headphones help. The fire, forge, mill and creature come
 from where they stand, and footsteps change on cobbles, mud, grass and wood.
 Distant lightning is followed by thunder. Reduced motion turns lightning, rain,
 grain and camera sway off.
+
+## The Abbey of the Last Bell
+
+From the moon temple, the western trail forks north-west to a walled abbey.
+On the intro screen, **Take me to the abbey** starts you at that fork. This is
+an optional, self-contained horror chapter; nothing in it affects the council.
+
+1. **The sisters’ graves.** The trail runs between rows of graves. Some carry a
+   small bell on a post, with its cord running down into the soil, and they
+   ring as you pass. One grave is fresh, and its bell will not stop moving.
+   Examine it for the first discovery.
+2. **The gate.** A sister hangs from the beam inside the gate arch. Once you
+   step into the courtyard, look back.
+3. **The chapel.** Go in by the south door. The burial register lies open on
+   a lectern before the altar.
+4. **The bone chapel.** Through the west door of the nave is a low ossuary
+   lined with skulls. The bell’s missing iron clapper rests on its altar.
+5. **The belfry.** Take the east opening of the nave along the sisters’ walk
+   and climb the stair. With the clapper in hand, **E** restores it and rings
+   the bell.
+
+While you search, a veiled sister with a lantern (the Keeper) appears at the
+far end of rooms and corridors. Hold your lit lantern on her and she vanishes,
+only to appear again somewhere you are not looking. She cannot hurt you until
+the bell rings.
+
+When it rings, every grave bell answers and the Keeper comes up the stair. Face
+her with your lantern lit and hold the light on her until the meter fills; she
+breaks apart into crows and your journal gains a witness account. If she
+reaches you while your light is off or turned away, you return to the belfry
+to try again. Leaving the abbey also ends the chase; she goes back to stalking
+and the bell can be rung again.
+
+Inside the abbey the sky no longer lights you: only candles and your lantern
+do. Sound changes too, with a longer echo, muffled rain and a wordless choir
+under the roofs.
 
 ## The watchman’s hunger
 

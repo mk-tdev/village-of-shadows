@@ -9,9 +9,23 @@ import { VillageAudio } from "@/lib/exploration/audio";
 import { TRAVELLERS, type CameraView, type TravellerName } from "@/lib/exploration/traveller";
 import { LANDMARKS, SPAWN, STREETS, COUNCIL, BOUNDS, forestHint, restoreSeals, type Landmark } from "@/lib/exploration/world";
 import { ENCOUNTER_COPY, encounterActive, type EncounterPhase } from "@/lib/exploration/encounter";
+import type { AbbeyCue } from "@/lib/exploration/abbey";
+
+const ABBEY_NOTICES: Partial<Record<AbbeyCue, string>> = {
+  crows: "Crows burst from the headstones and wheel toward the abbey.",
+  bell: "A grave bell rings once. Its cord runs down into the soil.",
+  rope: "Behind you, the rope at the gate is swinging empty.",
+  vanish: "Your light found her, and she was gone.",
+  ring: "The bell speaks for the first time in years. Out in the cemetery, every grave answers.",
+};
+const ABBEY_COPY = {
+  tolling: { title: "Every grave is ringing.", text: "Something is coming up the stair." },
+  hunting: { title: "The Keeper has come for her voice.", text: "Face her with your lantern lit until she breaks. Do not let her reach you in the dark." },
+  witness: { title: "The last bell", text: "I rang the bell, and the graves rang back. A sister in black came up the stair carrying a lantern no flame had lit. When my light held her, she came apart into crows. The rope at the gate is still swinging." },
+};
 import styles from "./exploration.module.css";
 
-type Mode = "intro" | "playing" | "paused" | "journal" | "clue" | "complete" | "restart" | "caught" | "traveller";
+type Mode = "intro" | "playing" | "paused" | "journal" | "clue" | "complete" | "restart" | "caught" | "abbeyCaught" | "traveller";
 const STORAGE_KEY = "village:prologue:seals:v1";
 const DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
@@ -58,10 +72,11 @@ export default function ExplorationExperience() {
   const [storageBlocked, setStorageBlocked] = useState(false);
   const [encounter, setEncounter] = useState<EncounterPhase>("waiting");
   const [witnessed, setWitnessed] = useState(false);
-  const [snapshot, setSnapshot] = useState<SceneSnapshot>({ point: SPAWN, bearing: 0, nearby: null, council: false, moving: false, encounter: "waiting", ward: 0, district: "The village threshold", villager: null, loading: 0 });
+  const [abbeyWitnessed, setAbbeyWitnessed] = useState(false);
+  const [snapshot, setSnapshot] = useState<SceneSnapshot>({ point: SPAWN, bearing: 0, nearby: null, council: false, moving: false, encounter: "waiting", ward: 0, district: "The village threshold", villager: null, loading: 0, abbey: { phase: "dormant", ward: 0, bell: null } });
   const playing = mode === "playing";
   const target = LANDMARKS.find(l => l.id === snapshot.nearby);
-  const objectiveHint = snapshot.point.z < -43 ? forestHint(snapshot.point) : snapshot.point.z > -22 ? "Follow the lamps north, past the well and chapel. The forest beyond the council is yours to explore." : "Take the empty chair by the fire to choose your players, or continue north through the broken gate into the forest.";
+  const objectiveHint = snapshot.point.z < -43 ? forestHint(snapshot.point, found) : snapshot.point.z > -22 ? "Follow the lamps north, past the well and chapel. The forest beyond the council is yours to explore." : "Take the empty chair by the fire to choose your players, or continue north through the broken gate into the forest.";
   const bearing = DIRECTIONS[Math.round(snapshot.bearing / 45) % 8];
   const location = snapshot.district;
 
@@ -82,6 +97,11 @@ export default function ExplorationExperience() {
   const interact = useCallback(() => {
     if (mode !== "playing") return;
     if (snapshot.council) { void takeSeat(); return; }
+    if (snapshot.abbey.bell && !snapshot.nearby) {
+      if (snapshot.abbey.bell === "ring") sceneRef.current?.ringBell();
+      else setNotice("The bell hangs silent. Its iron tongue was torn out, and someone hid it.");
+      return;
+    }
     if (snapshot.villager && !snapshot.nearby) { audioRef.current?.speak(); setNotice(`${snapshot.villager.name[0].toUpperCase()}${snapshot.villager.name.slice(1)}: ${snapshot.villager.line}`); return; }
     const landmark = LANDMARKS.find(l => l.id === snapshot.nearby);
     if (!landmark || found.includes(landmark.id)) return;
@@ -90,7 +110,7 @@ export default function ExplorationExperience() {
     audioRef.current?.discovery();
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); }
     catch { setStorageBlocked(true); setNotice("Your journal will be kept for this visit."); }
-  }, [found, mode, snapshot.council, snapshot.nearby, snapshot.villager, takeSeat]);
+  }, [found, mode, snapshot.council, snapshot.nearby, snapshot.villager, snapshot.abbey.bell, takeSeat]);
 
   const actions = useRef({ interact, playing });
   useEffect(() => { actions.current = { interact, playing }; }, [interact, playing]);
@@ -116,7 +136,10 @@ export default function ExplorationExperience() {
         spatial: (player, yaw, wolf) => audioRef.current?.spatial(player, yaw, wolf),
         abbey: (cue, source) => {
           audioRef.current?.abbey(cue, source);
-          setNotice({ crows: "The crows scatter toward the tower.", bell: "A cord pulls tight beneath the soil.", chain: "Overhead, the chain goes quiet.", toll: "The bell has no tongue. The toll comes from beneath your feet." }[cue]);
+          const line = ABBEY_NOTICES[cue];
+          if (line) setNotice(line);
+          if (cue === "banished") { setAbbeyWitnessed(true); setNotice("She came apart into crows. The abbey is quiet. Your journal holds what you saw."); }
+          if (cue === "caught") setMode("abbeyCaught");
         },
         omen: () => { audioRef.current?.whisper(); audioRef.current?.bell(); setNotice("You are certain someone was standing there."); },
         encounter: phase => {
@@ -175,12 +198,12 @@ export default function ExplorationExperience() {
   }
 
   function restart() {
-    setFound([]); setClue(null); setNotice(""); setLantern(true); setWitnessed(false);
+    setFound([]); setClue(null); setNotice(""); setLantern(true); setWitnessed(false); setAbbeyWitnessed(false);
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* In-memory reset still works. */ }
     sceneRef.current?.reset(); resume();
   }
 
-  return <main className={styles.experience} data-mode={mode} data-reduced-motion={reducedMotion} data-encounter={encounter}
+  return <main className={styles.experience} data-mode={mode} data-reduced-motion={reducedMotion} data-encounter={snapshot.abbey.phase === "hunting" ? "hunting" : encounter}
     onContextMenuCapture={event => { if (event.target instanceof Element && event.target.closest("button")) event.preventDefault(); }}
     onDragStartCapture={event => { if (event.target instanceof Element && event.target.closest("button")) event.preventDefault(); }}>
     <canvas ref={canvasRef} className={styles.canvas} tabIndex={0} aria-label="Explore the village. W A S D to walk, Shift to run, Space to jump, V to switch camera, arrow left and right to turn, E to examine, F for lantern, J for journal. Drag to look or click nearby ground to walk." />
@@ -215,6 +238,10 @@ export default function ExplorationExperience() {
         <span>The watchman’s hunger</span><h2>{ENCOUNTER_COPY[encounter].title}</h2><p>{ENCOUNTER_COPY[encounter].text}</p>
         {encounter === "hunting" && <div className={styles.ward}><span>{snapshot.ward > 0 ? "Hold the light on it" : "Face the creature · keep the lantern lit"}</span><meter min="0" max="1" value={snapshot.ward} aria-label="Lantern protection" /></div>}
       </aside>}
+      {(snapshot.abbey.phase === "tolling" || snapshot.abbey.phase === "hunting") && <aside className={styles.encounter} role="status" aria-live="polite">
+        <span>The Abbey of the Last Bell</span><h2>{ABBEY_COPY[snapshot.abbey.phase].title}</h2><p>{ABBEY_COPY[snapshot.abbey.phase].text}</p>
+        {snapshot.abbey.phase === "hunting" && <div className={styles.ward}><span>{snapshot.abbey.ward > 0 ? "Hold the light on her" : "Face her · keep the lantern lit"}</span><meter min="0" max="1" value={snapshot.abbey.ward} aria-label="Lantern protection" /></div>}
+      </aside>}
       <aside className={styles.objective} aria-label="Current objective">
         <span className={styles.location}>{t(location)}</span>
         <h1>{snapshot.council ? t("Take the empty chair") : snapshot.point.z < -43 ? "Beyond the last lantern" : t("Find the council fire")}</h1>
@@ -223,7 +250,7 @@ export default function ExplorationExperience() {
         <button className={styles.journalButton} onClick={() => setMode("journal")}>Map & journal <kbd>J</kbd></button>
       </aside>
       <div className={styles.interaction}>
-        {playing && (target || snapshot.council || snapshot.villager) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : target ? `Examine ${target.name.toLowerCase()}` : `Speak with ${snapshot.villager?.name}`}</button> : <span className={styles.walkHint}>W A S D · walk <i /> Shift · run <i /> Space · jump <i /> Drag · look</span>}
+        {playing && (target || snapshot.council || snapshot.villager || snapshot.abbey.bell) ? <button onClick={interact} className={styles.interactButton}><kbd>E</kbd>{snapshot.council ? t("Sit down & choose players") : target ? `Examine ${target.name.toLowerCase()}` : snapshot.abbey.bell === "ring" ? "Restore the clapper & ring the bell" : snapshot.abbey.bell === "silent" ? "Examine the silent bell" : `Speak with ${snapshot.villager?.name}`}</button> : <span className={styles.walkHint}>W A S D · walk <i /> Shift · run <i /> Space · jump <i /> Drag · look</span>}
       </div>
       <div className={styles.lanternControl}><button onClick={() => setLantern(value => !value)} aria-pressed={lantern}><LanternIcon /><span>Lantern {lantern ? "lit" : "unlit"}</span><kbd>F</kbd></button></div>
       <div className={styles.travelControls} aria-label="Traveller controls">
@@ -262,17 +289,19 @@ export default function ExplorationExperience() {
     {!failed && mode === "journal" && <Modal title="Your journal" onClose={resume} focusTop>
       <span className={styles.chapter}>Things worth remembering</span><h2>A record of the night.</h2><p>{found.length} of {LANDMARKS.length} optional keepsakes discovered. {storageBlocked ? "Your discoveries are kept for this visit; device storage is unavailable." : "Your discoveries are saved on this device."}</p>
       <figure className={styles.trailMap}>
-        <svg viewBox={`${BOUNDS.minX - 5} ${BOUNDS.minZ - 8} ${BOUNDS.maxX - BOUNDS.minX + 10} ${BOUNDS.maxZ - BOUNDS.minZ + 16}`} role="img" aria-label="Trail map: temple northwest, abandoned houses northeast, waterfall east. Your position is the white arrow. The council is south of the forest gate.">
-          <text x="-62" y="-111" className={styles.mapNorth}>N ↑</text>
-          <text x="-52" y="-102">Abbey gate</text>
+        <svg viewBox={`${BOUNDS.minX - 5} ${BOUNDS.minZ - 8} ${BOUNDS.maxX - BOUNDS.minX + 10} ${BOUNDS.maxZ - BOUNDS.minZ + 16}`} role="img" aria-label="Trail map: temple and abbey northwest, abandoned houses northeast, waterfall east. Your position is the white arrow. The council is south of the forest gate.">
+          <text x="-66" y={BOUNDS.minZ + 4} className={styles.mapNorth}>N ↑</text>
+          <rect x="-68" y="-134" width="52" height="33.5" fill="none" stroke="#857356" strokeWidth=".6" strokeDasharray="1.5 1" />
+          <text x="-40" y="-110">Abbey</text>
           {STREETS.map((s, i) => <polyline key={i} points={s.points.map(p => `${p.x},${p.z}`).join(" ")} fill="none" stroke="#857356" strokeWidth={s.width * .45} strokeLinecap="round" />)}
-          {LANDMARKS.map(l => <g key={l.id}><circle cx={l.x} cy={l.z} r="1.8" fill={found.includes(l.id) ? "#e6b974" : "#788f85"} /><text x={l.x + 3} y={l.z - 3}>{({ lantern: "Gate", well: "Well", chapel: "Chapel", temple: "Temple", ruins: "Ruins", falls: "Falls" })[l.id]}</text></g>)}
+          {LANDMARKS.map(l => <g key={l.id}><circle cx={l.x} cy={l.z} r="1.8" fill={found.includes(l.id) ? "#e6b974" : "#788f85"} /><text x={l.x + 3} y={l.z - 3}>{({ lantern: "Gate", well: "Well", chapel: "Chapel", temple: "Temple", ruins: "Ruins", falls: "Falls", grave: "Graves", register: "Abbey", clapper: "Bones" } as Record<string, string>)[l.id]}</text></g>)}
           <circle cx={COUNCIL.x} cy={COUNCIL.z} r="2" fill="#eea052" /><text x={COUNCIL.x + 4} y={COUNCIL.z + 1}>Council</text>
           <path d="M0,-3 L2,2 L0,1 L-2,2 Z" transform={`translate(${snapshot.point.x} ${snapshot.point.z}) rotate(${snapshot.bearing})`} fill="#fff5df" stroke="#fff5df" strokeWidth=".5" />
         </svg>
         <figcaption>Your lantern marks your position. All discoveries are optional; the council is always your way into the game.</figcaption>
       </figure>
       <ol className={styles.journalList}>{LANDMARKS.map((l, i) => <li key={l.id} data-found={found.includes(l.id)}><span>0{i + 1}</span><div><h3>{found.includes(l.id) ? l.seal : l.name}</h3><p>{found.includes(l.id) ? l.text : l.hint}</p></div></li>)}</ol>
+      {abbeyWitnessed && <section className={styles.witness}><span className={styles.chapter}>Witness account · this visit</span><h3>{ABBEY_COPY.witness.title}</h3><p>{ABBEY_COPY.witness.text}</p></section>}
       {witnessed && <section className={styles.witness}><span className={styles.chapter}>Witness account · this visit</span><h3>{ENCOUNTER_COPY.aftermath.title}</h3><p>{ENCOUNTER_COPY.aftermath.text}</p></section>}
       <button className={styles.primary} autoFocus onClick={resume}>Close journal <span>→</span></button>
     </Modal>}
@@ -290,6 +319,9 @@ export default function ExplorationExperience() {
     </Modal>}
 
     {!failed && mode === "restart" && <Modal title="Restart the prologue" onClose={() => setMode("paused")}><h2>Walk into the night again?</h2><p>This clears the {LANDMARKS.length} optional discoveries from your local journal and returns you to the entrance.</p><button className={styles.primary} onClick={restart}>Begin again <span>↻</span></button><button className={styles.textLink} autoFocus onClick={() => setMode("paused")}>Keep my discoveries</button></Modal>}
+    {!failed && mode === "abbeyCaught" && <Modal title="The Keeper reached you" onClose={() => { sceneRef.current?.retryAbbey(); setLantern(true); resume(); }}>
+      <span className={styles.chapter}>The Abbey of the Last Bell</span><h2>Your light went out.</h2><p>Cold hands closed over the lantern. When you can see again you are standing in the belfry, and something is starting up the stair.</p><p>Turn to face the stair with your lantern lit and hold the light on her until she breaks.</p><button className={styles.primary} autoFocus onClick={() => { sceneRef.current?.retryAbbey(); setLantern(true); resume(); }}>Stand in the belfry again <span>↻</span></button><Link className={styles.textLink} href="/setup">Escape to the council →</Link>
+    </Modal>}
     {!failed && mode === "caught" && <Modal title="The creature found you" onClose={() => { sceneRef.current?.retryEncounter(); setLantern(true); resume(); }}>
       <span className={styles.chapter}>The watchman’s hunger</span><h2>{ENCOUNTER_COPY.caught.title}</h2><p>{ENCOUNTER_COPY.caught.text}</p><p>Keep the creature in front of you with your lantern lit until it retreats. You can also run: hold Shift while walking.</p><button className={styles.primary} autoFocus onClick={() => { sceneRef.current?.retryEncounter(); setLantern(true); resume(); }}>Return to the lane <span>↻</span></button><Link className={styles.textLink} href="/setup">Escape to the council →</Link>
     </Modal>}

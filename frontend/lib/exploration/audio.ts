@@ -52,6 +52,21 @@ export class VillageAudio {
       }
       convolver.buffer = ir;
       this.reverbIn = c.createGain(); this.reverbIn.connect(convolver).connect(this.buses.reverb);
+      // A wordless choir: detuned voices through "ah" vowel formants, heard only indoors.
+      this.choir = c.createGain(); this.choir.gain.value = 0;
+      const formants = [[730, 1, 6], [1090, .5, 8], [2440, .25, 10]].map(([f, g, q]) => {
+        const band = c.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = f; band.Q.value = q;
+        const gain = c.createGain(); gain.gain.value = g; band.connect(gain).connect(this.choir!); return band;
+      });
+      [146.8, 147.6, 174.6, 220, 220.9, 293.7].forEach((f, i) => {
+        const o = c.createOscillator(); o.type = "sawtooth"; o.frequency.value = f;
+        const vib = c.createOscillator(); vib.frequency.value = 4.6 + i * .3; const depth = c.createGain(); depth.gain.value = 5 + i;
+        vib.connect(depth).connect(o.detune); vib.start();
+        const breath = c.createOscillator(); breath.frequency.value = .07 + i * .019; const swell = c.createGain(); swell.gain.value = .015;
+        const voice = c.createGain(); voice.gain.value = .022; breath.connect(swell).connect(voice.gain); breath.start();
+        o.connect(voice); formants.forEach(b => voice.connect(b)); o.start();
+      });
+      this.choir.connect(this.buses.music); this.choir.connect(this.reverbIn);
       this.wolf = this.panner(1.5, 30); this.wolf.connect(this.buses.creature);
     }
     await this.context.resume();
@@ -71,6 +86,8 @@ export class VillageAudio {
   }
 
   private reverbIn: GainNode | null = null;
+  private choir: GainNode | null = null;
+  private abbeyHunt = false;
 
   private panner(ref: number, max: number) {
     const p = this.context!.createPanner();
@@ -166,7 +183,7 @@ export class VillageAudio {
     else void this.context.suspend().catch(() => {});
   }
 
-  spatial(player: { x: number; z: number }, yaw: number, wolf: { x: number; z: number }) {
+  spatial(player: { x: number; z: number }, yaw: number, wolf: { x: number; z: number }, interior = 0) {
     const c = this.context;
     if (!c || !this.buses) return;
     const t = c.currentTime, L = c.listener;
@@ -182,12 +199,16 @@ export class VillageAudio {
     this.loops.get(`waterfall@${FALLS.x}`)?.gain.gain.setTargetAtTime(Math.max(0, 1 - fallsDistance / 38) * .95, t, .8);
     const atFire = Math.hypot(player.x - COUNCIL.x, player.z - COUNCIL.z) < 9;
     this.loops.get("music/explore_dark_ambience_loop@")?.gain.gain.setTargetAtTime(this.tension > 0 ? .15 : atFire ? .35 : .8, t, 1.5);
-    this.loops.get("music/tension_suspense_loop@")?.gain.gain.setTargetAtTime(this.tension > 0 && !this.hunting ? .9 : this.hunting ? .45 : 0, t, 1.2);
-    this.loops.get("music/chase_drums_loop@")?.gain.gain.setTargetAtTime(this.hunting ? .9 : 0, t, .6);
+    this.loops.get("music/tension_suspense_loop@")?.gain.gain.setTargetAtTime(this.tension > 0 && !this.hunting ? .9 : this.hunting || this.abbeyHunt ? .45 : 0, t, 1.2);
+    this.loops.get("music/chase_drums_loop@")?.gain.gain.setTargetAtTime(this.hunting || this.abbeyHunt ? .9 : 0, t, .6);
+    // Under stone roofs: longer reverb, muffled weather, and the sisters' choir.
+    this.buses.reverb.gain.setTargetAtTime(.5 + interior * 1.1, t, .6);
+    this.buses.amb.gain.setTargetAtTime(.55 * (1 - interior * .65), t, .6);
+    this.choir?.gain.setTargetAtTime(interior * (this.abbeyHunt ? .05 : .32), t, 1.2);
     // Ambient scheduler and heartbeat run off the audio clock, so pause freezes them.
     for (const event of this.schedule) if (t >= event.at) { event.play(); event.at = t + event.every[0] + Math.random() * (event.every[1] - event.every[0]); }
-    if (this.hunting && t >= this.heartbeat) {
-      const distance = Math.hypot(wolf.x - player.x, wolf.z - player.z);
+    if ((this.hunting || this.abbeyHunt) && t >= this.heartbeat) {
+      const distance = this.abbeyHunt ? 4 : Math.hypot(wolf.x - player.x, wolf.z - player.z);
       this.oneShot("sfx/heartbeat_single", .8, undefined, 1, 1, this.buses.sfx, 0);
       this.heartbeat = t + Math.max(.42, Math.min(1.1, distance / 9));
     }
@@ -213,14 +234,20 @@ export class VillageAudio {
   speak() { this.oneShot("sfx/cloth_rustle", .7, undefined, 1, 1, undefined, .05); }
   bell() { this.oneShot("sfx/church_bell_toll", .8, { x: CHAPEL.x, y: 12, z: CHAPEL.z - 2.7 }, 12, .92); }
   abbey(cue: AbbeyCue, source: { x: number; z: number }) {
-    const at = { x: source.x, z: source.z, y: cue === "chain" ? 4 : 1.6 };
-    if (cue === "crows") {
-      this.oneShot("sfx/crow_caw", .54, at, 5);
-      this.oneShot("sfx/cloth_whoosh_1", .35, at, 4, 1.4);
-    } else if (cue === "bell") {
-      this.oneShot("sfx/church_bell_toll", .44, at, 3, 1.24, undefined, .52);
-    } else if(cue === "toll") this.oneShot("sfx/church_bell_toll", .65, {...at,y:.2}, 6, .58, undefined, .8);
-    else this.oneShot("sfx/chain_rattle", .45, at, 4, .72);
+    const at = { x: source.x, z: source.z, y: 1.6 };
+    const music = this.buses?.music;
+    if (cue === "crows") { this.oneShot("sfx/crow_caw", .6, { ...at, y: 2 }, 5); this.oneShot("sfx/crow_caw", .4, { ...at, x: at.x + 3, y: 3 }, 5, 1.15, undefined, .3, .35); this.oneShot("sfx/cloth_whoosh_1", .4, at, 4, 1.4); }
+    if (cue === "bell") this.oneShot("sfx/church_bell_toll", .32, at, 2.5, 2.1, undefined, .4);
+    if (cue === "rope") { this.oneShot("sfx/chain_rattle", .5, { ...at, y: 5.5 }, 4, .6); this.oneShot("sfx/door_creak", .5, { ...at, y: 5 }, 4, .7, undefined, .5, .6); }
+    if (cue === "vanish") { this.oneShot("sfx/breath_heavy", .5, at, 2, .75, undefined, .7); this.oneShot("music/stinger_piano_shock", .4, undefined, 1, .9, music, .4); }
+    if (cue === "ring") {
+      this.oneShot("sfx/church_bell_toll", 1.4, { ...at, y: 9 }, 14, .62, undefined, .9);
+      this.oneShot("sfx/church_bell_toll", 1.1, { ...at, y: 9 }, 14, .62, undefined, .9, 2.4);
+      for (let i = 0; i < 6; i++) this.oneShot("sfx/church_bell_toll", .3, { x: -53 + (i % 2 ? 4 : -4), y: 1.6, z: -84 - i * 2.5 }, 6, 2 + i * .07, undefined, .5, 1.2 + i * .35);
+    }
+    if (cue === "hunt") { this.abbeyHunt = true; this.heartbeat = 0; this.oneShot("music/stinger_horror", .8, undefined, 1, .85, music, .3); this.oneShot("sfx/breath_heavy", .6, at, 3, .6, undefined, .8); }
+    if (cue === "banished") { this.abbeyHunt = false; for (let i = 0; i < 4; i++) this.oneShot("sfx/crow_caw", .55, { ...at, y: 2 + i }, 5, .9 + i * .1, undefined, .5, i * .22); this.oneShot("sfx/cloth_whoosh_1", .9, at, 3, .7); }
+    if (cue === "caught") { this.abbeyHunt = false; this.oneShot("music/stinger_piano_shock", .9, undefined, 1, .7, music, .5); this.oneShot("sfx/candle_blow_out", 1.2, undefined, 1, .8); }
   }
   whisper() {
     // A breath right behind the player's shoulder.

@@ -10,15 +10,15 @@ import { createAssets } from "./assets";
 import { buildArchitecture } from "./architecture";
 import { buildNature } from "./nature";
 import { buildWilderness } from "./wilderness";
-import { buildAbbey, type AbbeyCue } from "./abbey";
-import { ABBEY_TRAIL } from "./world";
+import { buildAbbey, type AbbeyCue, type AbbeyFrame } from "./abbey";
+import { ABBEY_TRAIL, BELFRY_TOP, BELL, TOWER } from "./world";
 import { buildDressing, COUNCIL_CHAIRS, COUNCIL_SEAT_HEIGHT } from "./dressing";
 import { createAtmosphere, FOG_COLOR, MOON_DIRECTION } from "./atmosphere";
 import { createPost } from "./post";
 import { createCast, handLantern, patrol, seated, standing, type CharacterName, type Villager, type Character } from "./characters";
 
 export type NearbyVillager = { id: string; name: string; line: string };
-export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number; district: string; villager: NearbyVillager | null; loading: number };
+export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number; district: string; villager: NearbyVillager | null; loading: number; abbey: Omit<AbbeyFrame, "interior"> };
 export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[]; view: CameraView; traveller: TravellerName; running: boolean };
 type SceneEvents = {
   abbey: (cue: AbbeyCue, source: Point) => void;
@@ -29,7 +29,7 @@ type SceneEvents = {
   step: (running: boolean, surface: Surface) => void;
   omen: () => void;
   encounter: (phase: EncounterPhase) => void;
-  spatial: (player: Point, yaw: number, wolf: Point) => void;
+  spatial: (player: Point, yaw: number, wolf: Point, interior: number) => void;
   thunder: (delay: number, strength: number) => void;
   error: () => void;
 };
@@ -58,6 +58,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   timer.connect(document);
   let settings: SceneSettings = { playing: false, lantern: true, reducedMotion: false, brightness: 1, found: [], view: "first", traveller: "woodsman_man", running: false };
   let jump = groundedJump(), jumpRequested = false, facing = Math.PI;
+  let ringRequested = false, interior = 0;
+  let abbeyFrame: AbbeyFrame = { phase: "dormant", ward: 0, bell: null, interior: 0 };
   let point = { ...SPAWN };
   let velocity = { x: 0, z: 0 };
   let yaw = 0;
@@ -86,7 +88,8 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   assets.environment(env => { scene.environment = env; });
 
   // Moonlight follows the player so a tight shadow frustum stays sharp across the larger map.
-  scene.add(new THREE.HemisphereLight("#9fb6c4", "#2a2e26", .55));
+  const hemi = new THREE.HemisphereLight("#9fb6c4", "#2a2e26", .55);
+  scene.add(hemi);
   const moonLight = new THREE.DirectionalLight("#b9cede", 1.9);
   moonLight.castShadow = true;
   moonLight.shadow.mapSize.setScalar(quality === "high" ? 2048 : 1024);
@@ -103,7 +106,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   const abbey = buildAbbey(scene, assets, cast);
   dressing.lampPoints.push(...abbey.lamps);
   dressing.lampPoints.push(...wilderness.lampPoints);
-  const atmosphere = createAtmosphere(scene, [...architecture.glows, ...dressing.lampPoints.map(position => ({ position, color: new THREE.Color("#ffae5a"), size: 2.2 }))], architecture.chimneys);
+  const atmosphere = createAtmosphere(scene, [...architecture.glows, ...abbey.glows, ...dressing.lampPoints.map(position => ({ position, color: new THREE.Color("#ffae5a"), size: 2.2 }))], architecture.chimneys);
   const keepsakes = createKeepsakes(scene, architecture.materials.door);
   const fire = createCouncilFire(scene, COUNCIL.z);
   const traveller = createTraveller(scene, cast, events.avatarError);
@@ -271,7 +274,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
       const k = 1 - Math.exp(-dt * (length > 0 ? 10 : 14));
       velocity = { x: velocity.x + (want.x - velocity.x) * k, z: velocity.z + (want.z - velocity.z) * k };
       if (Math.hypot(velocity.x, velocity.z) > .02) {
-        const next = movePlayer(point, velocity.x * dt, velocity.z * dt, [...creature.obstacles(), ...villagerObstacles()], jump.height);
+        const next = movePlayer(point, velocity.x * dt, velocity.z * dt, [...creature.obstacles(), ...villagerObstacles(), ...abbey.obstacles()], jump.height);
         const distance = Math.hypot(next.x - point.x, next.z - point.z);
         moving = distance > .001; footDistance += distance; bob += distance; point = next;
         if (moving) facing = Math.atan2(velocity.x, velocity.z);
@@ -362,23 +365,28 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     fire.update(world, camera, settings.reducedMotion);
     dressing.update(world, settings.reducedMotion);
     wilderness.update(elapsed, settings.reducedMotion);
-    if (settings.playing) abbey.update(elapsed, point, jump.height, moving && running, settings.reducedMotion, events.abbey);
-    const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); });
-    moonLight.intensity = 1.9 + flash * 9;
-    const danger = ["hunting", "pouncing"].includes(encounter.phase) ? 1 : ["feeding", "transforming"].includes(encounter.phase) ? .45 : 0;
+    abbeyFrame = abbey.update(elapsed, { p: point, height: jump.height, yaw, running: moving && running, reduced: settings.reducedMotion, lantern: settings.lantern, playing: settings.playing, found: settings.found, ring: ringRequested }, events.abbey);
+    ringRequested = false;
+    // Under the abbey roofs the sky stops lighting you: only candles and your lantern remain.
+    interior += (abbeyFrame.interior - interior) * Math.min(1, dt * 2.5);
+    hemi.intensity = .55 * (1 - interior * .82);
+    scene.environmentIntensity = .32 * (1 - interior * .8);
+    const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); }, interior);
+    moonLight.intensity = (1.9 + flash * 9) * (1 - interior * .6);
+    const danger = ["hunting", "pouncing"].includes(encounter.phase) || abbeyFrame.phase === "hunting" ? 1 : ["feeding", "transforming"].includes(encounter.phase) || abbeyFrame.phase === "tolling" ? .45 : 0;
     post.grade.danger.value += (danger - post.grade.danger.value) * Math.min(1, dt * 2);
     post.grade.time.value = world;
     post.grade.grain.value = settings.reducedMotion ? .3 : 1;
 
     if (world - lastSnapshot > .12) {
-      events.spatial(point, yaw, wolfPosition);
+      events.spatial(point, yaw, wolfPosition, interior);
       const active = encounterActive(encounter.phase);
       events.snapshot({
         point: { ...point }, bearing: ((-yaw * 180 / Math.PI) % 360 + 360) % 360,
         nearby: active || !jump.grounded ? null : nearbyLandmark(point, settings.found)?.id ?? null,
         council: !active && jump.grounded && jump.height < .1 && atCouncil(point), moving, encounter: encounter.phase, ward: encounter.lightTime / 2.6,
         district: districtAt(point), villager: active || !nearestVillager ? null : { id: nearestVillager.id, name: nearestVillager.name, line: nearestVillager.line },
-        loading: loadProgress,
+        loading: loadProgress, abbey: { phase: abbeyFrame.phase, ward: abbeyFrame.ward, bell: abbeyFrame.bell },
       });
       lastSnapshot = world;
     }
@@ -390,6 +398,7 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     (window as unknown as { __village?: unknown }).__village = {
       teleport(x: number, z: number, y = 0, p = -.035) { point = { x, z }; yaw = y; facing = y + Math.PI; pitch = p; velocity = { x: 0, z: 0 }; jump = groundedJump(); },
       state: () => ({ point: { ...point }, jump: { ...jump }, view: settings.view, traveller: settings.traveller, camera: camera.position.toArray(), playing: settings.playing, encounter: { ...encounter } }),
+      keeper(anchor: number) { abbey.debugStalk(anchor); },
       breakdown() {
         const rows: [string, number, number, boolean][] = [];
         scene.traverse(o => {
@@ -407,6 +416,13 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   }
 
   return {
+    ringBell() { if (settings.playing) ringRequested = true; },
+    retryAbbey() {
+      abbey.retry();
+      point = { x: BELL.x - .6, z: TOWER.z }; velocity = { x: 0, z: 0 };
+      jump = { height: BELFRY_TOP, velocity: 0, grounded: true };
+      yaw = Math.PI / 2; facing = yaw + Math.PI; pitch = -.18; clearInput();
+    },
     startAtAbbey() {
       const [fork, trail] = ABBEY_TRAIL;
       point = { ...fork };

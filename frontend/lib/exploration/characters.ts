@@ -125,6 +125,17 @@ export class Character {
     apply(this.spine, .15); apply(this.neck, .35); apply(this.head, .5);
   }
 
+  /** Rotate one bone about a world-space axis (after the mixer has posed it this frame). */
+  turnBone(name: string, axis: THREE.Vector3, angle: number) {
+    const bone = this.bones.get(name);
+    if (!bone?.parent) return;
+    this.root.updateMatrixWorld(true);
+    const parentWorld = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+    const world = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+    bone.quaternion.premultiply(parentWorld.clone().invert().multiply(world).multiply(parentWorld));
+    bone.updateMatrixWorld(true);
+  }
+
   /** Parent a prop to a bone, cancelling the rig's import scale so `object.scale` stays in metres. */
   attach(boneName: string, object: THREE.Object3D, offset = new THREE.Vector3()) {
     const bone = this.bones.get(boneName);
