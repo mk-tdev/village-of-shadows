@@ -4,6 +4,9 @@ import type { Glow } from "./architecture";
 const seeded = (i: number, salt = 1) => ((Math.sin(i * 127.1 + salt * 311.7) * 43758.5453) % 1 + 1) % 1;
 export const MOON_DIRECTION = new THREE.Vector3(.32, .42, -1).normalize();
 export const FOG_COLOR = new THREE.Color("#26343b");
+/** Daytime: a high late-morning sun and a pale, slightly hazy horizon. */
+export const SUN_DIRECTION = new THREE.Vector3(.45, .78, -.42).normalize();
+export const DAY_FOG_COLOR = new THREE.Color("#a3bfd2");
 
 function softSprite(size = 128) {
   const canvas = document.createElement("canvas"); canvas.width = canvas.height = size;
@@ -18,14 +21,14 @@ function softSprite(size = 128) {
 export function createAtmosphere(scene: THREE.Scene, glows: Glow[], chimneys: THREE.Vector3[]) {
   const disposables: { dispose(): void }[] = [];
   const track = <T extends { dispose(): void }>(d: T) => { disposables.push(d); return d; };
-  const uniforms = { time: { value: 0 }, flash: { value: 0 }, moonDir: { value: MOON_DIRECTION }, horizon: { value: FOG_COLOR.clone() } };
+  const uniforms = { time: { value: 0 }, flash: { value: 0 }, moonDir: { value: MOON_DIRECTION }, sunDir: { value: SUN_DIRECTION }, horizon: { value: FOG_COLOR.clone() }, day: { value: 0 } };
 
   // Sky dome: gradient, fbm clouds lit from behind by the moon, stars in the gaps.
   const sky = new THREE.Mesh(track(new THREE.SphereGeometry(400, 48, 24)), track(new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false, uniforms,
     vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w; }`,
     fragmentShader: `
-      varying vec3 vDir; uniform float time; uniform float flash; uniform vec3 moonDir; uniform vec3 horizon;
+      varying vec3 vDir; uniform float time; uniform float flash; uniform vec3 moonDir; uniform vec3 sunDir; uniform vec3 horizon; uniform float day;
       float hash(vec3 p){ p = fract(p * .3183099 + .1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
         return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
@@ -49,6 +52,16 @@ export function createAtmosphere(scene: THREE.Scene, glows: Glow[], chimneys: TH
         col = mix(col + star * vec3(.8, .85, 1.) * .7, mix(vec3(.05, .065, .08), vec3(.35, .42, .48), lit), clouds * .92);
         col += disc * vec3(.86, .9, .92) * (1. - clouds * .85);
         col += flash * vec3(.55, .62, .75) * (.4 + clouds);
+        // Daytime sky: blue zenith, hazy horizon, sun glow and white, sun-lit cumulus.
+        if (day > 0.) {
+          float s = max(dot(d, sunDir), 0.);
+          vec3 sky = mix(horizon * 1.2, vec3(.09, .28, .68), pow(smoothstep(-.02, .5, h), .75));
+          sky += vec3(1., .86, .62) * (pow(s, 8.) * .25 + pow(s, 90.) * .6) + vec3(1., .97, .9) * smoothstep(.9993, .9996, s) * 4.;
+          float dc = smoothstep(.5, .8, c) * smoothstep(-.02, .2, h);
+          vec3 cloud = mix(vec3(.62, .66, .72), vec3(1.08, 1.05, 1.), smoothstep(.5, .9, c) * .6 + pow(s, 4.) * .4);
+          sky = mix(sky, cloud, dc * .85);
+          col = mix(col, sky, day);
+        }
         gl_FragColor = vec4(col, 1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -119,14 +132,20 @@ export function createAtmosphere(scene: THREE.Scene, glows: Glow[], chimneys: TH
   return {
     uniforms,
     /** Returns lightning brightness (0..1) so the caller can lift scene lights in sync. */
-    update(time: number, camera: THREE.Camera, reduced: boolean, onThunder: (delay: number, strength: number) => void, shelter = 0) {
+    update(time: number, camera: THREE.Camera, reduced: boolean, onThunder: (delay: number, strength: number) => void, shelter = 0, day = 0) {
       uniforms.time.value = time;
+      uniforms.day.value = day;
+      uniforms.horizon.value.copy(FOG_COLOR).lerp(DAY_FOG_COLOR, day);
+      halos.forEach(s => { s.material.opacity = .16 * (1 - day * .85); });
+      mist.forEach((s, i) => { s.material.opacity = (.08 + seeded(i, 7) * .07) * (1 - day * .6); });
       sky.position.copy(camera.position);
       rainUniforms.center.value.copy(camera.position);
-      rain.visible = !reduced && shelter < .35;
+      rain.visible = !reduced && shelter < .35 && day < .5;
       mist.forEach((s, i) => { if (!reduced) s.position.x += Math.sin(time * .05 + i) * .004; });
       let flash = 0;
-      if (!reduced) {
+      // Clear days have no storm: lightning waits until night falls again.
+      if (day > .5) nextFlash = Math.max(nextFlash, time + 8);
+      if (!reduced && day <= .5) {
         if (time > nextFlash) {
           flashStart = time; nextFlash = time + 35 + seeded(Math.floor(time), 3) * 50;
           const strength = .5 + seeded(Math.floor(time), 4) * .5;

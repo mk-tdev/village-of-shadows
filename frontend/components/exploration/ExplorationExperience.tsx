@@ -27,6 +27,7 @@ import styles from "./exploration.module.css";
 
 type Mode = "intro" | "playing" | "paused" | "journal" | "clue" | "complete" | "restart" | "caught" | "abbeyCaught" | "traveller";
 const STORAGE_KEY = "village:prologue:seals:v1";
+const DAYTIME_KEY = "village:explore:daytime";
 const DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
 function LanternIcon() {
@@ -42,6 +43,10 @@ function Modal({ children, onClose, title, focusTop = false }: { children: React
     return () => dialog?.close();
   }, [focusTop]);
   return <dialog ref={ref} tabIndex={-1} className={styles.modal} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>{children}</dialog>;
+}
+
+function readDaytime() {
+  try { return localStorage.getItem(DAYTIME_KEY) === "day"; } catch { return false; }
 }
 
 function readSavedSeals() {
@@ -65,6 +70,7 @@ export default function ExplorationExperience() {
   const [view, setView] = useState<CameraView>("first");
   const [traveller, setTraveller] = useState<TravellerName>("woodsman_man");
   const [running, setRunning] = useState(false);
+  const [daytime, setDaytime] = useState(readDaytime);
   const travellerReturn = useRef<"intro" | "paused">("intro");
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -160,9 +166,10 @@ export default function ExplorationExperience() {
   }, []);
 
   useEffect(() => {
-    sceneRef.current?.configure({ playing: playing && !failed, lantern, reducedMotion, brightness, found, view, traveller, running });
+    sceneRef.current?.configure({ playing: playing && !failed, lantern, reducedMotion, brightness, found, view, traveller, running, daytime });
+    audioRef.current?.setDaytime(daytime);
     audioRef.current?.setActive(playing && sound && !failed);
-  }, [playing, lantern, reducedMotion, brightness, found, sound, failed, view, traveller, running]);
+  }, [playing, lantern, reducedMotion, brightness, found, sound, failed, view, traveller, running, daytime]);
 
   const lanternWas = useRef(lantern);
   useEffect(() => {
@@ -197,13 +204,20 @@ export default function ExplorationExperience() {
     setSound(next);
   }
 
+  function toggleDaytime() {
+    const next = !daytime;
+    setDaytime(next);
+    try { localStorage.setItem(DAYTIME_KEY, next ? "day" : "night"); } catch { /* Applies for this visit only. */ }
+    canvasRef.current?.focus();
+  }
+
   function restart() {
     setFound([]); setClue(null); setNotice(""); setLantern(true); setWitnessed(false); setAbbeyWitnessed(false);
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* In-memory reset still works. */ }
     sceneRef.current?.reset(); resume();
   }
 
-  return <main className={styles.experience} data-mode={mode} data-reduced-motion={reducedMotion} data-encounter={snapshot.abbey.phase === "hunting" ? "hunting" : encounter}
+  return <main className={styles.experience} data-mode={mode} data-reduced-motion={reducedMotion} data-daytime={daytime} data-encounter={snapshot.abbey.phase === "hunting" ? "hunting" : encounter}
     onContextMenuCapture={event => { if (event.target instanceof Element && event.target.closest("button")) event.preventDefault(); }}
     onDragStartCapture={event => { if (event.target instanceof Element && event.target.closest("button")) event.preventDefault(); }}>
     <canvas ref={canvasRef} className={styles.canvas} tabIndex={0} aria-label="Explore the village. W A S D to walk, Shift to run, Space to jump, V to switch camera, arrow left and right to turn, E to examine, F for lantern, J for journal. Drag to look or click nearby ground to walk." />
@@ -212,6 +226,7 @@ export default function ExplorationExperience() {
       <Link href="/" className={styles.brand}>{t("Village of Shadows")}<span>{t("The last light")}</span></Link>
       {mode !== "intro" && <div className={styles.compass} aria-label={`Facing ${bearing}`}><span>· · · ─────</span><b>{bearing}</b><span>───── · · ·</span><i>◆</i></div>}
       <nav aria-label="Exploration controls" className={styles.topControls}>
+        <button onClick={toggleDaytime} role="switch" aria-checked={daytime} aria-label="Daytime" title={daytime ? "Switch to night" : "Switch to day"}><span aria-hidden="true">{daytime ? "☀" : "☾"}</span> {daytime ? "Day" : "Night"}</button>
         <button onClick={toggleSound} aria-pressed={sound}>{sound ? t("Sound on") : t("Sound off")}</button>
         {mode !== "intro" && <button onClick={() => setMode("paused")}>{t("Pause")} <kbd>Esc</kbd></button>}
       </nav>
@@ -277,6 +292,7 @@ export default function ExplorationExperience() {
       <div className={styles.settings}>
         <label>Lantern light <input type="checkbox" checked={lantern} onChange={e => setLantern(e.target.checked)} /></label>
         <label>Sound <input type="checkbox" checked={sound} onChange={toggleSound} /></label>
+        <label>Daytime <input type="checkbox" checked={daytime} onChange={toggleDaytime} /></label>
         <label>Reduced motion <input type="checkbox" checked={reducedMotion} onChange={e => setReducedMotion(e.target.checked)} /></label>
         <label htmlFor="brightness">Brightness <span>{Math.round(brightness * 100)}%</span></label><input id="brightness" type="range" min="0.7" max="1.8" step="0.1" value={brightness} onChange={e => setBrightness(Number(e.target.value))} />
       </div>

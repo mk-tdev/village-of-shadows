@@ -14,24 +14,24 @@ import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null }, time: { value: 0 }, danger: { value: 0 }, grain: { value: 1 },
-    resolution: { value: new THREE.Vector2(1, 1) }, fade: { value: 0 },
+    resolution: { value: new THREE.Vector2(1, 1) }, fade: { value: 0 }, day: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float time; uniform float danger; uniform float grain; uniform float fade; uniform vec2 resolution; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float time; uniform float danger; uniform float grain; uniform float fade; uniform float day; uniform vec2 resolution; varying vec2 vUv;
     float rand(vec2 co){ return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
       vec2 c = vUv - .5; float r = length(c);
       float ca = (.0016 + danger * .004) * r;
       vec3 col = vec3(texture2D(tDiffuse, vUv + c * ca).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - c * ca).b);
       float l = dot(col, vec3(.2126, .7152, .0722));
-      vec3 shadowTint = vec3(.86, 1.0, 1.06), highTint = vec3(1.08, 1.0, .88);
+      vec3 shadowTint = mix(vec3(.86, 1.0, 1.06), vec3(.97, 1.0, 1.02), day), highTint = vec3(1.08, 1.0, .88);
       col *= mix(shadowTint, highTint, smoothstep(.05, .6, l));
-      col = mix(vec3(l), col, .88 - danger * .35);
+      col = mix(vec3(l), col, .88 + day * .34 - danger * .35);
       col = col * .97 + vec3(.008, .011, .013);
       col = mix(col, col * vec3(1.25, .55, .5), danger * (.25 + .15 * sin(time * 5.5)));
       float v = smoothstep(.95, .28, r * (1. + danger * .25));
-      col *= mix(.38, 1., v);
+      col *= mix(mix(.38, .78, day), 1., v);
       col += (rand(vUv * resolution + fract(time * 17.)) - .5) * .045 * grain;
       col *= 1. - fade;
       gl_FragColor = vec4(col, 1.);

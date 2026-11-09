@@ -32,6 +32,7 @@ export class VillageAudio {
   private lastStep = 0;
   private schedule: { at: number; play: () => void; every: [number, number] }[] = [];
   private heartbeat = 0;
+  private daytime = false;
 
   async start() {
     if (!this.context) {
@@ -150,7 +151,7 @@ export class VillageAudio {
           this.oneShot("sfx/breath_heavy", .12, { x: RUINS.x - 5, y: 1, z: RUINS.z }, 2, .65, undefined, .6, 2);
         }
       } },
-      { at: now + rnd(8, 16), every: [22, 45], play: () => this.oneShot("sfx/owl_hoot", .5, edge(), 6) },
+      { at: now + rnd(8, 16), every: [22, 45], play: () => { if (!this.daytime) this.oneShot("sfx/owl_hoot", .5, edge(), 6); } },
       { at: now + rnd(20, 40), every: [30, 60], play: () => this.oneShot("sfx/crow_caw", .45, { x: -24 + rnd(-6, 6), y: 6, z: -32 + rnd(-8, 8) }, 6) },
       { at: now + rnd(40, 70), every: [70, 130], play: () => this.oneShot("sfx/wolf_howl_distant_echo", .45, edge(), 20, rnd(.85, 1)) },
       { at: now + rnd(25, 50), every: [35, 80], play: () => this.oneShot(Math.random() < .5 ? "sfx/shutter_bang" : "sfx/door_creak", .7, { x: this.listener.x + rnd(-14, 14), y: 2.5, z: this.listener.z + rnd(-14, 14) }, 3) },
@@ -176,6 +177,8 @@ export class VillageAudio {
     source.onended = () => { source.disconnect(); g.disconnect(); panner?.disconnect(); send?.disconnect(); };
   }
 
+  setDaytime(daytime: boolean) { this.daytime = daytime; }
+
   setActive(active: boolean) {
     if (!this.context || !this.master) return;
     this.master.gain.setTargetAtTime(active ? .9 : 0, this.context.currentTime, .12);
@@ -194,7 +197,9 @@ export class VillageAudio {
     if (this.wolf) this.place(this.wolf, { x: wolf.x, y: 1.1, z: wolf.z });
     // Forest night swells near the palisade; the music bed recedes near the fire.
     const edge = Math.min(player.x - VILLAGE_BOUNDS.minX, VILLAGE_BOUNDS.maxX - player.x, player.z - VILLAGE_BOUNDS.minZ, VILLAGE_BOUNDS.maxZ - player.z);
-    this.loops.get("amb/forest_night_crickets_owl@")?.gain.gain.setTargetAtTime(Math.min(.65, Math.max(.08, .6 - edge * .04)), t, 1);
+    // By day the rain has passed and the night insects are silent; wind and creaking trees remain.
+    this.loops.get("amb/forest_night_crickets_owl@")?.gain.gain.setTargetAtTime(this.daytime ? 0 : Math.min(.65, Math.max(.08, .6 - edge * .04)), t, 1);
+    this.loops.get("amb/rain_light@")?.gain.gain.setTargetAtTime(this.daytime ? 0 : .32, t, 1.5);
     const fallsDistance = Math.hypot(player.x - FALLS.x, player.z - FALLS.z);
     this.loops.get(`waterfall@${FALLS.x}`)?.gain.gain.setTargetAtTime(Math.max(0, 1 - fallsDistance / 38) * .95, t, .8);
     const atFire = Math.hypot(player.x - COUNCIL.x, player.z - COUNCIL.z) < 9;

@@ -161,7 +161,14 @@ soundscape. Ambient fire and sky effects can continue. Opening the journal
 or a clue also freezes gameplay while you read. Switching
 away from the page pauses automatically, so a held key cannot leave you moving.
 
-The pause menu has brightness, sound, and reduced-motion controls. Reduced
+The **Day / Night** switch at the top of the screen (also in the pause menu)
+turns the whole village to a clear day: a sunlit blue sky, long shadows, thin
+haze, dimmed lamps, and no rain, lightning, crickets or owls. The village fades
+between the two over about a second, or switches at once with reduced motion.
+Your choice is remembered on this device. The abbey's chapel, bone chapel and
+belfry stay dim indoors by day, and every encounter plays the same way.
+
+The pause menu has daytime, brightness, sound, and reduced-motion controls. Reduced
 motion starts from your system preference and removes head bob, lantern sway,
 rain, moving fog, light variation, and the brief visual apparition. Its story
 cue remains readable. Reduced motion also removes transformation tremor, the

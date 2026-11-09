@@ -113,6 +113,8 @@
 .ward meter::-webkit-meter-optimum-value { background: #dcc28d; }
 .witness { border-top: 1px solid var(--line); padding-top: 20px; }
 .witness h3 { font-weight: 400; font-size: 20px; }
+/* By day the frame needs far less darkening; the intro keeps its vignette so the title stays legible. */
+.experience[data-daytime="true"]:not([data-mode="intro"]) .vignette { opacity: .45; }
 .experience[data-encounter="hunting"] .vignette { box-shadow: inset 0 0 130px #35100e88; }
 @media (max-width: 600px) { .encounter { top: 120px; } .encounter h2 { font-size: 25px; } .encounter p { font-size: 11px; max-width: 310px; } }
 @media (max-height: 600px) and (min-width: 601px) { .encounter { top: 75px; } .encounter h2 { font-size: 25px; } .encounter p { max-width: 490px; font-size: 11px; } }

@@ -13,13 +13,13 @@ import { buildWilderness } from "./wilderness";
 import { buildAbbey, type AbbeyCue, type AbbeyFrame } from "./abbey";
 import { ABBEY_TRAIL, BELFRY_TOP, BELL, TOWER } from "./world";
 import { buildDressing, COUNCIL_CHAIRS, COUNCIL_SEAT_HEIGHT } from "./dressing";
-import { createAtmosphere, FOG_COLOR, MOON_DIRECTION } from "./atmosphere";
+import { createAtmosphere, DAY_FOG_COLOR, FOG_COLOR, MOON_DIRECTION, SUN_DIRECTION } from "./atmosphere";
 import { createPost } from "./post";
 import { createCast, handLantern, patrol, seated, standing, type CharacterName, type Villager, type Character } from "./characters";
 
 export type NearbyVillager = { id: string; name: string; line: string };
 export type SceneSnapshot = { point: Point; bearing: number; nearby: string | null; council: boolean; moving: boolean; encounter: EncounterPhase; ward: number; district: string; villager: NearbyVillager | null; loading: number; abbey: Omit<AbbeyFrame, "interior"> };
-export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[]; view: CameraView; traveller: TravellerName; running: boolean };
+export type SceneSettings = { playing: boolean; lantern: boolean; reducedMotion: boolean; brightness: number; found: string[]; view: CameraView; traveller: TravellerName; running: boolean; daytime: boolean };
 type SceneEvents = {
   abbey: (cue: AbbeyCue, source: Point) => void;
   ready: () => void;
@@ -56,7 +56,9 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   camera.rotation.order = "YXZ";
   const timer = new THREE.Timer();
   timer.connect(document);
-  let settings: SceneSettings = { playing: false, lantern: true, reducedMotion: false, brightness: 1, found: [], view: "first", traveller: "woodsman_man", running: false };
+  let settings: SceneSettings = { playing: false, lantern: true, reducedMotion: false, brightness: 1, found: [], view: "first", traveller: "woodsman_man", running: false, daytime: false };
+  // 0 = night, 1 = day; eased so the toggle reads as the sky turning, not a cut.
+  let day = 0, dayPrimed = false;
   let jump = groundedJump(), jumpRequested = false, facing = Math.PI;
   let ringRequested = false, interior = 0;
   let abbeyFrame: AbbeyFrame = { phase: "dormant", ward: 0, bell: null, interior: 0 };
@@ -96,6 +98,11 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
   Object.assign(moonLight.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 140 });
   moonLight.shadow.bias = -.0006; moonLight.shadow.normalBias = .04;
   scene.add(moonLight, moonLight.target);
+  // Night and day endpoints for every light the time-of-day toggle blends between.
+  const NIGHT = { sky: new THREE.Color("#9fb6c4"), ground: new THREE.Color("#2a2e26"), hemi: .55, light: new THREE.Color("#b9cede"), key: 1.9, env: .32, fog: .028, exposure: 1.2, bloom: .55 };
+  const DAY = { sky: new THREE.Color("#bcd6ee"), ground: new THREE.Color("#6a5a3e"), hemi: 1.25, light: new THREE.Color("#ffe5c0"), key: 4.4, env: 1, fog: .0055, exposure: 1.05, bloom: .2 };
+  const lightDirection = new THREE.Vector3();
+  const fog = scene.fog as THREE.FogExp2;
 
   const architecture = buildArchitecture(scene, assets);
   const wind = { value: 0 };
@@ -333,21 +340,36 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     hand.position.y = -.27 + (bobOn ? Math.abs(Math.sin(stride * .5)) * .02 : 0);
     // Light, interaction and sound stay at the traveller, not the follow camera.
     lamp.position.set(point.x - Math.sin(yaw) * .6, jump.height + 1.4, point.z - Math.cos(yaw) * .6);
-    lamp.intensity = settings.lantern ? 12 + (settings.reducedMotion ? 0 : Math.sin(world * 7) * .5 + Math.sin(world * 13.3) * .3) : 0;
+    lamp.intensity = settings.lantern ? (12 + (settings.reducedMotion ? 0 : Math.sin(world * 7) * .5 + Math.sin(world * 13.3) * .3)) * (1 - day * .5) : 0;
     heldGlow.emissiveIntensity = settings.lantern ? 1 : 0;
 
     // Moon shadows centred on the player, snapped to texels to avoid shimmering.
     const texel = 64 / moonLight.shadow.mapSize.x;
     const cx = Math.round(point.x / texel) * texel, cz = Math.round(point.z / texel) * texel;
     moonLight.target.position.set(cx, 0, cz);
-    moonLight.position.set(cx + MOON_DIRECTION.x * 70, MOON_DIRECTION.y * 70, cz + MOON_DIRECTION.z * 70);
+    // The same shadow-casting light is the moon by night and the sun by day.
+    const dayTarget = settings.daytime ? 1 : 0;
+    if (!dayPrimed || settings.reducedMotion) { day = dayTarget; dayPrimed = true; }
+    else day += (dayTarget - day) * Math.min(1, dt * 1.6);
+    if (Math.abs(day - dayTarget) < .001) day = dayTarget;
+    lightDirection.copy(MOON_DIRECTION).lerp(SUN_DIRECTION, day).normalize();
+    moonLight.position.set(cx + lightDirection.x * 70, lightDirection.y * 70, cz + lightDirection.z * 70);
+    moonLight.color.copy(NIGHT.light).lerp(DAY.light, day);
+    hemi.color.copy(NIGHT.sky).lerp(DAY.sky, day);
+    hemi.groundColor.copy(NIGHT.ground).lerp(DAY.ground, day);
+    fog.color.copy(FOG_COLOR).lerp(DAY_FOG_COLOR, day);
+    fog.density = THREE.MathUtils.lerp(NIGHT.fog, DAY.fog, day);
+    renderer.toneMappingExposure = THREE.MathUtils.lerp(NIGHT.exposure, DAY.exposure, day) * settings.brightness;
+    post.bloom.strength = THREE.MathUtils.lerp(NIGHT.bloom, DAY.bloom, day);
+    post.grade.day.value = day;
 
     lightClock -= dt;
     if (lightClock <= 0) { lightSites = assignLights(); lightClock = .3; }
     pool.forEach((slot, i) => {
       if (slot.site >= 0 && lightSites[slot.site]) slot.light.position.copy(lightSites[slot.site]);
       const flicker = settings.reducedMotion ? 0 : Math.sin(world * 5 + i * 1.7) * 1.1 + Math.sin(world * 11.3 + i) * .5;
-      const goal = slot.target > 0 ? slot.target + flicker : 0;
+      // Lamps still burn by day, but the sun drowns most of their reach.
+      const goal = slot.target > 0 ? (slot.target + flicker) * (1 - day * .75) : 0;
       slot.light.intensity += (goal - slot.light.intensity) * Math.min(1, dt * 5);
     });
 
@@ -369,14 +391,14 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     ringRequested = false;
     // Under the abbey roofs the sky stops lighting you: only candles and your lantern remain.
     interior += (abbeyFrame.interior - interior) * Math.min(1, dt * 2.5);
-    hemi.intensity = .55 * (1 - interior * .82);
-    scene.environmentIntensity = .32 * (1 - interior * .8);
-    const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); }, interior);
-    moonLight.intensity = (1.9 + flash * 9) * (1 - interior * .6);
+    hemi.intensity = THREE.MathUtils.lerp(NIGHT.hemi, DAY.hemi, day) * (1 - interior * .82);
+    scene.environmentIntensity = THREE.MathUtils.lerp(NIGHT.env, DAY.env, day) * (1 - interior * .8);
+    const flash = atmosphere.update(world, camera, settings.reducedMotion, (delay, strength) => { if (settings.playing) events.thunder(delay, strength); }, interior, day);
+    moonLight.intensity = (THREE.MathUtils.lerp(NIGHT.key, DAY.key, day) + flash * 9) * (1 - interior * .6);
     const danger = ["hunting", "pouncing"].includes(encounter.phase) || abbeyFrame.phase === "hunting" ? 1 : ["feeding", "transforming"].includes(encounter.phase) || abbeyFrame.phase === "tolling" ? .45 : 0;
     post.grade.danger.value += (danger - post.grade.danger.value) * Math.min(1, dt * 2);
     post.grade.time.value = world;
-    post.grade.grain.value = settings.reducedMotion ? .3 : 1;
+    post.grade.grain.value = (settings.reducedMotion ? .3 : 1) * (1 - day * .6);
 
     if (world - lastSnapshot > .12) {
       events.spatial(point, yaw, wolfPosition, interior);
@@ -434,7 +456,6 @@ export function createVillage(canvas: HTMLCanvasElement, events: SceneEvents) {
     configure(next: SceneSettings) {
       settings = next;
       traveller.select(next.traveller);
-      renderer.toneMappingExposure = 1.2 * next.brightness;
       if (!next.playing) { clearInput(); dragging = null; unlock(); }
     },
     sit() {
